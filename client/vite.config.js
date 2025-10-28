@@ -47,6 +47,13 @@ export default defineConfig({
       cert: fs.readFileSync(path.resolve(__dirname, "cert.crt"))
     },
     host: true,
-    port: 5173
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false
+      }
+    }
   }
 });

@@ -11,31 +11,26 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [createdRoom, setCreatedRoom] = useState(null);
 
-  // Detectar si viene de un link compartido con parámetro ?join=CODIGO
+  // Detectar si viene de un QR con parámetros de sala en la URL
   useEffect(() => {
-    // Con hash routing, los parámetros están en location.hash, no en location.search
-    const hash = location.hash; // Ej: "#/?join=8EBIRH"
-    const queryStart = hash.indexOf('?');
+    // Verificar si la URL actual es la home y hay un hash con room
+    const hash = window.location.hash;
+    const roomMatch = hash.match(/#\/room\/([A-Z0-9]+)\/([a-z0-9-]+)/i);
     
-    if (queryStart !== -1) {
-      const queryString = hash.substring(queryStart + 1); // "join=8EBIRH"
-      const searchParams = new URLSearchParams(queryString);
-      const joinCode = searchParams.get('join');
-      
-      if (joinCode) {
-        // Pre-llenar el código y mostrar el modo de unirse
-        setRoomCode(joinCode.toUpperCase());
-        setMode("join");
-      }
+    if (roomMatch && location.pathname === '/') {
+      const [, roomId, userId] = roomMatch;
+      // Navegar directamente a la sala
+      navigate(`/room/${roomId}/${userId}`, { replace: true });
     }
-  }, [location.hash]);
+  }, [location, navigate]);
 
   const createRoom = async () => {
     setLoading(true);
     try {
       const response = await api.post('/rooms/create');
       const roomId = response.data.roomId;
-      setCreatedRoom({ roomId });
+      const adminId = response.data.adminId;
+      setCreatedRoom({ roomId, adminId });
       setMode("created");
       if (navigator.vibrate) navigator.vibrate(50);
     } catch (error) {
@@ -51,8 +46,9 @@ export default function Home() {
     if (!roomId) return;
     setLoading(true);
     try {
-      await api.post('/rooms/' + roomId + '/join');
-      navigate('/room/' + roomId);
+      const response = await api.post('/rooms/' + roomId + '/join');
+      const playerId = response.data.playerId;
+      navigate('/room/' + roomId + '/' + playerId);
       if (navigator.vibrate) navigator.vibrate(40);
     } catch (error) {
       console.error("Error al unirse:", error);
@@ -64,7 +60,7 @@ export default function Home() {
 
   const enterAsAdmin = () => {
     if (createdRoom) {
-      navigate('/room/' + createdRoom.roomId);
+      navigate('/room/' + createdRoom.roomId + '/' + createdRoom.adminId);
     }
   };
 
@@ -76,7 +72,7 @@ export default function Home() {
 
   // Usar variable de entorno o fallback a window.location.origin
   const baseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
-  const qrValue = createdRoom ? `${baseUrl}/#/?join=${createdRoom.roomId}` : '';
+  const qrValue = createdRoom ? `${baseUrl}/#/room/${createdRoom.roomId}/${createdRoom.adminId}` : '';
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 text-center">
@@ -107,14 +103,12 @@ export default function Home() {
           
           <button 
             onClick={() => {
-              const link = `${baseUrl}/#/?join=${createdRoom.roomId}`;
-              navigator.clipboard.writeText(link);
+              navigator.clipboard.writeText(createdRoom.roomId);
               if (navigator.vibrate) navigator.vibrate(30);
-              alert(`Link copiado: ${link}`);
             }} 
             className="text-sm underline hover:text-amber-300 transition-colors"
           >
-            📋 Copiar link de invitación
+            📋 Copiar código
           </button>
 
           <button onClick={enterAsAdmin} className="mt-4 bg-emerald-500 px-8 py-3 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all">
