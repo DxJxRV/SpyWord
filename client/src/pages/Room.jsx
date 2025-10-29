@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
+import { Eye, EyeOff, Share2, QrCode, RotateCw } from "lucide-react";
 import { api } from "../services/api";
 
 export default function Room() {
@@ -15,6 +16,10 @@ export default function Room() {
   const [countdown, setCountdown] = useState(null); // Countdown en segundos
   const [countdownActive, setCountdownActive] = useState(false); // Flag para activar el countdown
   const [showQRModal, setShowQRModal] = useState(false); // Estado para modal de QR
+  const [starterName, setStarterName] = useState(null); // Nombre del jugador que inicia
+  const [previousStarterName, setPreviousStarterName] = useState(null); // Nombre anterior para comparar
+  const [previousWord, setPreviousWord] = useState(null); // Palabra anterior para comparar
+  const [wordHidden, setWordHidden] = useState(false); // Estado para ocultar/mostrar la palabra
   const nextRoundTimestamp = useRef(null); // Guardar el timestamp original
 
   useEffect(() => {
@@ -25,6 +30,7 @@ export default function Room() {
         setCurrentRound(response.data.round);
         setTotalPlayers(response.data.totalPlayers);
         setIsAdmin(response.data.isAdmin); // Ahora viene del backend
+        setStarterName(response.data.starterName); // Guardar nombre del jugador que inicia
       } catch (err) {
         console.error("Error al cargar estado:", err);
         setError("No se pudo cargar la sala");
@@ -39,8 +45,11 @@ export default function Room() {
         
         // Guardar el timestamp solo la primera vez que llega
         if (res.data.nextRoundAt && !nextRoundTimestamp.current) {
+          setWord(null); // Limpiar la palabra al reiniciar
           nextRoundTimestamp.current = res.data.nextRoundAt;
           setCountdownActive(true); // Activar el countdown
+          setPreviousStarterName(starterName); // Guardar el nombre anterior
+          console.log(`📡 Countdown recibido, starterName: ${res.data.starterName}`);
         }
         
         // Limpiar el timestamp si ya no hay countdown
@@ -51,12 +60,24 @@ export default function Room() {
         }
         
         if (res.data.round !== currentRound) {
+          
           setCurrentRound(res.data.round);
+          setPreviousWord(word); // Guardar la palabra anterior
           setWord(res.data.word);
+          setStarterName(res.data.starterName); // Actualizar nombre del jugador que inicia
+          console.log(`🔄 Nueva ronda, starterName: ${res.data.starterName}, palabra anterior: ${word}`);
           nextRoundTimestamp.current = null; // Limpiar al cambiar de ronda
           setCountdown(null);
           setCountdownActive(false);
         }
+        
+        // Siempre actualizar starterName aunque no cambie la ronda
+        if (res.data.starterName && res.data.starterName !== starterName) {
+          setPreviousStarterName(starterName); // Guardar el nombre anterior
+          setStarterName(res.data.starterName);
+          console.log(`✅ StarterName actualizado: ${res.data.starterName} (anterior: ${starterName})`);
+        }
+        
         setTotalPlayers(res.data.totalPlayers);
         setIsAdmin(res.data.isAdmin); // Actualizar estado de admin
       } catch (err) {
@@ -94,6 +115,7 @@ export default function Room() {
 
   const handleRestart = async () => {
     setLoading(true);
+    setWord(null); // Limpiar la palabra al reiniciar
     try {
       await api.post(`/rooms/${roomId}/restart`); // Ya no necesita adminId
       if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
@@ -131,18 +153,45 @@ export default function Room() {
           <p className="text-xs text-gray-400">Ronda {currentRound} • {totalPlayers} jugadores</p>
         </div>
 
+        {/* Mostrar siempre quién inicia */}
+        {starterName && (
+          <div className="bg-amber-500/20 px-4 py-2 rounded-lg border border-amber-500/30">
+            <p className="text-xs text-amber-300 mb-1">Jugador que Inicia</p>
+            {countdownActive || starterName === previousStarterName ? (
+              // Skeleton durante el countdown - letras grises pulsantes
+              <p className="text-lg font-bold text-amber-400 animate-pulse">
+                <span className=" text-amber-400/30">Loading...</span>
+              </p>
+            ) : (
+              // Mostrar nombre
+              <p className="text-lg font-bold text-amber-400">{starterName}</p>
+            )}
+          </div>
+        )}
+
         {/* Mostrar countdown si está activo */}
-        {countdown !== null && countdown > 0 ? (
+        {(countdown !== null && countdown > 0) ? (
           <div className="bg-gradient-to-br from-orange-600/30 to-red-600/30 p-12 rounded-2xl border-2 border-orange-500/50 shadow-[0_0_40px_rgba(251,146,60,0.5)] animate-pulse">
-            <p className="text-sm text-orange-300 mb-3">⏳ Nueva ronda en:</p>
-            <h1 className="text-8xl font-black text-white mb-2">{countdown}</h1>
-            <p className="text-xs text-gray-300 mt-2">Todos se actualizarán al mismo tiempo</p>
+            <p className="text-sm text-orange-300 mb-3">⏳ Inicia en:</p>
+            <h1 className="text-8xl font-black text-white mb-6">{countdown}</h1>
+            <p className="text-xs text-gray-300 mt-4">Todos se actualizarán al mismo tiempo</p>
           </div>
         ) : (
-          <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 p-8 rounded-2xl border-2 border-purple-500/50 shadow-[0_0_30px_rgba(168,85,247,0.4)]">
+          <div className="relative bg-gradient-to-br from-purple-600/20 to-pink-600/20 p-8 rounded-2xl border-2 border-purple-500/50 shadow-[0_0_30px_rgba(168,85,247,0.4)]">
+            {/* Botón para ocultar/mostrar palabra en esquina superior derecha */}
+            <button
+              onClick={() => setWordHidden(!wordHidden)}
+              className="absolute top-4 right-4 bg-purple-500/50 hover:bg-purple-600 px-3 py-2 rounded-lg transition-all text-sm font-semibold text-white"
+              title={wordHidden ? "Mostrar palabra" : "Ocultar palabra"}
+            >
+              {wordHidden ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+            
             <p className="text-sm text-purple-300 mb-2">Tu palabra es:</p>
-            <h1 className="text-5xl font-bold text-white mb-2">{word || "..."}</h1>
-            {word === "???" && (
+            <h1 className="text-5xl font-bold text-white mb-2">
+              {wordHidden ? "***" : word || "..."}
+            </h1>
+            {!wordHidden && word === "???" && (
               <p className="text-amber-400 text-sm font-semibold animate-pulse">
                 🕵️ ¡Eres el impostor!
               </p>
@@ -150,23 +199,45 @@ export default function Room() {
           </div>
         )}
 
-        <div className="flex flex-col gap-3">
-          <button onClick={copyRoomLink} className="bg-blue-500/80 px-4 py-3 rounded-lg font-semibold hover:bg-blue-600 active:scale-95 transition-all">
-            📋 Compartir link de invitación
-          </button>
+        <div className="w-full">
+          {isAdmin ? (
+            // Layout para admin: botón grande a la izquierda, QR y Compartir a la derecha
+            <div className="grid grid-cols-3 grid-rows-2 gap-3">
+              {/* Botón Volver a jugar (admin) - ocupa 1-2 horizontal, 1-2 vertical */}
+              <button 
+                onClick={handleRestart} 
+                disabled={loading || countdown !== null} 
+                className="col-span-2 row-span-2 bg-emerald-500 px-4 py-6 rounded-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-3"
+              >
+                <RotateCw size={40} />
+                <span className="text-sm">{loading ? "Reiniciando..." : countdown !== null ? "⏳ Esperando..." : "Volver a jugar"}</span>
+              </button>
 
-          <button onClick={() => setShowQRModal(true)} className="bg-purple-500/80 px-4 py-3 rounded-lg font-semibold hover:bg-purple-600 active:scale-95 transition-all">
-            📱 Mostrar QR
-          </button>
+              {/* Botón Compartir link - 3 horizontal, 1 vertical */}
+              <button onClick={copyRoomLink} className="bg-blue-500/80 px-4 py-3 rounded-lg font-semibold hover:bg-blue-600 active:scale-95 transition-all flex flex-col items-center justify-center gap-2">
+                <Share2 size={24} />
+                <span className="text-xs">Compartir</span>
+              </button>
 
-          {isAdmin && (
-            <button 
-              onClick={handleRestart} 
-              disabled={loading || countdown !== null} 
-              className="bg-emerald-500 px-4 py-3 rounded-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "Reiniciando..." : countdown !== null ? "⏳ Esperando..." : "🔄 Volver a jugar"}
-            </button>
+              {/* Botón QR - 3 horizontal, 2 vertical */}
+              <button onClick={() => setShowQRModal(true)} className="bg-purple-500/80 px-4 py-3 rounded-lg font-semibold hover:bg-purple-600 active:scale-95 transition-all flex flex-col items-center justify-center gap-2">
+                <QrCode size={24} />
+                <span className="text-xs">QR</span>
+              </button>
+            </div>
+          ) : (
+            // Layout para jugadores: QR y Compartir del mismo tamaño, cada uno ocupa mitad
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={copyRoomLink} className="bg-blue-500/80 px-4 py-4 rounded-lg font-semibold hover:bg-blue-600 active:scale-95 transition-all flex flex-col items-center justify-center gap-2">
+                <Share2 size={28} />
+                <span className="text-sm">Compartir</span>
+              </button>
+
+              <button onClick={() => setShowQRModal(true)} className="bg-purple-500/80 px-4 py-4 rounded-lg font-semibold hover:bg-purple-600 active:scale-95 transition-all flex flex-col items-center justify-center gap-2">
+                <QrCode size={28} />
+                <span className="text-sm">QR</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

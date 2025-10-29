@@ -8,8 +8,17 @@ export default function Home() {
   const location = useLocation();
   const [mode, setMode] = useState(null);
   const [roomCode, setRoomCode] = useState("");
+  const [playerName, setPlayerName] = useState("");
   const [loading, setLoading] = useState(false);
   const [createdRoom, setCreatedRoom] = useState(null);
+
+  // Cargar nombre de localStorage si existe
+  useEffect(() => {
+    const savedName = localStorage.getItem("playerName");
+    if (savedName) {
+      setPlayerName(savedName);
+    }
+  }, []);
 
   // Detectar si viene de un link compartido con parámetro ?join=CODIGO
   useEffect(() => {
@@ -31,11 +40,20 @@ export default function Home() {
   }, [location.hash]);
 
   const createRoom = async () => {
+    const adminName = playerName.trim();
+    
+    if (!adminName) {
+      alert("Por favor ingresa tu nombre");
+      return;
+    }
+    
     setLoading(true);
     try {
-      const response = await api.post('/rooms/create');
+      const response = await api.post('/rooms/create', { adminName });
       const roomId = response.data.roomId;
       setCreatedRoom({ roomId });
+      // Guardar nombre en localStorage
+      localStorage.setItem("playerName", adminName);
       setMode("created");
       if (navigator.vibrate) navigator.vibrate(50);
     } catch (error) {
@@ -48,11 +66,19 @@ export default function Home() {
 
   const joinRoom = async (code) => {
     const roomId = code.trim().toUpperCase();
-    if (!roomId) return;
+    const playerName_ = playerName.trim();
+    
+    if (!roomId || !playerName_) {
+      alert("Por favor completa código y nombre");
+      return;
+    }
+    
     setLoading(true);
     try {
-      await api.post('/rooms/' + roomId + '/join');
-      navigate('/room/' + roomId);
+      await api.post(`/rooms/${roomId}/join`, { playerName: playerName_ });
+      // Guardar nombre en localStorage
+      localStorage.setItem("playerName", playerName_);
+      navigate(`/room/${roomId}`);
       if (navigator.vibrate) navigator.vibrate(40);
     } catch (error) {
       console.error("Error al unirse:", error);
@@ -83,11 +109,34 @@ export default function Home() {
       <h1 className="text-3xl font-bold mb-6">🕵️‍♂️ SpyWord</h1>
       {!mode && (
         <div className="flex flex-col gap-4">
-          <button onClick={createRoom} disabled={loading} className="bg-emerald-500 px-6 py-3 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50">
-            {loading ? "Creando..." : "🧩 Crear partida"}
+          <button onClick={() => setMode("create")} className="bg-emerald-500 px-6 py-3 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all">
+            🧩 Crear partida
           </button>
           <button onClick={() => setMode("join")} className="bg-blue-500 px-6 py-3 rounded-xl text-lg font-semibold hover:bg-blue-600 active:scale-95 transition-all">
             🔗 Unirse a partida
+          </button>
+        </div>
+      )}
+      {mode === "create" && (
+        <div className="flex flex-col items-center gap-4 mt-4 max-w-md w-full">
+          <p className="text-lg font-semibold">Crear nueva partida</p>
+          <p className="text-sm text-gray-400">Ingresa tu nombre</p>
+          
+          <input 
+            className="bg-gray-800 px-6 py-4 rounded-xl text-center text-lg font-semibold uppercase border-2 border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors w-full" 
+            placeholder="Tu nombre" 
+            value={playerName} 
+            onChange={(e) => setPlayerName(e.target.value)} 
+            maxLength={20}
+            autoFocus
+          />
+          
+          <button onClick={createRoom} disabled={loading || !playerName.trim()} className="w-full bg-emerald-500 px-6 py-4 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            {loading ? "Creando..." : "✓ Crear partida"}
+          </button>
+          
+          <button onClick={resetView} className="mt-2 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition-all">
+            � Volver
           </button>
         </div>
       )}
@@ -128,21 +177,28 @@ export default function Home() {
       {mode === "join" && (
         <div className="flex flex-col items-center gap-4 mt-4 max-w-md w-full">
           <p className="text-lg font-semibold">Únete a una partida</p>
-          <p className="text-sm text-gray-400">Ingresa el código de 6 caracteres</p>
+          <p className="text-sm text-gray-400">Ingresa el código y tu nombre</p>
           
           <div className="flex flex-col gap-3 w-full mt-4">
+            <input 
+              className="bg-gray-800 px-6 py-4 rounded-xl text-center text-lg font-semibold uppercase border-2 border-gray-700 focus:border-blue-500 focus:outline-none transition-colors" 
+              placeholder="Tu nombre" 
+              value={playerName} 
+              onChange={(e) => setPlayerName(e.target.value)} 
+              maxLength={20}
+            />
+
             <input 
               className="bg-gray-800 px-6 py-4 rounded-xl text-center text-2xl font-mono uppercase tracking-widest border-2 border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors" 
               placeholder="A7DLK4" 
               value={roomCode} 
               onChange={(e) => setRoomCode(e.target.value.toUpperCase())} 
               maxLength={6}
-              autoFocus
             />
             
             <button 
               onClick={() => joinRoom(roomCode)} 
-              disabled={loading || !roomCode || roomCode.length !== 6} 
+              disabled={loading || !roomCode || roomCode.length !== 6 || !playerName.trim()} 
               className="bg-emerald-500 px-6 py-4 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Uniéndose..." : "🔗 Unirse a la sala"}

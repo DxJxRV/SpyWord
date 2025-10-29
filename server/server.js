@@ -30,9 +30,16 @@ function generateRoomId() {
   return roomId;
 }
 
-// Función para seleccionar palabra aleatoria
-function getRandomWord() {
-  return WORDS[Math.floor(Math.random() * WORDS.length)];
+// Función para seleccionar palabra aleatoria (sin repetir la palabra anterior)
+function getRandomWord(excludeWord = null) {
+  let availableWords = WORDS;
+  
+  // Si hay una palabra a excluir y hay más palabras disponibles, excluirla
+  if (excludeWord && WORDS.length > 1) {
+    availableWords = WORDS.filter(w => w !== excludeWord);
+  }
+  
+  return availableWords[Math.floor(Math.random() * availableWords.length)];
 }
 
 // Función para limpiar jugadores inactivos (más de 10 segundos sin actividad)
@@ -74,21 +81,29 @@ setInterval(() => {
 
 // ➕ POST /api/rooms/create
 app.post('/api/rooms/create', (req, res) => {
+  const { adminName } = req.body;
   const roomId = generateRoomId();
   const adminId = uuidv4();
   const word = getRandomWord();
   
   rooms[roomId] = {
     adminId,
+    adminName: adminName || "Admin", // Guardar nombre del admin
     word,
     round: 1,
-    players: {}, // { playerId: { lastSeen: timestamp, isActive: true } }
+    players: {
+      // El admin también es un jugador
+      [adminId]: { lastSeen: Date.now(), name: adminName || "Admin" }
+    },
     impostorId: null, // ID del impostor actual
+    starterPlayerId: null, // ID del jugador que inicia la partida
+    lastStarterPlayerId: null, // ID del último jugador que inició (para no repetir)
+    lastWord: word, // Última palabra usada (para no repetir)
     lastActivity: Date.now(),
     nextRoundAt: null // Timestamp para countdown sincronizado
   };
   
-  console.log(`✅ Sala creada: ${roomId} - Admin: ${adminId} - Palabra: ${word}`);
+  console.log(`✅ Sala creada: ${roomId} - Admin: ${adminId} (${adminName || "Admin"}) - Palabra: ${word}`);
   
   // Establecer cookie de sesión
   res.cookie('sid', adminId, {
@@ -108,23 +123,29 @@ app.post('/api/rooms/create', (req, res) => {
 // 👥 POST /api/rooms/:roomId/join
 app.post('/api/rooms/:roomId/join', (req, res) => {
   const { roomId } = req.params;
+  const { playerName } = req.body;
   
   if (!rooms[roomId]) {
     return res.status(404).json({ error: 'Sala no encontrada' });
   }
   
+  if (!playerName || playerName.trim().length === 0) {
+    return res.status(400).json({ error: 'El nombre del jugador es requerido' });
+  }
+  
   const room = rooms[roomId];
   const playerId = uuidv4();
   
-  // Registrar jugador con timestamp
+  // Registrar jugador con nombre y timestamp
   room.players[playerId] = {
-    lastSeen: Date.now()
+    lastSeen: Date.now(),
+    name: playerName.trim()
   };
   
   room.lastActivity = Date.now();
   
   const activePlayers = getActivePlayers(room);
-  console.log(`👤 Jugador unido a ${roomId}: ${playerId} (Total activos: ${activePlayers.length})`);
+  console.log(`👤 Jugador unido a ${roomId}: ${playerId} (Nombre: ${playerName}) (Total activos: ${activePlayers.length})`);
   
   // Establecer cookie de sesión
   res.cookie('sid', playerId, {
@@ -140,7 +161,8 @@ app.post('/api/rooms/:roomId/join', (req, res) => {
   res.json({
     word: isImpostor ? "???" : room.word,
     isImpostor,
-    round: room.round
+    round: room.round,
+    playerName: playerName.trim()
   });
 });
 
@@ -159,23 +181,40 @@ app.post('/api/rooms/:roomId/restart', (req, res) => {
     return res.status(403).json({ error: 'Solo el admin puede reiniciar la partida' });
   }
   
-  // Configurar countdown de 7 segundos
-  const nextRoundAt = Date.now() + 7000; // 7 segundos en el futuro
+  // Configurar countdown de 5 segundos
+  const nextRoundAt = Date.now() + 5000; // 5 segundos en el futuro
   room.nextRoundAt = nextRoundAt;
   room.lastActivity = Date.now();
   
-  console.log(`⏳ Countdown iniciado en ${roomId} - Nueva ronda en 7 segundos`);
+  console.log(`⏳ Countdown iniciado en ${roomId} - Nueva ronda en 5 segundos`);
   
   // Programar la actualización automática después de 7 segundos
   setTimeout(() => {
     if (rooms[roomId]) {
-      // Cambiar palabra y aumentar ronda
-      room.word = getRandomWord();
+      // Cambiar palabra (sin repetir la anterior) y aumentar ronda
+      room.word = getRandomWord(room.lastWord);
+      room.lastWord = room.word; // Guardar la palabra actual para la próxima vez
       room.round++;
       room.nextRoundAt = null; // Limpiar el countdown
       
       // Limpiar jugadores inactivos antes de asignar impostor
       const activePlayers = cleanInactivePlayers(room);
+      
+      // Seleccionar el jugador que va a iniciar la partida (al azar, sin repetir el anterior)
+      if (activePlayers.length > 0) {
+        let availablePlayers = activePlayers;
+        
+        // Si hay más de 1 jugador y el último iniciador sigue activo, excluirlo
+        if (activePlayers.length > 1 && room.starterPlayerId && activePlayers.includes(room.starterPlayerId)) {
+          availablePlayers = activePlayers.filter(id => id !== room.starterPlayerId);
+        }
+        
+        const starterIndex = Math.floor(Math.random() * availablePlayers.length);
+        room.starterPlayerId = availablePlayers[starterIndex]; // Asignar el nuevo
+        console.log(`🎬 Jugador que inicia: ${room.starterPlayerId} (${room.players[room.starterPlayerId].name})`);
+      } else {
+        room.starterPlayerId = null;
+      }
       
       // Seleccionar impostor aleatorio solo de jugadores activos
       if (activePlayers.length > 0) {
@@ -189,7 +228,7 @@ app.post('/api/rooms/:roomId/restart', (req, res) => {
       
       console.log(`🔄 Partida reiniciada en ${roomId} - Ronda: ${room.round} - Nueva palabra: ${room.word}`);
     }
-  }, 7000);
+  }, 5000);
   
   res.json({
     nextRoundAt,
@@ -211,11 +250,23 @@ app.get('/api/rooms/:roomId/state', (req, res) => {
   
   // Actualizar timestamp del jugador si existe
   if (playerId) {
-    if (!room.players[playerId]) {
-      room.players[playerId] = { lastSeen: Date.now() };
-      console.log(`📝 Jugador registrado en ${roomId}: ${playerId}`);
+    // Si es el admin, mantener su nombre correcto
+    if (playerId === room.adminId) {
+      if (!room.players[playerId]) {
+        room.players[playerId] = { lastSeen: Date.now(), name: room.adminName };
+        console.log(`📝 Admin reingresó: ${playerId} (${room.adminName})`);
+      } else {
+        room.players[playerId].lastSeen = Date.now();
+        room.players[playerId].name = room.adminName; // Asegurar que siempre tenga el nombre correcto
+      }
     } else {
-      room.players[playerId].lastSeen = Date.now();
+      // Para jugadores normales
+      if (!room.players[playerId]) {
+        room.players[playerId] = { lastSeen: Date.now(), name: "Anónimo" };
+        console.log(`📝 Jugador registrado en ${roomId}: ${playerId}`);
+      } else {
+        room.players[playerId].lastSeen = Date.now();
+      }
     }
   }
   
@@ -248,13 +299,17 @@ app.get('/api/rooms/:roomId/state', (req, res) => {
   // Verificar si el usuario es admin
   const isAdmin = playerId === room.adminId;
   
+  // Obtener el nombre del jugador que inicia
+  const starterName = room.starterPlayerId ? room.players[room.starterPlayerId]?.name : null;
+  
   res.json({
     round: room.round,
     word,
     totalPlayers: activePlayers.length, // Número de jugadores activos
     activePlayers: activePlayers.length, // Alias más claro
     nextRoundAt: room.nextRoundAt,
-    isAdmin
+    isAdmin,
+    starterName: starterName || null
   });
 });
 
