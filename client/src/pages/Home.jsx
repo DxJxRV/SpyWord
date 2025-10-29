@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
+import { Share2, Copy, Play, ArrowLeft } from "lucide-react";
 import { api } from "../services/api";
 
 export default function Home() {
@@ -123,7 +124,7 @@ export default function Home() {
           <p className="text-sm text-gray-400">Ingresa tu nombre</p>
           
           <input 
-            className="bg-gray-800 px-6 py-4 rounded-xl text-center text-lg font-semibold uppercase border-2 border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors w-full" 
+            className="bg-gray-800 px-6 py-4 rounded-xl text-center text-lg font-semibold uppercase border-2 border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors w-full placeholder:text-gray-500" 
             placeholder="Tu nombre" 
             value={playerName} 
             onChange={(e) => setPlayerName(e.target.value)} 
@@ -131,17 +132,19 @@ export default function Home() {
             autoFocus
           />
           
-          <button onClick={createRoom} disabled={loading || !playerName.trim()} className="w-full bg-emerald-500 px-6 py-4 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-            {loading ? "Creando..." : "✓ Crear partida"}
+          <button onClick={createRoom} disabled={loading || !playerName.trim()} className="w-full bg-emerald-500 px-6 py-4 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <Play size={20} />
+            <span>{loading ? "Creando..." : "Crear partida"}</span>
           </button>
           
-          <button onClick={resetView} className="mt-2 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition-all">
-            � Volver
+          <button onClick={resetView} className="bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition-all flex items-center justify-center gap-2">
+            <ArrowLeft size={18} />
+            <span>Volver</span>
           </button>
         </div>
       )}
       {mode === "created" && createdRoom && (
-        <div className="flex flex-col items-center gap-4 mt-6">
+        <div className="flex flex-col items-center gap-4 mt-6 max-w-xs w-full">
           <p className="text-lg">¡Sala creada! Comparte este QR:</p>
           <p className="text-sm text-gray-400">Los jugadores pueden escanearlo con su cámara</p>
           
@@ -149,29 +152,55 @@ export default function Home() {
             <QRCodeCanvas value={qrValue} size={220} bgColor="#ffffff" fgColor="#000000" level="H" />
           </div>
           
-          <div className="bg-amber-500/20 px-6 py-3 rounded-lg border-2 border-amber-500/50">
+          <div className="bg-amber-500/20 px-6 py-3 rounded-lg border-2 border-amber-500/50 w-full text-center">
             <p className="text-xs text-amber-300 mb-1">Código de sala:</p>
             <p className="text-amber-400 font-mono text-4xl font-bold tracking-widest">{createdRoom.roomId}</p>
           </div>
           
-          <button 
-            onClick={() => {
-              const link = `${baseUrl}/#/?join=${createdRoom.roomId}`;
-              navigator.clipboard.writeText(link);
-              if (navigator.vibrate) navigator.vibrate(30);
-              alert(`Link copiado: ${link}`);
-            }} 
-            className="text-sm underline hover:text-amber-300 transition-colors"
-          >
-            📋 Copiar link de invitación
-          </button>
+          <div className="w-full">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Botón Entrar a la sala - grande */}
+              <button onClick={enterAsAdmin} className="col-span-2 bg-emerald-500 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <Play size={24} />
+                <span>Entrar a la sala</span>
+              </button>
 
-          <button onClick={enterAsAdmin} className="mt-4 bg-emerald-500 px-8 py-3 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all">
-            ▶️ Entrar a la sala
-          </button>
-          <button onClick={resetView} className="mt-2 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition-all">
-            🔙 Volver
-          </button>
+              {/* Botón Compartir link - chiquito */}
+              <button 
+                onClick={async () => {
+                  const baseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
+                  const link = `${baseUrl}/#/?join=${createdRoom.roomId}`;
+                  
+                  // Copiar al portapapeles
+                  navigator.clipboard.writeText(link);
+                  if (navigator.vibrate) navigator.vibrate(30);
+                  
+                  // Abrir el modal nativo de compartir si está disponible
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({
+                        title: "🕵️‍♂️ SpyWord",
+                        text: `¡Únete a mi partida de SpyWord!\n${link}`,
+                        url: link
+                      });
+                    } catch (err) {
+                      console.log("Compartir cancelado o error:", err);
+                    }
+                  }
+                }} 
+                className="bg-blue-500/80 px-4 py-3 rounded-lg font-semibold hover:bg-blue-600 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <Share2 size={20} />
+                <span className="text-sm">Compartir</span>
+              </button>
+
+              {/* Botón Volver - chiquito */}
+              <button onClick={resetView} className="bg-white/20 px-4 py-3 rounded-lg hover:bg-white/30 transition-all flex items-center justify-center gap-2">
+                <ArrowLeft size={20} />
+                <span className="text-sm">Volver</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {mode === "join" && (
@@ -181,7 +210,7 @@ export default function Home() {
           
           <div className="flex flex-col gap-3 w-full mt-4">
             <input 
-              className="bg-gray-800 px-6 py-4 rounded-xl text-center text-lg font-semibold uppercase border-2 border-gray-700 focus:border-blue-500 focus:outline-none transition-colors" 
+              className="bg-gray-800 px-6 py-4 rounded-xl text-center text-lg font-semibold uppercase border-2 border-gray-700 focus:border-blue-500 focus:outline-none transition-colors placeholder:text-gray-500" 
               placeholder="Tu nombre" 
               value={playerName} 
               onChange={(e) => setPlayerName(e.target.value)} 
@@ -189,8 +218,8 @@ export default function Home() {
             />
 
             <input 
-              className="bg-gray-800 px-6 py-4 rounded-xl text-center text-2xl font-mono uppercase tracking-widest border-2 border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors" 
-              placeholder="A7DLK4" 
+              className="bg-gray-800 px-6 py-4 rounded-xl text-center text-lg font-semibold uppercase border-2 border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors placeholder:text-gray-500" 
+              placeholder="Tu Código" 
               value={roomCode} 
               onChange={(e) => setRoomCode(e.target.value.toUpperCase())} 
               maxLength={6}
@@ -199,14 +228,16 @@ export default function Home() {
             <button 
               onClick={() => joinRoom(roomCode)} 
               disabled={loading || !roomCode || roomCode.length !== 6 || !playerName.trim()} 
-              className="bg-emerald-500 px-6 py-4 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-emerald-500 px-6 py-4 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? "Uniéndose..." : "🔗 Unirse a la sala"}
+              <Play size={20} />
+              <span>{loading ? "Uniéndose..." : "Unirse a la sala"}</span>
             </button>
           </div>
 
-          <button onClick={resetView} className="mt-6 bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition-all">
-            🔙 Volver
+          <button onClick={resetView} className="bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition-all flex items-center justify-center gap-2">
+            <ArrowLeft size={18} />
+            <span>Volver</span>
           </button>
         </div>
       )}

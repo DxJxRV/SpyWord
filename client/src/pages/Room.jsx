@@ -127,12 +127,30 @@ export default function Room() {
     }
   };
 
-  const copyRoomLink = () => {
+  const copyRoomLink = async () => {
     const baseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
     const link = `${baseUrl}/#/?join=${roomId}`;
+    
+    // Copiar al portapapeles
     navigator.clipboard.writeText(link);
     if (navigator.vibrate) navigator.vibrate(30);
-    alert(`Link copiado: ${link}`);
+    
+    // Abrir el modal nativo de compartir si está disponible
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "🕵️‍♂️ SpyWord",
+          text: `¡Únete a mi partida de SpyWord!`,
+          url: link
+        });
+      } catch (err) {
+        // Usuario canceló el compartir o hubo un error
+        console.log("Compartir cancelado o error:", err);
+      }
+    } else {
+      // Fallback: mostrar alerta si el navegador no soporta Web Share API
+      alert(`Link copiado: ${link}`);
+    }
   };
 
   if (error) {
