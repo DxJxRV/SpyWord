@@ -44,7 +44,7 @@ function RoomNavbar() {
   };
   
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-gradient-to-r from-purple-900/80 to-blue-900/80 backdrop-blur-md border-b border-purple-500/30 z-40">
+  <nav className="fixed top-0 left-0 right-0 bg-gradient-to-r from-purple-900/20 to-blue-900/20 backdrop-blur-md border-b border-purple-500/20 z-40 bg-opacity-10">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-300 hidden sm:inline">Sala:</span>
