@@ -23,56 +23,61 @@ export default function Room() {
   const nextRoundTimestamp = useRef(null); // Guardar el timestamp original
 
   useEffect(() => {
-  let isActive = true;
+    let isActive = true;
 
-  const poll = async () => {
-  if (!isActive) return;
+    const poll = async () => {
+      if (!isActive) return;
 
-  console.log(`📡 [POLL] Enviando petición → round=${currentRound} nextRoundAt=${nextRoundTimestamp.current || 0}`);
+      console.log(`📡 [POLL] Enviando petición → round=${currentRound} nextRoundAt=${nextRoundTimestamp.current || 0}`);
 
-  try {
-    const res = await api.get(`/rooms/${roomId}/state`, {
-      params: {
-        round: currentRound || 0,
-        nextRoundAt: nextRoundTimestamp.current || 0,
-      },
-      timeout: 35000, // un poco mayor al timeout del server
-    });
+      try {
+        const res = await api.get(`/rooms/${roomId}/state`, {
+          params: {
+            round: currentRound || 0,
+            nextRoundAt: nextRoundTimestamp.current || 0,
+          },
+          timeout: 35000, // un poco mayor al timeout del server
+        });
 
-    console.log("📩 [POLL] Respuesta recibida:", res.data);
+        console.log("📩 [POLL] Respuesta recibida:", res.data);
 
-    // 🔁 Sin cambios
-    if (res.data.unchanged) {
-      console.log("⏳ [POLL] Sin cambios — esperará 2 segundos antes de volver a consultar");
-      setTimeout(poll, 2000);
-      return;
-    }
+        // 🔁 Sin cambios
+        if (res.data.unchanged) {
+          console.log("⏳ [POLL] Sin cambios — esperará 2 segundos antes de volver a consultar");
+          setTimeout(poll, 2000);
+          return;
+        }
 
-    // ✅ Cambios detectados
-    console.log("🔄 [POLL] Cambios detectados → actualizando estado...");
+        // ✅ Cambios detectados
+        console.log("🔄 [POLL] Cambios detectados → actualizando estado...");
 
-    setCurrentRound(res.data.round);
-    setWord(res.data.word);
-    setTotalPlayers(res.data.totalPlayers);
-    setIsAdmin(res.data.isAdmin);
-    setStarterName(res.data.starterName);
-    nextRoundTimestamp.current = res.data.nextRoundAt;
+        setCurrentRound(res.data.round);
+        setWord(res.data.word);
+        setTotalPlayers(res.data.totalPlayers);
+        setIsAdmin(res.data.isAdmin);
+        setStarterName(res.data.starterName);
 
-
-    console.log("✅ [POLL] Estado actualizado, volverá a esperar 2 segundos antes de la siguiente consulta...");
-    setTimeout(poll, 2000); // ⚠️ evita spam inmediato
-  } catch (err) {
-    console.error("💥 [POLL] Error en long polling:", err.message || err);
-    console.log("🔁 [POLL] Reintentará en 3 segundos...");
-    setTimeout(poll, 3000);
-  }
-};
+        if (res.data.nextRoundAt && !nextRoundTimestamp.current) {
+          nextRoundTimestamp.current = res.data.nextRoundAt;
+          setCountdownActive(true); // Activar el countdown
+          console.log(`📡 Countdown recibido, starterName: ${res.data.starterName}`);
+        }
 
 
-  poll();
+        console.log("✅ [POLL] Estado actualizado, volverá a esperar 2 segundos antes de la siguiente consulta...");
+        setTimeout(poll, 2000); // ⚠️ evita spam inmediato
+      } catch (err) {
+        console.error("💥 [POLL] Error en long polling:", err.message || err);
+        console.log("🔁 [POLL] Reintentará en 3 segundos...");
+        setTimeout(poll, 3000);
+      }
+    };
 
-  return () => { isActive = false; };
-}, [roomId, currentRound]);
+
+    poll();
+
+    return () => { isActive = false; };
+  }, [roomId, currentRound]);
 
 
   // Efecto separado para actualizar el countdown cada segundo
@@ -117,11 +122,11 @@ export default function Room() {
   const copyRoomLink = async () => {
     const baseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
     const link = `${baseUrl}/#/?join=${roomId}`;
-    
+
     // Copiar al portapapeles
     navigator.clipboard.writeText(link);
     if (navigator.vibrate) navigator.vibrate(30);
-    
+
     // Abrir el modal nativo de compartir si está disponible
     if (navigator.share) {
       try {
@@ -191,7 +196,7 @@ export default function Room() {
             >
               {wordHidden ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
-            
+
             <p className="text-sm text-purple-300 mb-2">Tu palabra es:</p>
             <h1 className="text-5xl font-bold text-white mb-2">
               {wordHidden ? "***" : word || "..."}
@@ -209,9 +214,9 @@ export default function Room() {
             // Layout para admin: botón grande a la izquierda, QR y Compartir a la derecha
             <div className="grid grid-cols-3 grid-rows-2 gap-3">
               {/* Botón Volver a jugar (admin) - ocupa 1-2 horizontal, 1-2 vertical */}
-              <button 
-                onClick={handleRestart} 
-                disabled={loading || countdown !== null} 
+              <button
+                onClick={handleRestart}
+                disabled={loading || countdown !== null}
                 className="col-span-2 row-span-2 bg-emerald-500 px-4 py-6 rounded-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-3"
               >
                 <RotateCw size={40} />
@@ -249,19 +254,19 @@ export default function Room() {
 
       {/* Modal de QR */}
       {showQRModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 z-50"
           onClick={() => setShowQRModal(false)}
         >
-          <div 
+          <div
             className="bg-gray-900 rounded-2xl p-8 max-w-sm w-full border-2 border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.3)]"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-2xl font-bold text-center mb-2">🕵️‍♂️ SpyWord</h2>
             <p className="text-sm text-gray-400 text-center mb-6">Escanea para unirte</p>
-            
+
             <div className="bg-white p-6 rounded-xl mb-6">
-              <QRCodeCanvas 
+              <QRCodeCanvas
                 value={`${import.meta.env.VITE_BASE_URL || window.location.origin}/#/?join=${roomId}`}
                 size={240}
                 bgColor="#ffffff"
@@ -275,7 +280,7 @@ export default function Room() {
               <p className="text-purple-400 font-mono text-3xl font-bold tracking-widest text-center">{roomId}</p>
             </div>
 
-            <button 
+            <button
               onClick={() => setShowQRModal(false)}
               className="w-full bg-white/20 px-4 py-3 rounded-lg font-semibold hover:bg-white/30 active:scale-95 transition-all"
             >
