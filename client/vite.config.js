@@ -7,21 +7,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export default defineConfig({
-  base: "/", // raíz del dominio o subruta
+  base: "/", // asegúrate de servir desde raíz del dominio
   build: {
     outDir: "dist",
     emptyOutDir: true,
-  },
-  server: {
-    host: true,
-    port: 5173,
-    proxy: {
-      "/api": {
-        target: `http://localhost:${process.env.VITE_SERVER_PORT || 3003}`,
-        changeOrigin: true,
-        secure: false,
-      },
-    },
   },
   plugins: [
     react(),
@@ -32,7 +21,7 @@ export default defineConfig({
         "icons/icon-192.png",
         "icons/icon-512.png",
         "icons/maskable-192.png",
-        "icons/maskable-512.png",
+        "icons/maskable-512.png"
       ],
       manifest: false, // usamos el manifest del /public
       workbox: {
