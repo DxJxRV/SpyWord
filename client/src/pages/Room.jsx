@@ -58,7 +58,6 @@ export default function Room() {
     setStarterName(res.data.starterName);
     nextRoundTimestamp.current = res.data.nextRoundAt;
 
-    setCountdownActive(true);
 
     console.log("✅ [POLL] Estado actualizado, volverá a esperar 2 segundos antes de la siguiente consulta...");
     setTimeout(poll, 2000); // ⚠️ evita spam inmediato
