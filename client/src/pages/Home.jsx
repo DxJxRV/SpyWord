@@ -110,7 +110,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 text-center">
-      <h1 className="text-3xl font-bold mb-6">🕵️‍♂️ SpyWord</h1>
+  <h1 className="text-3xl font-bold mb-6">Impostor<br/>Word 🕵️‍♂️</h1>
       {!mode && (
         <div className="flex flex-col gap-4">
           <button onClick={() => setMode("create")} className="bg-emerald-500 px-6 py-3 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all">
@@ -182,8 +182,8 @@ export default function Home() {
                   if (navigator.share) {
                     try {
                       await navigator.share({
-                        title: "🕵️‍♂️ SpyWord",
-                        text: `¡Únete a mi partida de SpyWord!\n${link}`,
+                        title: "🕵️‍♂️ Impostor Word",
+                        text: `¡Únete a mi partida de Impostor Word!\n${link}`,
                         url: link
                       });
                     } catch (err) {

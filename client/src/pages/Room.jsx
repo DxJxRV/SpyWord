@@ -131,8 +131,8 @@ export default function Room() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "🕵️‍♂️ SpyWord",
-          text: `¡Únete a mi partida de SpyWord!`,
+          title: "🕵️‍♂️ Impostor Word",
+          text: `¡Únete a mi partida de Impostor Word!`,
           url: link
         });
       } catch (err) {
@@ -158,7 +158,9 @@ export default function Room() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20 text-center">
+      <h2 className="text-3xl font-bold text-center mb-10">Impostor<br/>Word 🕵️‍♂️</h2>
       <div className="max-w-md w-full space-y-6">
+        
         <div className="bg-blue-500/20 px-4 py-2 rounded-lg border border-blue-500/30">
           <p className="text-xs text-gray-400">Ronda {currentRound} • {totalPlayers} jugadores</p>
         </div>
@@ -181,10 +183,10 @@ export default function Room() {
 
         {/* Mostrar countdown si está activo */}
         {(countdown !== null && countdown > 0) ? (
-          <div className="bg-gradient-to-br from-orange-600/30 to-red-600/30 p-12 rounded-2xl border-2 border-orange-500/50 shadow-[0_0_40px_rgba(251,146,60,0.5)] animate-pulse">
-            <p className="text-sm text-orange-300 mb-3">⏳ Inicia en:</p>
-            <h1 className="text-8xl font-black text-white mb-6">{countdown}</h1>
-            <p className="text-xs text-gray-300 mt-4">Todos se actualizarán al mismo tiempo</p>
+          <div className="bg-gradient-to-br from-orange-600/30 to-red-600/30 p-8 rounded-2xl border-2 border-orange-500/50 shadow-[0_0_40px_rgba(251,146,60,0.5)] animate-pulse min-h-[180px] flex flex-col justify-center items-center">
+            <p className="text-sm text-orange-300 mb-2">⏳ Inicia en:</p>
+            <h1 className="text-5xl font-bold text-white mb-2">{countdown}</h1>
+            <p className="text-xs text-gray-300">Todos se actualizarán al mismo tiempo</p>
           </div>
         ) : (
           <div className="relative bg-gradient-to-br from-purple-600/20 to-pink-600/20 p-8 rounded-2xl border-2 border-purple-500/50 shadow-[0_0_30px_rgba(168,85,247,0.4)]">
@@ -262,7 +264,7 @@ export default function Room() {
             className="bg-gray-900 rounded-2xl p-8 max-w-sm w-full border-2 border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.3)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold text-center mb-2">🕵️‍♂️ SpyWord</h2>
+            <h2 className="text-2xl font-bold text-center mb-2">Impostor<br/>Word 🕵️‍♂️</h2>
             <p className="text-sm text-gray-400 text-center mb-6">Escanea para unirte</p>
 
             <div className="bg-white p-6 rounded-xl mb-6">
