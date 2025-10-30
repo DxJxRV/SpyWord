@@ -8,7 +8,7 @@ export default function Room() {
   const { roomId } = useParams(); // Solo necesitamos roomId
   const navigate = useNavigate();
   const [word, setWord] = useState("");
-  const [currentRound, setCurrentRound] = useState(1);
+  const [currentRound, setCurrentRound] = useState(0);
   const [totalPlayers, setTotalPlayers] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,70 +23,58 @@ export default function Room() {
   const nextRoundTimestamp = useRef(null); // Guardar el timestamp original
 
   useEffect(() => {
-    const fetchInitialState = async () => {
-      try {
-        const response = await api.get(`/rooms/${roomId}/state`);
-        setWord(response.data.word);
-        setCurrentRound(response.data.round);
-        setTotalPlayers(response.data.totalPlayers);
-        setIsAdmin(response.data.isAdmin); // Ahora viene del backend
-        setStarterName(response.data.starterName); // Guardar nombre del jugador que inicia
-      } catch (err) {
-        console.error("Error al cargar estado:", err);
-        setError("No se pudo cargar la sala");
-      }
-    };
+  let isActive = true;
 
-    fetchInitialState();
+  const poll = async () => {
+  if (!isActive) return;
 
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.get(`/rooms/${roomId}/state`);
-        
-        // Guardar el timestamp solo la primera vez que llega
-        if (res.data.nextRoundAt && !nextRoundTimestamp.current) {
-          setWord(null); // Limpiar la palabra al reiniciar
-          nextRoundTimestamp.current = res.data.nextRoundAt;
-          setCountdownActive(true); // Activar el countdown
-          setPreviousStarterName(starterName); // Guardar el nombre anterior
-          console.log(`📡 Countdown recibido, starterName: ${res.data.starterName}`);
-        }
-        
-        // Limpiar el timestamp si ya no hay countdown
-        if (!res.data.nextRoundAt && nextRoundTimestamp.current) {
-          nextRoundTimestamp.current = null;
-          setCountdown(null);
-          setCountdownActive(false);
-        }
-        
-        if (res.data.round !== currentRound) {
-          
-          setCurrentRound(res.data.round);
-          setPreviousWord(word); // Guardar la palabra anterior
-          setWord(res.data.word);
-          setStarterName(res.data.starterName); // Actualizar nombre del jugador que inicia
-          console.log(`🔄 Nueva ronda, starterName: ${res.data.starterName}, palabra anterior: ${word}`);
-          nextRoundTimestamp.current = null; // Limpiar al cambiar de ronda
-          setCountdown(null);
-          setCountdownActive(false);
-        }
-        
-        // Siempre actualizar starterName aunque no cambie la ronda
-        if (res.data.starterName && res.data.starterName !== starterName) {
-          setPreviousStarterName(starterName); // Guardar el nombre anterior
-          setStarterName(res.data.starterName);
-          console.log(`✅ StarterName actualizado: ${res.data.starterName} (anterior: ${starterName})`);
-        }
-        
-        setTotalPlayers(res.data.totalPlayers);
-        setIsAdmin(res.data.isAdmin); // Actualizar estado de admin
-      } catch (err) {
-        console.error("Error en polling:", err);
-      }
-    }, 2000);
+  console.log(`📡 [POLL] Enviando petición → round=${currentRound} nextRoundAt=${nextRoundTimestamp.current || 0}`);
 
-    return () => clearInterval(interval);
-  }, [roomId, currentRound]);
+  try {
+    const res = await api.get(`/rooms/${roomId}/state`, {
+      params: {
+        round: currentRound || 0,
+        nextRoundAt: nextRoundTimestamp.current || 0,
+      },
+      timeout: 35000, // un poco mayor al timeout del server
+    });
+
+    console.log("📩 [POLL] Respuesta recibida:", res.data);
+
+    // 🔁 Sin cambios
+    if (res.data.unchanged) {
+      console.log("⏳ [POLL] Sin cambios — esperará 2 segundos antes de volver a consultar");
+      setTimeout(poll, 2000);
+      return;
+    }
+
+    // ✅ Cambios detectados
+    console.log("🔄 [POLL] Cambios detectados → actualizando estado...");
+
+    setCurrentRound(res.data.round);
+    setWord(res.data.word);
+    setTotalPlayers(res.data.totalPlayers);
+    setIsAdmin(res.data.isAdmin);
+    setStarterName(res.data.starterName);
+    nextRoundTimestamp.current = res.data.nextRoundAt;
+
+    setCountdownActive(true);
+
+    console.log("✅ [POLL] Estado actualizado, volverá a esperar 2 segundos antes de la siguiente consulta...");
+    setTimeout(poll, 2000); // ⚠️ evita spam inmediato
+  } catch (err) {
+    console.error("💥 [POLL] Error en long polling:", err.message || err);
+    console.log("🔁 [POLL] Reintentará en 3 segundos...");
+    setTimeout(poll, 3000);
+  }
+};
+
+
+  poll();
+
+  return () => { isActive = false; };
+}, [roomId, currentRound]);
+
 
   // Efecto separado para actualizar el countdown cada segundo
   useEffect(() => {
