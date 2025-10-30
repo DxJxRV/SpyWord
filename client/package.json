@@ -13,6 +13,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.15",
     "axios": "^1.13.0",
+    "dotenv": "^17.2.3",
     "lucide-react": "^0.548.0",
     "peerjs": "^1.5.5",
     "qrcode.react": "^4.2.0",

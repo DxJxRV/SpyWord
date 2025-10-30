@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import fs from "fs";
 import path from "path";
+import dotenv from 'dotenv';
+dotenv.config();
 
 export default defineConfig({
   plugins: [
@@ -50,7 +52,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: `http://localhost:${process.env.VITE_SERVER_PORT || 3003}`,
         changeOrigin: true,
         secure: false
       }
