@@ -269,7 +269,7 @@ export default function Room() {
 
             <div className="bg-white p-6 rounded-xl mb-6">
               <QRCodeCanvas
-                value={`${import.meta.env.VITE_BASE_URL || window.location.origin}/#/?join=${roomId}`}
+                value={`${import.meta.env.VITE_BASE_URL || 'https://impostorword.com/'}/#/?join=${roomId}`}
                 size={240}
                 bgColor="#ffffff"
                 fgColor="#000000"

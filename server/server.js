@@ -16,7 +16,7 @@ const allowedOrigins = [
   "https://impostorword.com",
   "http://www.impostorword.com",
   "https://www.impostorword.com",
-  "http://localhost:5173", // opcional, por si pruebas local
+  "https://localhost:5173", // opcional, por si pruebas local
 ];
 
 app.use(
