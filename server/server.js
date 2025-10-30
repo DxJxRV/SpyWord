@@ -10,10 +10,26 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(express.json());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'https://localhost:5173',
-  credentials: true
-}));
+
+const allowedOrigins = [
+  "http://impostorword.com",
+  "https://impostorword.com",
+  "http://www.impostorword.com",
+  "https://www.impostorword.com",
+  "http://localhost:5173", // opcional, por si pruebas local
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Permitir requests sin origen (como Postman)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("No autorizado por CORS"));
+    },
+    credentials: true,
+  })
+);
 app.use(cookieParser());
 
 // Almacenamiento en memoria
