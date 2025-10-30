@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { Toaster, toast } from "sonner";
 import Home from "./pages/Home";
 import Room from "./pages/Room";
 import Lobby from "./pages/Lobby";
@@ -22,9 +23,24 @@ function RoomNavbar() {
   const roomId = pathParts[2] || '';
   
   const handleExit = () => {
-    if (window.confirm('¿Salir de la sala?')) {
-      navigate('/');
-    }
+    // Extraer roomId antes de navegar
+    const pathParts = location.pathname.split('/');
+    const roomId = pathParts[2] || '';
+    
+    // Navegar inmediatamente a home
+    navigate('/');
+    
+    // Mostrar toast con opción de regresar
+    toast.error("Saliste de la sala", {
+      description: "Ya estás en el inicio",
+      action: {
+        label: "Regresar a sala",
+        onClick: () => {
+          navigate(`/room/${roomId}`);
+        }
+      },
+      duration: 5000
+    });
   };
   
   return (
@@ -53,6 +69,14 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden">
+        {/* 🔹 Toaster para notificaciones */}
+        <Toaster 
+          theme="dark" 
+          position="top-right"
+          richColors
+          closeButton
+        />
+
         {/* 🔹 Botón de pantalla completa (arriba a la derecha) */}
         <FullscreenButton />
 

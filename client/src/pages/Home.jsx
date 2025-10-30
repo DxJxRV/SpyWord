@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import { Share2, Copy, Play, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "../services/api";
 
 export default function Home() {
@@ -44,7 +45,7 @@ export default function Home() {
     const adminName = playerName.trim();
     
     if (!adminName) {
-      alert("Por favor ingresa tu nombre");
+      toast.error("Por favor ingresa tu nombre");
       return;
     }
     
@@ -56,10 +57,11 @@ export default function Home() {
       // Guardar nombre en localStorage
       localStorage.setItem("playerName", adminName);
       setMode("created");
+      toast.success(`¡Partida creada! Código: ${roomId}`);
       if (navigator.vibrate) navigator.vibrate(50);
     } catch (error) {
       console.error("Error al crear sala:", error);
-      alert("Error al crear la sala. Intenta de nuevo.");
+      toast.error("Error al crear la sala. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -70,7 +72,7 @@ export default function Home() {
     const playerName_ = playerName.trim();
     
     if (!roomId || !playerName_) {
-      alert("Por favor completa código y nombre");
+      toast.error("Por favor completa código y nombre");
       return;
     }
     
@@ -79,11 +81,12 @@ export default function Home() {
       await api.post(`/rooms/${roomId}/join`, { playerName: playerName_ });
       // Guardar nombre en localStorage
       localStorage.setItem("playerName", playerName_);
+      toast.success("¡Te uniste a la sala!");
       navigate(`/room/${roomId}`);
       if (navigator.vibrate) navigator.vibrate(40);
     } catch (error) {
       console.error("Error al unirse:", error);
-      alert("No se pudo unir a la sala. Verifica el código.");
+      toast.error("No se pudo unir a la sala. Verifica el código.");
     } finally {
       setLoading(false);
     }
