@@ -36,7 +36,31 @@ app.use(cookieParser());
 const rooms = {};
 
 // Lista de palabras
-const WORDS = ["gato", "perro", "avión", "mesa", "fútbol", "plátano"];
+const WORDS = [
+  "gato", "perro", "avión", "mesa", "fútbol", "plátano",
+  "silla", "ordenador", "ventana", "puerta", "cielo", "mar",
+  "montaña", "río", "bosque", "ciudad", "pueblo", "auto", "camión", "bicicleta",
+  "tren", "barco", "submarino", "estrella", "luna", "sol", "planeta", "galaxia", "universo", "nube",
+  "lluvia", "trueno", "relámpago", "nieve", "hielo", "fuego", "arena", "tierra", "piedra", "flor",
+  "árbol", "fruta", "naranja", "manzana", "pera", "uva", "sandía", "melón", "cereza", "fresa",
+  "carne", "pollo", "pescado", "queso", "pan", "leche", "agua", "vino", "cerveza", "café",
+  "té", "azúcar", "sal", "aceite", "arroz", "pasta", "pizza", "hamburguesa", "taco", "sushi",
+  "guitarra", "piano", "batería", "violín", "trompeta", "micrófono", "altavoz", "auriculares", "radio", "televisión",
+  "cámara", "móvil", "tablet", "reloj", "teclado", "ratón", "pantalla", "robot", "dron", "cohete",
+  "programa", "código", "juego", "nivel", "enemigo", "jugador", "arma", "escudo", "misión", "aventura",
+  "amor", "odio", "felicidad", "tristeza", "miedo", "ira", "paz", "guerra", "amistad", "familia",
+  "padre", "madre", "hermano", "hermana", "hijo", "hija", "abuelo", "abuela", "tío", "tía",
+  "primo", "prima", "novio", "novia", "marido", "esposa", "bebé", "niño", "niña", "adulto",
+  "anciano", "doctor", "ingeniero", "profesor", "alumno", "piloto", "mecánico", "panadero", "bombero", "policía",
+  "actor", "cantante", "bailarín", "escritor", "pintor", "fotógrafo", "periodista", "chef", "programador", "diseñador",
+  "Lionel Messi", "Cristiano Ronaldo", "Kylian Mbappé", "Neymar", "Luis Suárez", "Karim Benzema", "Erling Haaland", "Vinícius Jr", "Pedri", "Gavi",
+  "Real Madrid", "Barcelona", "Manchester United", "Liverpool", "Chelsea", "Arsenal", "Bayern Múnich", "Borussia Dortmund", "PSG", "Inter de Milán",
+  "Milan", "Juventus", "Atlético de Madrid", "Sevilla", "Benfica", "Porto", "Ajax", "Flamengo", "River Plate", "Boca Juniors",
+  "Taylor Swift", "Bad Bunny", "Shakira", "Dua Lipa", "Rosalía", "Eminem", "Drake", "Billie Eilish", "The Weeknd", "Adele",
+  "Iron Man", "Spider-Man", "Batman", "Superman", "Wonder Woman", "Flash", "Hulk", "Thor", "Loki", "Capitán América",
+  "Harry Potter", "Hermione", "Ron Weasley", "Voldemort", "Dumbledore", "Frodo", "Gandalf", "Legolas", "Aragorn", "Gollum"
+];
+
 
 // Función para generar roomId de 6 caracteres
 function generateRoomId() {
