@@ -43,3 +43,18 @@ enum WordSuggestionStatus {
   APPROVED
   REJECTED
 }
+
+// Modelo para Modos de Juego Especiales
+model GameMode {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  wordList    String   @db.Text // JSON string de la lista de palabras para este modo
+  isDailyMode Boolean  @default(false) @map("is_daily_mode") // Solo uno debe ser true
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("game_modes")
+  @@index([isActive, isDailyMode])
+}

@@ -11,6 +11,10 @@ import {
 } from './services/word.service.js';
 dotenv.config();
 
+// --- Control de Anuncios ---
+const IS_PREMIUM_MODE_ACTIVE = false; // TRUE desactiva todos los anuncios globalmente
+// ---------------------------
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -145,8 +149,8 @@ app.post('/api/rooms/create', async (req, res) => {
     // Establecer cookie de sesión
     res.cookie('sid', adminId, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000 // 24 horas
     });
 
@@ -175,26 +179,41 @@ app.post('/api/rooms/:roomId/join', (req, res) => {
   }
 
   const room = rooms[roomId];
-  const playerId = uuidv4();
+  let playerId;
 
-  // Registrar jugador con nombre y timestamp
-  room.players[playerId] = {
-    lastSeen: Date.now(),
-    name: playerName.trim(),
-    isAlive: true,
-    hasVoted: false
-  };
+  // Verificar si el jugador ya tiene una sesión activa en esta sala
+  const existingPlayerId = req.cookies.sid;
+  if (existingPlayerId && room.players[existingPlayerId]) {
+    // El jugador ya existe en esta sala, reutilizar el ID
+    playerId = existingPlayerId;
+    room.players[playerId].lastSeen = Date.now();
+    console.log(`🔄 Jugador reconectado a ${roomId}: ${playerId} (${playerName})`);
+  } else {
+    // Crear nuevo jugador
+    playerId = uuidv4();
+
+    // Registrar jugador con nombre y timestamp
+    room.players[playerId] = {
+      lastSeen: Date.now(),
+      name: playerName.trim(),
+      isAlive: true,
+      hasVoted: false
+    };
+
+    const activePlayers = getActivePlayers(room);
+    console.log(`👤 Jugador nuevo unido a ${roomId}: ${playerId} (Nombre: ${playerName}) (Total activos: ${activePlayers.length})`);
+
+    // Solo notificar a clientes esperando si es un jugador nuevo
+    notifyWaitingClients(roomId);
+  }
 
   room.lastActivity = Date.now();
-
-  const activePlayers = getActivePlayers(room);
-  console.log(`👤 Jugador unido a ${roomId}: ${playerId} (Nombre: ${playerName}) (Total activos: ${activePlayers.length})`);
 
   // Establecer cookie de sesión
   res.cookie('sid', playerId, {
     httpOnly: true,
-    secure: true,
-    sameSite: 'none',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 horas
   });
 
@@ -221,12 +240,18 @@ app.post('/api/rooms/:roomId/restart', async (req, res) => {
 
     const room = rooms[roomId];
 
+    console.log(`🔍 [RESTART] adminId from cookie: ${adminId}, room.adminId: ${room.adminId}`);
+
     if (room.adminId !== adminId) {
+      console.log(`❌ [RESTART] Admin verification failed!`);
       return res.status(403).json({ error: 'Solo el admin puede reiniciar la partida' });
     }
 
-    // Configurar countdown de 5 segundos
-    const nextRoundAt = Date.now() + 5000; // 5 segundos en el futuro
+    console.log(`✅ [RESTART] Admin verified successfully`);
+
+
+    // Configurar countdown de 3 segundos
+    const nextRoundAt = Date.now() + 3000; // 3 segundos en el futuro
     room.nextRoundAt = nextRoundAt;
     room.lastActivity = Date.now();
 
@@ -263,12 +288,13 @@ app.post('/api/rooms/:roomId/restart', async (req, res) => {
   room.votes = {};
   room.votersRemaining = 0;
   room.eliminatedPlayerId = null;
-  // Resetear hasVoted y asegurar que jugadores vivos mantengan isAlive
+  // Resetear datos de victoria
+  room.winner = null;
+  room.winReason = null;
+  // Resetear hasVoted y revivir a todos los jugadores
   for (const playerId in room.players) {
     room.players[playerId].hasVoted = false;
-    if (room.players[playerId].isAlive === undefined) {
-      room.players[playerId].isAlive = true;
-    }
+    room.players[playerId].isAlive = true; // Revivir a todos
   }
 
   console.log(`⏳ Countdown iniciado en ${roomId} - Nueva ronda en 5 segundos`);
@@ -281,26 +307,14 @@ app.post('/api/rooms/:roomId/restart', async (req, res) => {
       room.nextRoundAt = null;
       // No reasignar palabra/impostor/starter aquí, ya están asignados arriba
       console.log(`🔄 Partida reiniciada en ${roomId} - Ronda: ${room.round} - Nueva palabra: ${room.word}`);
+
+      // Notificar a todos los clientes después de incrementar round
+      notifyWaitingClients(roomId);
     }
   }, 5000);
 
-  // 🔔 Notificar a todos los clientes en espera
-  if (waitingClients[roomId]) {
-    waitingClients[roomId].forEach(client => {
-      const starterName = room.starterPlayerId ? room.players[room.starterPlayerId]?.name : null;
-      const word = room.word;
-
-      client.json({
-        round: room.round,
-        word,
-        totalPlayers: Object.keys(room.players).length,
-        nextRoundAt: room.nextRoundAt || null,
-        isAdmin: false,
-        starterName: starterName || null
-      });
-    });
-    waitingClients[roomId] = [];
-  }
+  // Notificar inmediatamente sobre el countdown
+  notifyWaitingClients(roomId);
 
 
   res.json({
@@ -358,6 +372,32 @@ function resolveVoting(room) {
     room.players[eliminatedId].isAlive = false;
     room.eliminatedPlayerId = eliminatedId;
     console.log(`❌ Jugador eliminado: ${room.players[eliminatedId].name} (${maxVotes} votos)`);
+
+    // 🏆 Verificar condiciones de victoria
+
+    // Condición 1: Se eliminó al impostor → Jugadores ganan
+    if (eliminatedId === room.impostorId) {
+      room.status = 'GAME_OVER';
+      room.winner = 'PLAYERS';
+      room.winReason = 'impostor_eliminated';
+      console.log(`🎉 ¡VICTORIA DE LOS JUGADORES! El impostor fue eliminado`);
+    } else {
+      // Condición 2: Verificar si solo quedan 2 jugadores vivos
+      const remainingAlive = Object.keys(room.players).filter(
+        id => room.players[id].isAlive !== false
+      );
+
+      if (remainingAlive.length <= 2 && remainingAlive.includes(room.impostorId)) {
+        // El impostor sobrevivió y solo quedan 2 o menos jugadores
+        room.status = 'GAME_OVER';
+        room.winner = 'IMPOSTOR';
+        room.winReason = 'impostor_survived';
+        console.log(`🎉 ¡VICTORIA DEL IMPOSTOR! Solo quedan ${remainingAlive.length} jugadores`);
+      } else {
+        // El juego continúa
+        room.status = 'RESULTS';
+      }
+    }
   } else {
     // No hay mayoría o hay empate
     room.eliminatedPlayerId = null;
@@ -366,11 +406,13 @@ function resolveVoting(room) {
     } else {
       console.log(`📊 No se alcanzó mayoría (máximo: ${maxVotes}/${majorityNeeded}) - Nadie eliminado`);
     }
+    room.status = 'RESULTS';
   }
 
-  // Cambiar estado a RESULTS
-  room.status = 'RESULTS';
-  room.round++; // Incrementar ronda para forzar actualización en clientes
+  // Si el juego no terminó, incrementar ronda
+  if (room.status !== 'GAME_OVER') {
+    room.round++; // Incrementar ronda para forzar actualización en clientes
+  }
 
   // Resetear hasVoted para siguiente votación
   for (const playerId in room.players) {
@@ -420,6 +462,9 @@ app.post('/api/rooms/:roomId/call_vote', (req, res) => {
   room.lastActivity = Date.now();
 
   console.log(`🗳️ Votación iniciada en ${roomId} por ${room.players[callerId].name} - ${room.votersRemaining} votantes`);
+
+  // Notificar a todos los clientes esperando
+  notifyWaitingClients(roomId);
 
   res.json({
     success: true,
@@ -474,9 +519,13 @@ app.post('/api/rooms/:roomId/vote', (req, res) => {
   if (room.votersRemaining === 0) {
     console.log(`🗳️ Todos votaron - Resolviendo votación`);
     resolveVoting(room);
+    // Notificar inmediatamente después de resolver
+    notifyWaitingClients(roomId);
   } else {
     // Forzar actualización parcial
     room.lastActivity = Date.now();
+    // Notificar para actualizar conteo de votos
+    notifyWaitingClients(roomId);
   }
 
   res.json({
@@ -518,9 +567,50 @@ app.post('/api/rooms/:roomId/continue_game', (req, res) => {
 
   console.log(`▶️ Juego continuado en ${roomId}`);
 
+  // Notificar a todos los clientes esperando
+  notifyWaitingClients(roomId);
+
   res.json({
     success: true,
     status: 'IN_GAME'
+  });
+});
+
+// 🏷️ POST /api/rooms/:roomId/update_name
+// Actualizar el nombre de un jugador en una sala
+app.post('/api/rooms/:roomId/update_name', (req, res) => {
+  const { roomId } = req.params;
+  const playerId = req.cookies.sid;
+  const { newName } = req.body;
+
+  if (!rooms[roomId]) {
+    return res.status(404).json({ error: 'Sala no encontrada' });
+  }
+
+  if (!playerId || !rooms[roomId].players[playerId]) {
+    return res.status(403).json({ error: 'No estás en esta sala' });
+  }
+
+  if (!newName || !newName.trim()) {
+    return res.status(400).json({ error: 'Nombre inválido' });
+  }
+
+  const room = rooms[roomId];
+  const oldName = room.players[playerId].name;
+  const trimmedName = newName.trim().substring(0, 25); // Máximo 25 caracteres
+
+  // Actualizar el nombre
+  room.players[playerId].name = trimmedName;
+  room.lastActivity = Date.now();
+
+  console.log(`✏️ Jugador ${playerId} cambió su nombre de "${oldName}" a "${trimmedName}" en ${roomId}`);
+
+  // Notificar a todos los clientes esperando
+  notifyWaitingClients(roomId);
+
+  res.json({
+    success: true,
+    newName: trimmedName
   });
 });
 
@@ -529,7 +619,21 @@ app.post('/api/rooms/:roomId/continue_game', (req, res) => {
 const LONG_POLL_TIMEOUT = 30000; // 30 segundos
 
 // Mantenemos una lista de "clientes esperando" por sala
-const waitingClients = {}; // { roomId: [res, res, ...] }
+const waitingClients = {}; // { roomId: [{ res, sendStateFn }, ...] }
+
+// Función para notificar a todos los clientes esperando de una sala
+function notifyWaitingClients(roomId) {
+  if (!waitingClients[roomId] || waitingClients[roomId].length === 0) {
+    return;
+  }
+
+  console.log(`📢 [NOTIFY] Marcando ${waitingClients[roomId].length} clientes para actualización inmediata en ${roomId}`);
+
+  // Marcar todos los clientes para que respondan en la próxima iteración
+  waitingClients[roomId].forEach(client => {
+    client.shouldRespond = true;
+  });
+}
 
 // 📡 GET /api/rooms/:roomId/state  (Long Polling)
 app.get('/api/rooms/:roomId/state', async (req, res) => {
@@ -538,6 +642,7 @@ app.get('/api/rooms/:roomId/state', async (req, res) => {
   const clientRound = Number(req.query.round || 0);
   const clientNextRound = Number(req.query.nextRoundAt || 0);
   const clientStatus = req.query.status || 'IN_GAME';
+  const clientTotalPlayers = Number(req.query.totalPlayers || 0);
 
   if (!rooms[roomId]) {
     console.log(`❌ [STATE] Sala no encontrada: ${roomId}`);
@@ -578,9 +683,12 @@ app.get('/api/rooms/:roomId/state', async (req, res) => {
     const word = playerId === room.impostorId ? "???" : room.word;
     const starterName = room.starterPlayerId ? room.players[room.starterPlayerId]?.name : null;
 
-    // Preparar datos de jugadores con estado de vida
+    // Preparar datos de jugadores con estado de vida (solo jugadores activos)
     const playersData = {};
-    for (const pId in room.players) {
+    for (const pId of activePlayers) {
+      // Verificar que el jugador todavía existe (puede haber sido eliminado por inactividad)
+      if (!room.players[pId]) continue;
+
       playersData[pId] = {
         name: room.players[pId].name,
         isAlive: room.players[pId].isAlive !== false, // Default true si no existe
@@ -608,7 +716,16 @@ app.get('/api/rooms/:roomId/state', async (req, res) => {
       votesTally,
       votersRemaining: room.votersRemaining || 0,
       eliminatedPlayerId: room.eliminatedPlayerId || null,
-      myId: playerId // ID del cliente actual
+      myId: playerId, // ID del cliente actual
+      // Datos de victoria
+      winner: room.winner || null,
+      winReason: room.winReason || null,
+      impostorId: room.status === 'GAME_OVER' ? room.impostorId : null, // Solo revelar al impostor cuando termina el juego
+      // Control de anuncios
+      isPremium: IS_PREMIUM_MODE_ACTIVE, // Flag global para desactivar anuncios
+      // Premium Pass del Anfitrión: si el admin es premium, los interstitials se desactivan para TODOS
+      // TODO: Cuando JWT esté listo, verificar: await verifyUserPremium(room.adminId)
+      isRoomPremium: IS_PREMIUM_MODE_ACTIVE // Por ahora usa flag global, luego será JWT del adminId
     };
 
     res.json(payload);
@@ -617,10 +734,14 @@ app.get('/api/rooms/:roomId/state', async (req, res) => {
   // --- Normalizar valores para comparación ---
   const serverRound = Number(room.round || 0);
   const serverNextRound = Number(room.nextRoundAt || 0);
+  const serverStatus = room.status || 'IN_GAME';
+  const serverTotalPlayers = Number(activePlayers.length || 0);
 
   // Si el cliente no tiene datos (round = 0, nextRoundAt = 0), envía estado completo inmediatamente
   console.log("Client Round: ", clientRound)
   console.log("client Next Round: ", clientNextRound)
+  console.log("Client Status: ", clientStatus)
+  console.log("Client Total Players: ", clientTotalPlayers)
   if (clientRound === 0 && clientNextRound === 0) {
     console.log(`🚀 [INIT] Enviando estado inicial de la sala ${roomId}`);
     return sendState(false);
@@ -628,33 +749,75 @@ app.get('/api/rooms/:roomId/state', async (req, res) => {
 
 
   // --- Si algo cambió desde lo que el cliente tiene, responder de inmediato ---
-  if (serverRound !== clientRound || serverNextRound !== clientNextRound) {
-    console.log(`⚡ [UPDATE] Cambio detectado en ${roomId} → round=${serverRound}, nextRoundAt=${serverNextRound}`);
+  if (serverRound !== clientRound || serverNextRound !== clientNextRound || serverStatus !== clientStatus || serverTotalPlayers !== clientTotalPlayers) {
+    console.log(`⚡ [UPDATE] Cambio detectado en ${roomId} → round=${serverRound}, nextRoundAt=${serverNextRound}, status=${serverStatus}, totalPlayers=${serverTotalPlayers}`);
     return sendState(false);
   }
 
   // --- Si todo sigue igual, "colgar" la conexión hasta que haya cambio o timeout ---
   console.log(`🕓 [WAIT] Cliente esperando cambios en room ${roomId} (round=${serverRound})`);
 
+  // Inicializar array de clientes esperando si no existe
+  if (!waitingClients[roomId]) {
+    waitingClients[roomId] = [];
+  }
+
   const startTime = Date.now();
   const timeout = 30000; // 30 segundos
+  let hasResponded = false;
 
-  // Espera activa: revisa cada 500 ms si algo cambió
+  // Crear objeto de cliente para la lista de espera
+  const clientData = { shouldRespond: false };
+
+  // Función para enviar respuesta y limpiar
+  const respondAndCleanup = (unchanged = false) => {
+    if (hasResponded) return;
+    hasResponded = true;
+
+    // Remover este cliente de la lista de espera
+    waitingClients[roomId] = waitingClients[roomId].filter(client => client !== clientData);
+
+    clearInterval(interval);
+    sendState(unchanged);
+  };
+
+  // Agregar este cliente a la lista de espera
+  waitingClients[roomId].push(clientData);
+
+  // Espera activa: revisa cada 100 ms si algo cambió
   const interval = setInterval(() => {
     const now = Date.now();
+    const currentActivePlayers = cleanInactivePlayers(room);
     const roundChanged = Number(room.round || 0) !== serverRound;
     const nextChanged = Number(room.nextRoundAt || 0) !== serverNextRound;
+    const statusChanged = (room.status || 'IN_GAME') !== serverStatus;
+    const playersChanged = Number(currentActivePlayers.length || 0) !== serverTotalPlayers;
 
-    if (roundChanged || nextChanged) {
-      console.log(`✅ [CHANGE] Cambio detectado mientras esperaba en ${roomId}`);
-      clearInterval(interval);
-      sendState(false);
-    } else if (now - startTime >= timeout) {
-      console.log(`⌛ [TIMEOUT] Sin cambios en ${roomId}, respondiendo unchanged`);
-      clearInterval(interval);
-      sendState(true);
+    // Responder si fue marcado explícitamente para responder
+    if (clientData.shouldRespond) {
+      console.log(`📢 [NOTIFIED] Cliente notificado, respondiendo en ${roomId}`);
+      respondAndCleanup(false);
     }
-  }, 500);
+    // O si detectó un cambio
+    else if (roundChanged || nextChanged || statusChanged || playersChanged) {
+      console.log(`✅ [CHANGE] Cambio detectado mientras esperaba en ${roomId}`);
+      respondAndCleanup(false);
+    }
+    // O si se acabó el tiempo
+    else if (now - startTime >= timeout) {
+      console.log(`⌛ [TIMEOUT] Sin cambios en ${roomId}, respondiendo unchanged`);
+      respondAndCleanup(true);
+    }
+  }, 100); // Reducido a 100ms para respuesta más rápida
+
+  // Manejar desconexión del cliente
+  req.on('close', () => {
+    if (!hasResponded) {
+      console.log(`🔌 [DISCONNECT] Cliente desconectado de ${roomId}`);
+      waitingClients[roomId] = waitingClients[roomId].filter(client => client !== clientData);
+      clearInterval(interval);
+    }
+  });
 });
 
 
@@ -743,6 +906,177 @@ app.get('/api/admin/categories', async (req, res) => {
   } catch (error) {
     console.error('❌ Error al obtener categorías:', error);
     res.status(500).json({ error: 'Error al obtener categorías' });
+  }
+});
+
+// 🎮 GET /api/modes/daily - Obtener el modo del día
+app.get('/api/modes/daily', async (req, res) => {
+  try {
+    // Buscar el modo marcado como diario
+    let dailyMode = await prisma.gameMode.findFirst({
+      where: {
+        isDailyMode: true,
+        isActive: true
+      }
+    });
+
+    // Si no hay modo diario, devolver un modo por defecto
+    if (!dailyMode) {
+      const defaultWords = [
+        'Perro', 'Gato', 'Elefante', 'León', 'Pizza', 'Hamburguesa',
+        'Teléfono', 'Computadora', 'Playa', 'Montaña', 'Doctor', 'Maestro',
+        'Fútbol', 'Basketball', 'Internet', 'Robot', 'Sol', 'Luna',
+        'Auto', 'Avión', 'Camisa', 'Zapatos'
+      ];
+      dailyMode = {
+        id: 0,
+        name: 'Modo Clásico',
+        description: 'Juega con las palabras clásicas de Impostor Word',
+        wordList: JSON.stringify(defaultWords),
+        isActive: true
+      };
+    }
+
+    res.json({
+      id: dailyMode.id,
+      name: dailyMode.name,
+      description: dailyMode.description,
+      words: JSON.parse(dailyMode.wordList || '[]')
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener modo diario:', error);
+    res.status(500).json({ error: 'Error al obtener modo diario' });
+  }
+});
+
+// 📋 GET /api/admin/modes - Obtener todos los modos (Admin)
+app.get('/api/admin/modes', async (req, res) => {
+  try {
+    const modes = await prisma.gameMode.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const formatted = modes.map(mode => ({
+      ...mode,
+      words: JSON.parse(mode.wordList || '[]')
+    }));
+
+    res.json({ modes: formatted });
+  } catch (error) {
+    console.error('❌ Error al obtener modos:', error);
+    res.status(500).json({ error: 'Error al obtener modos' });
+  }
+});
+
+// ➕ POST /api/admin/modes - Crear modo de juego (Admin)
+app.post('/api/admin/modes', async (req, res) => {
+  try {
+    const { name, description, words } = req.body;
+
+    if (!name || !words || !Array.isArray(words)) {
+      return res.status(400).json({ error: 'Se requiere nombre y lista de palabras' });
+    }
+
+    const mode = await prisma.gameMode.create({
+      data: {
+        name,
+        description: description || null,
+        wordList: JSON.stringify(words),
+        isActive: true,
+        isDailyMode: false
+      }
+    });
+
+    res.json({
+      success: true,
+      mode: {
+        ...mode,
+        words: JSON.parse(mode.wordList)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error al crear modo:', error);
+    res.status(500).json({ error: 'Error al crear modo' });
+  }
+});
+
+// ✏️ PUT /api/admin/modes/:id - Actualizar modo de juego (Admin)
+app.put('/api/admin/modes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, words, isActive } = req.body;
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (words !== undefined) updateData.wordList = JSON.stringify(words);
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const mode = await prisma.gameMode.update({
+      where: { id: parseInt(id) },
+      data: updateData
+    });
+
+    res.json({
+      success: true,
+      mode: {
+        ...mode,
+        words: JSON.parse(mode.wordList)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error al actualizar modo:', error);
+    res.status(500).json({ error: 'Error al actualizar modo' });
+  }
+});
+
+// 🌟 PUT /api/admin/modes/:id/set-daily - Establecer modo como diario (Admin)
+app.put('/api/admin/modes/:id/set-daily', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Primero, quitar el flag de todos los modos
+    await prisma.gameMode.updateMany({
+      where: { isDailyMode: true },
+      data: { isDailyMode: false }
+    });
+
+    // Luego, establecer el modo seleccionado como diario
+    const mode = await prisma.gameMode.update({
+      where: { id: parseInt(id) },
+      data: { isDailyMode: true }
+    });
+
+    res.json({
+      success: true,
+      message: `${mode.name} establecido como modo del día`,
+      mode: {
+        ...mode,
+        words: JSON.parse(mode.wordList)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error al establecer modo diario:', error);
+    res.status(500).json({ error: 'Error al establecer modo diario' });
+  }
+});
+
+// 🗑️ DELETE /api/admin/modes/:id - Eliminar modo de juego (Admin)
+app.delete('/api/admin/modes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.gameMode.delete({
+      where: { id: parseInt(id) }
+    });
+
+    res.json({
+      success: true,
+      message: 'Modo eliminado correctamente'
+    });
+  } catch (error) {
+    console.error('❌ Error al eliminar modo:', error);
+    res.status(500).json({ error: 'Error al eliminar modo' });
   }
 });
 
@@ -851,7 +1185,8 @@ app.delete('/api/admin/words/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor SpyWord escuchando en http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor Impostor Word escuchando en http://0.0.0.0:${PORT}`);
+  console.log(`🌐 Accesible desde la red local`);
   console.log(`📝 Sistema de palabras: Base de datos con Prisma`);
 });

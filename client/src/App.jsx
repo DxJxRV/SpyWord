@@ -2,11 +2,16 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-ro
 import { Toaster, toast } from "sonner";
 import { useState } from "react";
 import { Pencil, Check, X } from "lucide-react";
-import Home from "./pages/Home";
+import MainMenu from "./pages/MainMenu";
+import Online from "./pages/Online";
+import DailyMode from "./pages/DailyMode";
+import PassAndPlay from "./pages/PassAndPlay";
 import Room from "./pages/Room";
 import Admin from "./pages/Admin";
-import InstallPrompt from "./components/InstallPrompt";
+import LegalPages from "./pages/LegalPages";
+import About from "./pages/About";
 import FullscreenButton from "./components/FullscreenButton";
+import Footer from "./components/Footer";
 import { TutorialProvider } from "./contexts/TutorialContext";
 import { getUserName, setUserName as saveUserName } from "./utils/nameGenerator";
 
@@ -130,14 +135,26 @@ function RoomNavbar() {
   );
 }
 
+function ConditionalFooter() {
+  const location = useLocation();
+
+  // Don't show footer in Room or Admin pages
+  const hideFooter = location.pathname.startsWith('/room/') ||
+                     location.pathname.startsWith('/admin');
+
+  if (hideFooter) return null;
+
+  return <Footer />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <TutorialProvider>
-        <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden">
+        <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden flex flex-col">
         {/* 🔹 Toaster para notificaciones */}
-        <Toaster 
-          theme="dark" 
+        <Toaster
+          theme="dark"
           position="top-right"
           richColors
           closeButton
@@ -150,17 +167,22 @@ export default function App() {
         <RoomNavbar />
 
         {/* 🔹 Contenido de rutas */}
-        <div className="pt-0">
+        <div className="pt-0 flex-1">
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<MainMenu />} />
+            <Route path="/online" element={<Online />} />
+            <Route path="/daily-mode" element={<DailyMode />} />
+            <Route path="/pass-and-play" element={<PassAndPlay />} />
             <Route path="/room/:roomId" element={<Room />} />
-            <Route path="/join/:roomId" element={<Home />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/privacy" element={<LegalPages type="privacy" />} />
+            <Route path="/terms" element={<LegalPages type="terms" />} />
+            <Route path="/about" element={<About />} />
           </Routes>
         </div>
 
-        {/* 🔹 Botón de instalación flotante (abajo a la derecha) */}
-        <InstallPrompt />
+        {/* 🔹 Footer condicional */}
+        <ConditionalFooter />
         </div>
       </TutorialProvider>
     </BrowserRouter>

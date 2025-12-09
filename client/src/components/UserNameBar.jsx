@@ -52,7 +52,7 @@ export default function UserNameBar() {
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-purple-900/30 to-blue-900/30 backdrop-blur-md border-b border-purple-500/20 z-50">
+    <div className="fixed top-14 left-0 right-0 bg-gradient-to-r from-purple-900/30 to-blue-900/30 backdrop-blur-md border-b border-purple-500/20 z-40">
       <div data-tutorial="user-name-bar" className="flex items-center justify-center px-4 py-3">
         {isEditing ? (
           <div className="flex items-center gap-2">

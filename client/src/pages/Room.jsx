@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Eye, EyeOff, Share2, QrCode, RotateCw } from "lucide-react";
+import { Eye, EyeOff, Share2, QrCode, RotateCw, Copy } from "lucide-react";
 import { api } from "../services/api";
 import { toast } from "sonner";
 import Joyride from "react-joyride";
@@ -9,6 +9,10 @@ import { useTutorial } from "../contexts/TutorialContext";
 import { tutorialStepsRoom } from "../data/tutorialSteps";
 import TutorialButton from "../components/TutorialButton";
 import VotingPanel from "../components/VotingPanel";
+import GameOverPanel from "../components/GameOverPanel";
+import AdPlaceholder from "../components/AdPlaceholder";
+import InterstitialAd from "../components/InterstitialAd";
+import AppHeader from "../components/AppHeader";
 
 export default function Room() {
   const { roomId } = useParams(); // Solo necesitamos roomId
@@ -37,6 +41,16 @@ export default function Room() {
   const [votersRemaining, setVotersRemaining] = useState(0); // Cuántos jugadores faltan por votar
   const [eliminatedPlayerId, setEliminatedPlayerId] = useState(null); // ID del jugador eliminado
   const [myId, setMyId] = useState(null); // ID del jugador actual
+
+  // Estados para game over
+  const [winner, setWinner] = useState(null); // 'IMPOSTOR' o 'PLAYERS'
+  const [winReason, setWinReason] = useState(null); // 'impostor_eliminated' o 'impostor_survived'
+  const [impostorId, setImpostorId] = useState(null); // ID del impostor (solo revelado en game over)
+
+  // Estados para anuncios
+  const [isPremium, setIsPremium] = useState(false); // Control de anuncios desde el servidor
+  const [isRoomPremium, setIsRoomPremium] = useState(false); // Premium Pass del Anfitrión
+  const [showRestartInterstitial, setShowRestartInterstitial] = useState(false);
 
   // Referencia para rastrear IDs de jugadores previos
   const previousPlayerIds = useRef(new Set());
@@ -124,6 +138,15 @@ export default function Room() {
         setEliminatedPlayerId(res.data.eliminatedPlayerId || null);
         setMyId(res.data.myId || null);
 
+        // Actualizar datos de game over
+        setWinner(res.data.winner || null);
+        setWinReason(res.data.winReason || null);
+        setImpostorId(res.data.impostorId || null);
+
+        // Actualizar estado de anuncios
+        setIsPremium(res.data.isPremium || false);
+        setIsRoomPremium(res.data.isRoomPremium || false);
+
         if (res.data.nextRoundAt && !nextRoundTimestamp.current) {
           nextRoundTimestamp.current = res.data.nextRoundAt;
           setCountdownActive(true); // Activar el countdown
@@ -172,7 +195,13 @@ export default function Room() {
     return () => clearInterval(timer);
   }, [countdownActive]);
 
-  const handleRestart = async () => {
+  const handleRestart = () => {
+    // Mostrar viñeta intersticial antes de reiniciar
+    setShowRestartInterstitial(true);
+  };
+
+  const handleRestartInterstitialClose = async () => {
+    setShowRestartInterstitial(false);
     setLoading(true);
     setWord(null); // Limpiar la palabra al reiniciar
     try {
@@ -226,10 +255,48 @@ export default function Room() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20 text-center">
-      <h2 className="text-3xl font-bold text-center mb-10">Impostor<br/>Word 🕵️‍♂️</h2>
-      <div className="max-w-md w-full space-y-6">
-        
+    <>
+      <AppHeader />
+
+      {/* Bottom bar con código de room y botón salir */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-900/90 backdrop-blur-sm border-t border-gray-800 z-30">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+          {/* Código del room - clickeable para copiar */}
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(roomId);
+              toast.success("¡Código copiado!");
+              if (navigator.vibrate) navigator.vibrate(30);
+            }}
+            className="flex items-center gap-2 hover:bg-white/5 px-3 py-2 rounded-lg transition-all group cursor-pointer"
+            title="Click para copiar código"
+          >
+            <p className="text-xs text-gray-400">Sala:</p>
+            <p className="text-amber-400 font-mono text-lg font-bold tracking-wider">{roomId}</p>
+            <Copy size={16} className="text-gray-400 group-hover:text-amber-400 transition-colors" />
+          </button>
+
+          {/* Botón salir */}
+          <button
+            onClick={() => navigate('/')}
+            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 text-sm font-medium"
+          >
+            <span>✕</span>
+            <span>Salir</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20 pb-24 text-center">
+        <div className="max-w-md w-full space-y-6">
+
+        {/* Banner Publicitario - Top */}
+        {roomStatus !== 'GAME_OVER' && (
+          <div className="flex justify-center">
+            <AdPlaceholder isPremium={isPremium} format="horizontal" />
+          </div>
+        )}
+
         <div data-tutorial="room-info" className="bg-blue-500/20 px-4 py-2 rounded-lg border border-blue-500/30">
           <p className="text-xs text-gray-400">Ronda {currentRound} • {totalPlayers} jugadores</p>
         </div>
@@ -308,24 +375,42 @@ export default function Room() {
           </div>
         )}
 
-        {/* Panel de votación */}
-        <VotingPanel
-          roomState={{
-            status: roomStatus,
-            players,
-            votesTally,
-            votersRemaining,
-            eliminatedPlayerId,
-            isAdmin,
-          }}
-          roomId={roomId}
-          myId={myId}
-          onUpdate={() => {
-            // Forzar una actualización del polling
-            setCurrentRound((prev) => prev);
-          }}
-        />
+        {/* Panel de votación o game over */}
+        {roomStatus === 'GAME_OVER' ? (
+          <GameOverPanel
+            roomState={{
+              winner,
+              winReason,
+              players,
+              impostorId,
+              isAdmin,
+            }}
+            roomId={roomId}
+            myId={myId}
+            onRestart={handleRestart}
+            isPremium={isPremium}
+          />
+        ) : (
+          <VotingPanel
+            roomState={{
+              status: roomStatus,
+              players,
+              votesTally,
+              votersRemaining,
+              eliminatedPlayerId,
+              isAdmin,
+            }}
+            roomId={roomId}
+            myId={myId}
+            onUpdate={() => {
+              // Forzar una actualización del polling
+              setCurrentRound((prev) => prev);
+            }}
+          />
+        )}
 
+        {/* Botones de compartir (ocultos en game over) */}
+        {roomStatus !== 'GAME_OVER' && (
         <div className="w-full">
           {isAdmin ? (
             // Layout para admin: botón grande a la izquierda, QR y Compartir a la derecha
@@ -368,6 +453,14 @@ export default function Room() {
             </div>
           )}
         </div>
+        )}
+
+        {/* Banner Publicitario - Bottom */}
+        {roomStatus !== 'GAME_OVER' && (
+          <div className="flex justify-center">
+            <AdPlaceholder isPremium={isPremium} format="horizontal" />
+          </div>
+        )}
       </div>
 
       {/* Modal de QR */}
@@ -502,7 +595,16 @@ export default function Room() {
 
       {/* Botón flotante para reiniciar tutorial */}
       <TutorialButton isRoom={true} />
-    </div>
+
+      {/* Viñeta Intersticial */}
+      {showRestartInterstitial && (
+        <InterstitialAd
+          isRoomPremium={isRoomPremium}
+          onClose={handleRestartInterstitialClose}
+        />
+      )}
+      </div>
+    </>
   );
 }
 

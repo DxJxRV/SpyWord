@@ -1,6 +1,6 @@
 {
-  "name": "SpyWord",
-  "short_name": "SpyWord",
+  "name": "Impostor Word",
+  "short_name": "ImpostorWord",
   "description": "Descubre quién no conoce la palabra secreta.",
   "start_url": "/",
   "scope": "/",

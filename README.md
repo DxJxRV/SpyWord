@@ -1,4 +1,4 @@
-# 🕵️‍♂️ SpyWord - Juego Multijugador
+# 🕵️‍♂️ Impostor Word - Juego Multijugador
 
 Juego de palabras con salas tipo Google Meet donde los jugadores reciben una palabra y deben descubrir quién es el impostor.
 

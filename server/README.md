@@ -1,6 +1,6 @@
-# SpyWord Server
+# Impostor Word Server
 
-Backend para el juego SpyWord.
+Backend para el juego Impostor Word.
 
 ## Instalación
 
