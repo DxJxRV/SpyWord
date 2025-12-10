@@ -20,6 +20,16 @@ export default defineConfig({
       manifest: false,
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        
+        // ==========================================================
+        // 🛠️ CORRECCIÓN CRÍTICA: EXCLUIR RUTAS DEL BACKEND DEL SERVICE WORKER
+        // ==========================================================
+        navigateFallbackDenylist: [
+            /^\/auth/,     // Ignora rutas de autenticación
+            /^\/api/,      // Ignora llamadas a la API
+            /^\/webhook/   // Ignora el webhook
+        ],
+        
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === "image",
