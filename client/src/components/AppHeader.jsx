@@ -26,6 +26,7 @@ export default function AppHeader() {
   const [loginPassword, setLoginPassword] = useState("");
   const [registerName, setRegisterName] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [redirectToPremium, setRedirectToPremium] = useState(false); // Flag para redirigir a premium después del login
 
   // Verificar parámetros de autenticación en la URL (OAuth redirect)
   useEffect(() => {
@@ -36,11 +37,25 @@ export default function AppHeader() {
       refreshUser();
       toast.success("¡Sesión iniciada correctamente!");
       window.history.replaceState({}, '', location.pathname);
+
+      // Si el usuario quería ir a premium, redirigir
+      if (redirectToPremium) {
+        setRedirectToPremium(false);
+        navigate('/premium');
+      }
     } else if (authStatus === 'error') {
       toast.error("Error al iniciar sesión");
       window.history.replaceState({}, '', location.pathname);
     }
-  }, [location.search, location.pathname]);
+  }, [location.search, location.pathname, redirectToPremium, navigate]);
+
+  // Redirigir a premium si el usuario se loguea y tenía intención de ser premium
+  useEffect(() => {
+    if (user && redirectToPremium) {
+      setRedirectToPremium(false);
+      navigate('/premium');
+    }
+  }, [user, redirectToPremium, navigate]);
 
   // Cerrar menú al hacer click fuera
   useEffect(() => {
@@ -100,6 +115,12 @@ export default function AppHeader() {
   };
 
   const handleLogin = () => {
+    setShowLoginModal(true);
+    setShowProfileMenu(false);
+  };
+
+  const handlePremiumClick = () => {
+    setRedirectToPremium(true);
     setShowLoginModal(true);
     setShowProfileMenu(false);
   };
@@ -216,8 +237,51 @@ export default function AppHeader() {
                     // Usuario autenticado
                     <>
                       <p className="text-xs text-gray-400 mb-2">Cuenta de Google</p>
-                      <p className="text-sm font-semibold text-white truncate">{user.email}</p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-sm font-semibold text-white truncate mb-2">{user.email}</p>
+
+                      {/* Campo de nombre editable para usuarios autenticados */}
+                      <div className="mt-2">
+                        <p className="text-xs text-gray-400 mb-1">Nombre en el juego</p>
+                        {isEditing ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={tempName}
+                              onChange={(e) => setTempName(e.target.value)}
+                              onKeyDown={handleKeyDown}
+                              className="bg-gray-700 text-white px-2 py-1 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm flex-1"
+                              maxLength={25}
+                              autoFocus
+                            />
+                            <button
+                              onClick={handleSaveName}
+                              className="bg-emerald-500/80 hover:bg-emerald-600 p-1.5 rounded-lg transition-all"
+                              title="Guardar"
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="bg-red-500/80 hover:bg-red-600 p-1.5 rounded-lg transition-all"
+                              title="Cancelar"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleEditName}
+                            className="group flex items-center gap-2 hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-all w-full"
+                          >
+                            <span className="text-sm font-semibold text-white flex-1 text-left">
+                              {name}
+                            </span>
+                            <Pencil size={14} className="text-gray-400 group-hover:text-white transition-colors" />
+                          </button>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-gray-500 mt-2">
                         {user.isPremium ? (
                           <span className="text-amber-400">✨ Usuario Premium</span>
                         ) : (
@@ -273,7 +337,7 @@ export default function AppHeader() {
 
                 <div className="py-2">
                   {!isAuthLoading && !user && (
-                    // Usuario no autenticado - Mostrar botón de login
+                    // Usuario no autenticado - Mostrar botón de login y premium
                     <>
                       <button
                         className="w-full px-4 py-3 text-left hover:bg-blue-500/10 transition-colors flex items-center gap-3 group"
@@ -283,6 +347,17 @@ export default function AppHeader() {
                         <div>
                           <p className="text-white font-medium">Iniciar sesión</p>
                           <p className="text-xs text-gray-400">Accede con Google</p>
+                        </div>
+                      </button>
+
+                      <button
+                        className="w-full px-4 py-3 text-left hover:bg-amber-500/10 transition-colors flex items-center gap-3 group"
+                        onClick={handlePremiumClick}
+                      >
+                        <Crown size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                        <div>
+                          <p className="text-white font-medium">Hazte Premium</p>
+                          <p className="text-xs text-gray-400">Inicia sesión para ser Premium</p>
                         </div>
                       </button>
                     </>
@@ -357,6 +432,7 @@ export default function AppHeader() {
                 setLoginEmail("");
                 setLoginPassword("");
                 setRegisterName("");
+                setRedirectToPremium(false);
               }}
               className="absolute top-3 right-3 text-gray-400 hover:text-white"
             >
@@ -367,6 +443,16 @@ export default function AppHeader() {
             {loginMode === "options" && (
               <div className="space-y-4">
                 <h2 className="text-2xl font-bold text-white mb-4">Iniciar Sesión</h2>
+
+                {/* Mensaje si viene de Premium */}
+                {redirectToPremium && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
+                    <div className="flex items-center gap-2 text-amber-400 text-sm">
+                      <Crown size={16} />
+                      <p>Después de iniciar sesión serás redirigido a Premium</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Google OAuth */}
                 <button
@@ -420,6 +506,16 @@ export default function AppHeader() {
                 </button>
 
                 <h2 className="text-2xl font-bold text-white mb-4">Iniciar Sesión</h2>
+
+                {/* Mensaje si viene de Premium */}
+                {redirectToPremium && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
+                    <div className="flex items-center gap-2 text-amber-400 text-sm">
+                      <Crown size={16} />
+                      <p>Después de iniciar sesión serás redirigido a Premium</p>
+                    </div>
+                  </div>
+                )}
 
                 <form onSubmit={handleEmailLogin} className="space-y-4">
                   <div>
@@ -483,6 +579,16 @@ export default function AppHeader() {
                 </button>
 
                 <h2 className="text-2xl font-bold text-white mb-4">Crear Cuenta</h2>
+
+                {/* Mensaje si viene de Premium */}
+                {redirectToPremium && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
+                    <div className="flex items-center gap-2 text-amber-400 text-sm">
+                      <Crown size={16} />
+                      <p>Después de registrarte serás redirigido a Premium</p>
+                    </div>
+                  </div>
+                )}
 
                 <form onSubmit={handleEmailRegister} className="space-y-4">
                   <div>

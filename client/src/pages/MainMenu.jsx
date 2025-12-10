@@ -18,81 +18,62 @@ export default function MainMenu() {
 
   // Auto-join feature: detect ?join=CODIGO parameter
   useEffect(() => {
-    let cancelled = false;
-
     // Con hash routing, los parámetros están en location.hash, no en location.search
     const hash = location.hash; // Ej: "#/?join=8EBIRH"
     const queryStart = hash.indexOf('?');
 
-    if (queryStart !== -1) {
-      const queryString = hash.substring(queryStart + 1); // "join=8EBIRH"
-      const searchParams = new URLSearchParams(queryString);
-      const joinCode = searchParams.get('join');
+    if (queryStart === -1) return;
 
-      if (joinCode) {
-        const roomId = joinCode.trim().toUpperCase();
-        const sessionKey = `joined_${roomId}`;
+    const queryString = hash.substring(queryStart + 1); // "join=8EBIRH"
+    const searchParams = new URLSearchParams(queryString);
+    const joinCode = searchParams.get('join');
 
-        // Check if already joined in this session
-        const alreadyJoined = sessionStorage.getItem(sessionKey);
-        if (alreadyJoined) {
-          console.log(`⚠️ Ya se unió a ${roomId} en esta sesión, navegando directamente`);
-          navigate(`/room/${roomId}`, { replace: true });
-          return;
-        }
+    if (!joinCode) return;
 
-        // Prevent concurrent join attempts
-        if (isJoining.current) {
-          console.log(`⚠️ Ya hay un intento de unirse en progreso, ignorando`);
-          return;
-        }
+    const roomId = joinCode.trim().toUpperCase();
+    const sessionKey = `joined_${roomId}`;
 
-        isJoining.current = true;
-
-        // Intentar unirse automáticamente
-        const autoJoin = async () => {
-          setLoading(true);
-          try {
-            const playerName = getUserName();
-            await api.post(`/rooms/${roomId}/join`, { playerName });
-
-            // Check if effect was cancelled (component unmounted or effect re-ran)
-            if (cancelled) {
-              console.log(`⚠️ Operación de unirse cancelada para ${roomId}`);
-              return;
-            }
-
-            // Mark as joined in session
-            sessionStorage.setItem(sessionKey, 'true');
-
-            toast.success("¡Te uniste a la sala!");
-            navigate(`/room/${roomId}`, { replace: true });
-            if (navigator.vibrate) navigator.vibrate(40);
-          } catch (error) {
-            if (cancelled) return;
-
-            console.error("Error al unirse:", error);
-            toast.error("No se pudo unir a la sala. Verifica el código.");
-            // Don't mark as joined on error
-            // Limpiar el parámetro join del URL y volver al home
-            navigate('/', { replace: true });
-          } finally {
-            if (!cancelled) {
-              setLoading(false);
-              isJoining.current = false;
-            }
-          }
-        };
-
-        autoJoin();
-      }
+    // Check if already joined in this session
+    const alreadyJoined = sessionStorage.getItem(sessionKey);
+    if (alreadyJoined) {
+      console.log(`✅ Ya unido a ${roomId}, navegando...`);
+      navigate(`/room/${roomId}`, { replace: true });
+      return;
     }
 
-    // Cleanup function
-    return () => {
-      cancelled = true;
+    // Prevent concurrent join attempts
+    if (isJoining.current) {
+      console.log(`⚠️ Ya hay un intento de unirse en progreso`);
+      return;
+    }
+
+    isJoining.current = true;
+
+    // Intentar unirse automáticamente
+    const autoJoin = async () => {
+      setLoading(true);
+      try {
+        const playerName = getUserName();
+        await api.post(`/rooms/${roomId}/join`, { playerName });
+
+        // Mark as joined in session
+        sessionStorage.setItem(sessionKey, 'true');
+
+        toast.success("¡Te uniste a la sala!");
+        navigate(`/room/${roomId}`, { replace: true });
+        if (navigator.vibrate) navigator.vibrate(40);
+      } catch (error) {
+        console.error("Error al unirse:", error);
+        toast.error("No se pudo unir a la sala. Verifica el código.");
+        navigate('/', { replace: true });
+      } finally {
+        setLoading(false);
+        isJoining.current = false;
+      }
     };
-  }, [location.hash, navigate]);
+
+    autoJoin();
+  }, [navigate]);
 
   useEffect(() => {
     // Fetch el modo del día

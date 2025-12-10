@@ -357,6 +357,67 @@ app.post('/api/rooms/:roomId/restart', async (req, res) => {
   }
 });
 
+// 🚫 POST /api/rooms/:roomId/kick - Eliminar un jugador de la sala
+app.post('/api/rooms/:roomId/kick', (req, res) => {
+  const { roomId } = req.params;
+  const { playerId } = req.body;
+  const adminId = req.cookies.sid;
+
+  if (!rooms[roomId]) {
+    return res.status(404).json({ error: 'Sala no encontrada' });
+  }
+
+  const room = rooms[roomId];
+
+  // Verificar que quien hace la petición es el admin
+  if (room.adminId !== adminId) {
+    return res.status(403).json({ error: 'Solo el admin puede eliminar jugadores' });
+  }
+
+  // Verificar que el jugador existe
+  if (!room.players[playerId]) {
+    return res.status(404).json({ error: 'Jugador no encontrado' });
+  }
+
+  // No permitir que el admin se elimine a sí mismo
+  if (playerId === adminId) {
+    return res.status(400).json({ error: 'No puedes eliminarte a ti mismo' });
+  }
+
+  // Eliminar el jugador
+  const playerName = room.players[playerId].name;
+  delete room.players[playerId];
+
+  // Si el jugador eliminado era el impostor, seleccionar un nuevo impostor
+  if (room.impostorId === playerId) {
+    const activePlayers = getActivePlayers(room);
+    if (activePlayers.length > 0) {
+      const randomIndex = Math.floor(Math.random() * activePlayers.length);
+      room.impostorId = activePlayers[randomIndex];
+      console.log(`🎭 Nuevo impostor seleccionado: ${room.impostorId}`);
+    }
+  }
+
+  // Si el jugador eliminado era el que iniciaba, seleccionar otro
+  if (room.starterPlayerId === playerId) {
+    const activePlayers = getActivePlayers(room);
+    if (activePlayers.length > 0) {
+      const randomIndex = Math.floor(Math.random() * activePlayers.length);
+      room.starterPlayerId = activePlayers[randomIndex];
+      console.log(`🎮 Nuevo jugador que inicia: ${room.starterPlayerId}`);
+    }
+  }
+
+  room.lastActivity = Date.now();
+
+  console.log(`🚫 Jugador eliminado de ${roomId}: ${playerId} (${playerName})`);
+
+  // Notificar a todos los clientes
+  notifyWaitingClients(roomId);
+
+  res.json({ success: true, message: `${playerName} fue eliminado` });
+});
+
 // ============================================
 // 🗳️ ENDPOINTS DE VOTACIÓN
 // ============================================
@@ -678,14 +739,15 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
   const room = rooms[roomId];
   room.lastActivity = Date.now();
 
-  // Asegurar que el jugador exista o registrarlo
-  if (playerId) {
-    if (!room.players[playerId]) {
-      room.players[playerId] = { lastSeen: Date.now(), name: "Anónimo" };
-      console.log(`📝 Jugador registrado en ${roomId}: ${playerId}`);
-    } else {
-      room.players[playerId].lastSeen = Date.now();
-    }
+  // Verificar si el jugador fue eliminado de la sala
+  if (playerId && !room.players[playerId]) {
+    console.log(`🚫 [STATE] Jugador ${playerId} no está en sala ${roomId} - fue eliminado`);
+    return res.json({ kicked: true });
+  }
+
+  // Actualizar lastSeen del jugador
+  if (playerId && room.players[playerId]) {
+    room.players[playerId].lastSeen = Date.now();
   }
 
   // Limpiar jugadores inactivos

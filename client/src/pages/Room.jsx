@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Eye, EyeOff, Share2, QrCode, RotateCw, Copy } from "lucide-react";
+import { Eye, EyeOff, Share2, QrCode, RotateCw, Copy, ChevronDown, ChevronUp, UserX } from "lucide-react";
 import { api } from "../services/api";
 import { toast } from "sonner";
 import Joyride from "react-joyride";
@@ -52,6 +52,9 @@ export default function Room() {
   // Estados para anuncios
   const [isRoomPremium, setIsRoomPremium] = useState(false); // Premium Pass del Anfitrión
   const [showRestartInterstitial, setShowRestartInterstitial] = useState(false);
+
+  // Estado para dropdown de jugadores
+  const [showPlayersDropdown, setShowPlayersDropdown] = useState(false);
 
   // Referencia para rastrear IDs de jugadores previos
   const previousPlayerIds = useRef(new Set());
@@ -114,6 +117,14 @@ export default function Room() {
         });
 
         console.log("📩 [POLL] Respuesta recibida:", res.data);
+
+        // 🚫 Jugador eliminado de la sala
+        if (res.data.kicked) {
+          console.log("🚫 [POLL] Jugador eliminado de la sala → redirigiendo a home");
+          toast.error("Has sido eliminado de la sala");
+          navigate("/");
+          return;
+        }
 
         // 🔁 Sin cambios
         if (res.data.unchanged) {
@@ -243,6 +254,27 @@ export default function Room() {
     }
   };
 
+  const handleKickPlayer = async (playerId, playerName) => {
+    if (!isAdmin) {
+      toast.error("Solo el administrador puede eliminar jugadores");
+      return;
+    }
+
+    if (playerId === myId) {
+      toast.error("No puedes eliminarte a ti mismo");
+      return;
+    }
+
+    try {
+      await api.post(`/rooms/${roomId}/kick`, { playerId });
+      toast.success(`${playerName} fue eliminado de la sala`);
+      if (navigator.vibrate) navigator.vibrate(50);
+    } catch (err) {
+      console.error("Error al eliminar jugador:", err);
+      toast.error("Error al eliminar el jugador");
+    }
+  };
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
@@ -297,8 +329,43 @@ export default function Room() {
           </div>
         )}
 
-        <div data-tutorial="room-info" className="bg-blue-500/20 px-4 py-2 rounded-lg border border-blue-500/30">
-          <p className="text-xs text-gray-400">Ronda {currentRound} • {totalPlayers} jugadores</p>
+        <div className="relative">
+          <button
+            data-tutorial="room-info"
+            onClick={() => setShowPlayersDropdown(!showPlayersDropdown)}
+            className="w-full bg-blue-500/20 px-4 py-2 rounded-lg border border-blue-500/30 hover:bg-blue-500/30 transition-all flex items-center justify-center relative"
+          >
+            <p className="text-xs text-gray-400">Ronda {currentRound} • {totalPlayers} jugadores</p>
+            <span className="absolute right-4">
+              {showPlayersDropdown ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+            </span>
+          </button>
+
+          {/* Dropdown de jugadores */}
+          {showPlayersDropdown && (
+            <div className="absolute top-full mt-2 left-0 right-0 bg-gray-800 rounded-lg border border-blue-500/30 shadow-lg z-10 max-h-64 overflow-y-auto">
+              {Object.entries(players).map(([playerId, player]) => (
+                <div
+                  key={playerId}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-700/50 transition-colors border-b border-gray-700 last:border-b-0"
+                >
+                  <span className="text-sm text-white">
+                    {player.name}
+                    {playerId === myId && <span className="text-gray-400 ml-1">(tú)</span>}
+                  </span>
+                  {isAdmin && playerId !== myId && (
+                    <button
+                      onClick={() => handleKickPlayer(playerId, player.name)}
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded transition-all"
+                      title={`Eliminar a ${player.name}`}
+                    >
+                      <UserX size={18} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Mostrar siempre quién inicia (oculto durante votación) */}
@@ -312,7 +379,12 @@ export default function Room() {
               </p>
             ) : (
               // Mostrar nombre
-              <p className="text-lg font-bold text-amber-400">{starterName}</p>
+              <p className="text-lg font-bold text-amber-400">
+                {starterName}
+                {myId && players[myId] && players[myId].name === starterName && (
+                  <span className="text-amber-300 ml-1 text-sm">(tú)</span>
+                )}
+              </p>
             )}
           </div>
         )}
