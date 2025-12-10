@@ -1,15 +1,19 @@
 import { useZxing } from "react-zxing";
 import { X, Camera as CameraIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function QRScanner({ onScan, onClose }) {
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
+  const [facingMode, setFacingMode] = useState("environment"); // Empezar con cámara trasera
+  const [cameraRetried, setCameraRetried] = useState(false);
 
   const { ref } = useZxing({
     paused: false,
     constraints: {
-      video: true, // Usar cualquier cámara disponible
+      video: {
+        facingMode: facingMode, // Cámara trasera en móviles, frontal en desktop
+      },
     },
     timeBetweenDecodingAttempts: 300,
     onDecodeResult(result) {
@@ -44,7 +48,17 @@ export default function QRScanner({ onScan, onClose }) {
     },
     onError(error) {
       console.error("Error de cámara:", error);
-      setError("No se pudo acceder a la cámara. Verifica los permisos.");
+
+      // Si falla con cámara trasera y no hemos intentado con la frontal, reintentar
+      if ((error.name === "NotFoundError" || error.name === "OverconstrainedError") &&
+          facingMode === "environment" &&
+          !cameraRetried) {
+        console.log("Cámara trasera no disponible, intentando con cámara frontal...");
+        setCameraRetried(true);
+        setFacingMode("user");
+      } else {
+        setError("No se pudo acceder a la cámara. Verifica los permisos.");
+      }
     },
   });
 
