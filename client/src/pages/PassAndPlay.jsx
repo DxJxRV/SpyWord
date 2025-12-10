@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Play } from "lucide-react";
+import { ArrowLeft, Users, Play, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import ScratchCard from "react-scratchcard-v2";
+import Joyride, { ACTIONS, EVENTS, STATUS } from "react-joyride";
 import AppHeader from "../components/AppHeader";
 import { palabras } from "../data/palabras";
 import AdPlaceholder from "../components/AdPlaceholder";
@@ -26,6 +27,185 @@ export default function PassAndPlay() {
   const { isPremium } = useAuth();
   const isRoomPremium = false; // Premium Pass - false porque es modo local
   const [showNewRoundInterstitial, setShowNewRoundInterstitial] = useState(false);
+
+  // Estados del tutorial
+  const [runTutorial, setRunTutorial] = useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
+  const [isTutorialMode, setIsTutorialMode] = useState(false);
+
+  // Definir TODOS los pasos del tutorial en un solo array
+  const tutorialSteps = [
+    // Paso 0: Contador de jugadores
+    {
+      target: '.pnp-player-counter',
+      content: '👥 Este es el contador de jugadores. Ajusta cuántas personas van a jugar en esta partida. Mínimo 3 jugadores.',
+      disableBeacon: true,
+      placement: 'bottom',
+    },
+    // Paso 1: Botón iniciar partida
+    {
+      target: '.pnp-start-button',
+      content: '🎮 Cuando estés listo, presiona "Iniciar Partida". Cada jugador verá su palabra por turnos.',
+      disableBeacon: true,
+      placement: 'bottom',
+    },
+    // Paso 2: Contenedor de raspado (se mostrará cuando showingCard sea true)
+    {
+      target: '.pnp-scratch-container',
+      content: '✨ Este es el contenedor de raspado. Cada jugador debe raspar con el dedo (o mouse) para revelar su palabra. Si eres el impostor te saldrá "???"',
+      disableBeacon: true,
+      placement: 'bottom',
+    },
+    // Paso 3: Botón siguiente jugador
+    {
+      target: '.pnp-next-button',
+      content: '➡️ Cuando hayas visto tu palabra, presiona este botón. En una partida real, cada jugador verá su palabra. En el tutorial, pasaremos directamente a la fase de discusión.',
+      disableBeacon: true,
+      placement: 'top',
+    },
+    // Paso 4: Botón ir a votar (se mostrará en fase de discusión)
+    {
+      target: '.pnp-vote-button',
+      content: '🗳️ Después de discutir, presiona "Ir a Votar" para ir a la pantalla de votación.',
+      disableBeacon: true,
+      placement: 'top',
+    },
+    // Paso 5: Pantalla de votación (se mostrará cuando votingMode sea true)
+    {
+      target: '.pnp-voting-container',
+      content: '⚖️ Aquí todos votan por quien creen que es el impostor. Si eliminan al impostor, ¡los jugadores ganan! Si fallan, el juego continúa. Si solo quedan 2 jugadores y uno es el impostor, ¡el impostor gana!',
+      disableBeacon: true,
+      placement: 'top',
+    },
+  ];
+
+  // Función para iniciar el tutorial
+  const startTutorial = () => {
+    // Si no estamos en setup mode, resetear primero
+    if (!setupMode) {
+      resetGame();
+      // Esperar un momento para que se complete el reset
+      setTimeout(() => {
+        setIsTutorialMode(true);
+        setRunTutorial(true);
+        setTutorialStepIndex(0);
+      }, 300);
+    } else {
+      setIsTutorialMode(true);
+      setRunTutorial(true);
+      setTutorialStepIndex(0);
+    }
+  };
+
+  // Manejador del callback del tutorial
+  const handleJoyrideCallback = (data) => {
+    const { action, index, status, type } = data;
+
+    console.log(`📘 Tutorial Callback: index=${index}, action=${action}, status=${status}, type=${type}, votingMode=${votingMode}, showingCard=${showingCard}`);
+
+    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+      // Tutorial terminado o saltado
+      setRunTutorial(false);
+      if (status === STATUS.FINISHED) {
+        toast.success("¡Tutorial completado! Ya puedes jugar libremente.");
+      }
+      setIsTutorialMode(false);
+      setTutorialStepIndex(0);
+      // Resetear al modo setup
+      resetGame();
+      return;
+    }
+
+    if (![EVENTS.STEP_AFTER, EVENTS.TARGET_NOT_FOUND].includes(type)) {
+      return; // Solo procesar eventos STEP_AFTER
+    }
+
+    // PASO 1: Botón "Iniciar Partida" - Iniciar el juego en modo tutorial
+    if (index === 1 && action === ACTIONS.NEXT) {
+      console.log("📘 Tutorial: Paso 1 → Iniciando juego...");
+      setTimeout(() => {
+        startGameTutorial();
+        setTimeout(() => {
+          setTutorialStepIndex(2);
+        }, 800);
+      }, 300);
+      return;
+    }
+
+    // PASO 3: Botón "Listo/Siguiente" - Pasar a discusión (las reglas del tutorial lo permiten)
+    if (index === 3 && action === ACTIONS.NEXT) {
+      console.log(`📘 Tutorial: Paso 3 → Activando siguiente jugador (modo tutorial saltará a discusión)...`);
+
+      // Llamar handleNextPlayer una sola vez - la lógica del tutorial dentro de la función
+      // se encargará de saltar directamente a la discusión
+      handleNextPlayer();
+
+      // Esperar un momento para que el estado se actualice y avanzar al paso 4
+      setTimeout(() => {
+        console.log("📘 Tutorial: Avanzando al paso 4 (botón ir a votar)");
+        setTutorialStepIndex(4);
+      }, 600);
+      return;
+    }
+
+    // PASO 4: Botón "Ir a Votar" - Activar pantalla de votación
+    if (index === 4 && action === ACTIONS.NEXT) {
+      console.log("📘 Tutorial: Paso 4 → Activando votación...");
+      setTimeout(() => {
+        startVoting();
+        setTimeout(() => {
+          setTutorialStepIndex(5);
+        }, 800);
+      }, 300);
+      return;
+    }
+
+    // PASO 5: Pantalla de votación - Finalizar tutorial
+    if (index === 5 && action === ACTIONS.NEXT) {
+      console.log("📘 Tutorial: Paso 5 → Finalizando...");
+      setRunTutorial(false);
+      setIsTutorialMode(false);
+      toast.success("¡Tutorial completado! Ya puedes jugar libremente.");
+      setTimeout(() => {
+        resetGame();
+      }, 500);
+      return;
+    }
+
+    // Navegación normal solo para pasos 0 y 2 (que no tienen lógica especial)
+    if (action === ACTIONS.NEXT && (index === 0 || index === 2)) {
+      console.log(`📘 Tutorial: Navegación normal ${index} → ${index + 1}`);
+      setTutorialStepIndex(index + 1);
+    } else if (action === ACTIONS.PREV && index > 0) {
+      console.log(`📘 Tutorial: Navegación atrás ${index} → ${index - 1}`);
+      setTutorialStepIndex(index - 1);
+    }
+  };
+
+  const startGameTutorial = () => {
+    // Configurar juego en modo tutorial
+    setTotalPlayers(4);
+
+    // Select random word
+    const randomWord = palabras[Math.floor(Math.random() * palabras.length)];
+    setNormalWord(randomWord);
+    setImpostorWord("???");
+
+    // El impostor será el jugador 3 (índice 2) en el tutorial
+    const impostor = 2;
+    setImpostorIndex(impostor);
+
+    const words = Array(4).fill(null).map((_, idx) =>
+      idx === impostor ? "???" : randomWord
+    );
+
+    setSessionWordList(words);
+    setCurrentPlayerIndex(0);
+
+    // NO mostrar intersticial en modo tutorial
+    setSetupMode(false);
+    setShowingCard(true);
+  };
 
   const startGame = () => {
     if (totalPlayers < 3) {
@@ -59,7 +239,24 @@ export default function PassAndPlay() {
     setShowingCard(true);
   };
 
+  // Mostrar el intersticial solo si NO estamos en modo tutorial
+  const shouldShowInterstitial = showNewRoundInterstitial && !isTutorialMode;
+
   const handleNextPlayer = () => {
+    // En modo tutorial, después del primer jugador, saltar directamente a discusión
+    if (isTutorialMode && currentPlayerIndex === 0) {
+      console.log("📘 Tutorial: Saltando directamente a discusión desde jugador 1...");
+      const playersArray = Array(totalPlayers).fill(null).map((_, idx) => ({
+        index: idx,
+        isAlive: true,
+        isImpostor: idx === impostorIndex
+      }));
+      setAlivePlayers(playersArray);
+      setShowingCard(false);
+      toast.success("¡Tutorial! Pasando a la fase de discusión.");
+      return;
+    }
+
     if (currentPlayerIndex < totalPlayers - 1) {
       setCurrentPlayerIndex(currentPlayerIndex + 1);
       setShowingCard(true);
@@ -123,11 +320,48 @@ export default function PassAndPlay() {
     setWinner(null);
   };
 
+  // Renderizar el botón de ayuda (disponible en todas las pantallas)
+  const HelpButton = () => (
+    <button
+      onClick={startTutorial}
+      className="absolute top-20 right-6 bg-blue-500/20 hover:bg-blue-500/30 px-4 py-2 rounded-lg transition-all flex items-center gap-2 border border-blue-500/50 z-50"
+    >
+      <HelpCircle size={20} />
+      <span>¿Cómo jugar?</span>
+    </button>
+  );
+
   if (setupMode) {
     return (
       <>
         <AppHeader />
+
+        {/* Joyride Tutorial Global - Funciona en todas las pantallas */}
+        <Joyride
+          steps={tutorialSteps}
+          run={runTutorial && isTutorialMode}
+          stepIndex={tutorialStepIndex}
+          continuous
+          showProgress
+          showSkipButton
+          callback={handleJoyrideCallback}
+          styles={{
+            options: {
+              primaryColor: '#10b981',
+              zIndex: 10000,
+            },
+          }}
+          locale={{
+            back: 'Atrás',
+            close: 'Cerrar',
+            last: 'Finalizar',
+            next: 'Siguiente',
+            skip: 'Saltar',
+          }}
+        />
+
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
+
           <button
             onClick={() => navigate('/')}
             className="absolute top-20 left-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all flex items-center gap-2"
@@ -136,13 +370,16 @@ export default function PassAndPlay() {
             <span>Volver</span>
           </button>
 
+          {/* Botón de Ayuda */}
+          <HelpButton />
+
           <h1 className="text-3xl font-bold mb-6">🎮 Pasa y Juega</h1>
           <p className="text-gray-400 mb-8 text-center max-w-md">
             Juega en un solo dispositivo. Cada jugador verá su palabra por turnos.
           </p>
 
           <div className="bg-gray-800/50 p-8 rounded-2xl max-w-md w-full space-y-6">
-            <div>
+            <div className="pnp-player-counter">
               <label className="flex items-center gap-2 text-lg font-semibold mb-3">
                 <Users size={24} />
                 <span>Número de jugadores</span>
@@ -162,7 +399,7 @@ export default function PassAndPlay() {
 
             <button
               onClick={startGame}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="pnp-start-button w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               <Play size={24} />
               <span>Iniciar Partida</span>
@@ -175,7 +412,7 @@ export default function PassAndPlay() {
           </div>
 
           {/* Viñeta Intersticial */}
-          {showNewRoundInterstitial && (
+          {shouldShowInterstitial && (
             <InterstitialAd
               isPremium={isPremium}
               isRoomPremium={isRoomPremium}
@@ -195,7 +432,35 @@ export default function PassAndPlay() {
     return (
       <>
         <AppHeader />
+
+        {/* Joyride Tutorial Global */}
+        <Joyride
+          steps={tutorialSteps}
+          run={runTutorial && isTutorialMode}
+          stepIndex={tutorialStepIndex}
+          continuous
+          showProgress
+          showSkipButton
+          callback={handleJoyrideCallback}
+          styles={{
+            options: {
+              primaryColor: '#10b981',
+              zIndex: 10000,
+            },
+          }}
+          locale={{
+            back: 'Atrás',
+            close: 'Cerrar',
+            last: 'Finalizar',
+            next: 'Siguiente',
+            skip: 'Saltar',
+          }}
+        />
+
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
+          {/* Botón de Ayuda */}
+          <HelpButton />
+
           <div className="max-w-md w-full space-y-6">
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-2">
@@ -206,7 +471,7 @@ export default function PassAndPlay() {
               </p>
             </div>
 
-            <div className="relative flex justify-center">
+            <div className="pnp-scratch-container relative flex justify-center">
               <ScratchCard
                 key={currentPlayerIndex}
                 width={320}
@@ -239,7 +504,7 @@ export default function PassAndPlay() {
 
             <button
               onClick={handleNextPlayer}
-              className="w-full bg-blue-500 hover:bg-blue-600 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95"
+              className="pnp-next-button w-full bg-blue-500 hover:bg-blue-600 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95"
             >
               {currentPlayerIndex < totalPlayers - 1
                 ? `Listo / Siguiente Jugador`
@@ -265,6 +530,9 @@ export default function PassAndPlay() {
       <>
         <AppHeader />
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
+          {/* Botón de Ayuda */}
+          <HelpButton />
+
           <div className="max-w-md w-full text-center space-y-6">
             <div className={`p-8 rounded-2xl ${
               winner === 'IMPOSTOR'
@@ -308,8 +576,36 @@ export default function PassAndPlay() {
     return (
       <>
         <AppHeader />
+
+        {/* Joyride Tutorial Global */}
+        <Joyride
+          steps={tutorialSteps}
+          run={runTutorial && isTutorialMode}
+          stepIndex={tutorialStepIndex}
+          continuous
+          showProgress
+          showSkipButton
+          callback={handleJoyrideCallback}
+          styles={{
+            options: {
+              primaryColor: '#10b981',
+              zIndex: 10000,
+            },
+          }}
+          locale={{
+            back: 'Atrás',
+            close: 'Cerrar',
+            last: 'Finalizar',
+            next: 'Siguiente',
+            skip: 'Saltar',
+          }}
+        />
+
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
-          <div className="max-w-md w-full space-y-6">
+          {/* Botón de Ayuda */}
+          <HelpButton />
+
+          <div className="pnp-voting-container max-w-md w-full space-y-6">
             <div className="text-center">
               <h2 className="text-3xl font-bold mb-2">⚖️ Votación</h2>
               <p className="text-gray-400">
@@ -350,7 +646,35 @@ export default function PassAndPlay() {
   return (
     <>
       <AppHeader />
+
+      {/* Joyride Tutorial Global */}
+      <Joyride
+        steps={tutorialSteps}
+        run={runTutorial && isTutorialMode}
+        stepIndex={tutorialStepIndex}
+        continuous
+        showProgress
+        showSkipButton
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#10b981',
+            zIndex: 10000,
+          },
+        }}
+        locale={{
+          back: 'Atrás',
+          close: 'Cerrar',
+          last: 'Finalizar',
+          next: 'Siguiente',
+          skip: 'Saltar',
+        }}
+      />
+
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
+        {/* Botón de Ayuda */}
+        <HelpButton />
+
         <div className="max-w-md w-full text-center space-y-6">
           <h2 className="text-3xl font-bold">💬 Discusión</h2>
           <div className="bg-gray-800/50 p-6 rounded-2xl space-y-4">
@@ -377,7 +701,7 @@ export default function PassAndPlay() {
 
           <button
             onClick={startVoting}
-            className="w-full bg-purple-600 hover:bg-purple-700 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95"
+            className="pnp-vote-button w-full bg-purple-600 hover:bg-purple-700 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95"
           >
             ⚖️ Ir a Votar
           </button>
