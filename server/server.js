@@ -1,8 +1,10 @@
+// IMPORTAR LA CONFIGURACIÓN PRIMERO - Esto carga process.env antes que cualquier otra cosa
+import './config.js';
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { v4 as uuidv4 } from 'uuid';
-import dotenv from 'dotenv';
 import {
   getRandomWordWeighted,
   logWordFeedback,
@@ -11,7 +13,6 @@ import {
 } from './services/word.service.js';
 import { passport, checkAuth, setupAuthRoutes, requireAuth } from './auth.js';
 import { setupPaymentRoutes } from './payment.js';
-dotenv.config();
 
 // --- Control de Anuncios ---
 const IS_PREMIUM_MODE_ACTIVE = false; // TRUE desactiva todos los anuncios globalmente
