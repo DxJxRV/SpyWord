@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Vote, UserX, CheckCircle, XCircle, Users, AlertTriangle } from "lucide-react";
+import { Vote, UserX, CheckCircle, XCircle, Users, AlertTriangle, Play } from "lucide-react";
 import { api } from "../services/api";
 
 export default function VotingPanel({ roomState, roomId, myId, onUpdate }) {
@@ -300,9 +300,10 @@ export default function VotingPanel({ roomState, roomId, myId, onUpdate }) {
           <button
             onClick={handleContinue}
             disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl font-bold text-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl font-bold text-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading ? "Continuando..." : "Continuar el Juego"}
+            <Play size={24} />
+            <span>{loading ? "Continuando..." : "Continuar Partida"}</span>
           </button>
         )}
 

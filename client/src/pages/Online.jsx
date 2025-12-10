@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, ArrowLeft } from "lucide-react";
+import { Play, ArrowLeft, Link2, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../services/api";
 import { getUserName } from "../utils/nameGenerator";
@@ -73,6 +73,11 @@ export default function Online() {
     setRoomCode("");
   };
 
+  const handleScanQR = () => {
+    toast.info("Funcionalidad de escaneo QR próximamente");
+    // TODO: Implementar scanner de QR con cámara
+  };
+
   return (
     <>
       <AppHeader />
@@ -90,19 +95,33 @@ export default function Online() {
 
         {!mode && (
           <div className="flex flex-col gap-4 max-w-md w-full">
+            {/* Botón Crear Partida */}
             <button
               onClick={handleCreateRoom}
               disabled={loading}
-              className="bg-emerald-500 px-6 py-3 rounded-xl text-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-5 rounded-xl hover:from-emerald-600 hover:to-emerald-700 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-4 shadow-lg"
             >
-              <Play size={20} />
-              <span>{loading ? "Creando..." : "Crear partida"}</span>
+              <div className="bg-white/20 p-3 rounded-lg">
+                <Play size={28} />
+              </div>
+              <div className="flex flex-col items-start text-left">
+                <span className="text-xl font-bold">{loading ? "Creando..." : "Crear partida"}</span>
+                <span className="text-sm text-emerald-100 opacity-90">Inicia un nuevo juego como anfitrión</span>
+              </div>
             </button>
+
+            {/* Botón Unirse a Partida */}
             <button
               onClick={() => setMode("join")}
-              className="bg-blue-500 px-6 py-3 rounded-xl text-lg font-semibold hover:bg-blue-600 active:scale-95 transition-all"
+              className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-5 rounded-xl hover:from-blue-600 hover:to-blue-700 active:scale-95 transition-all flex items-center gap-4 shadow-lg"
             >
-              🔗 Unirse a partida
+              <div className="bg-white/20 p-3 rounded-lg">
+                <Link2 size={28} />
+              </div>
+              <div className="flex flex-col items-start text-left">
+                <span className="text-xl font-bold">Unirse a partida</span>
+                <span className="text-sm text-blue-100 opacity-90">Entra con código o escanea QR</span>
+              </div>
             </button>
 
             {/* Banner Publicitario */}
@@ -116,12 +135,28 @@ export default function Online() {
           <div className="flex flex-col items-center gap-4 mt-4 max-w-md w-full">
             <p className="text-xl font-semibold">Únete a una partida</p>
 
-            <div className="bg-blue-500/20 px-4 py-3 rounded-lg border border-blue-500/30 w-full">
-              <p className="text-xs text-blue-300 mb-1">💡 Tip</p>
-              <p className="text-sm text-gray-300">Puedes escanear el código QR con tu cámara nativa y te llevará directo al juego</p>
+            {/* Botón Escanear QR con Cámara */}
+            <button
+              onClick={handleScanQR}
+              className="w-full bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4 rounded-xl hover:from-purple-600 hover:to-purple-700 active:scale-95 transition-all flex items-center gap-4 shadow-lg"
+            >
+              <div className="bg-white/20 p-2.5 rounded-lg">
+                <Camera size={24} />
+              </div>
+              <div className="flex flex-col items-start text-left">
+                <span className="text-lg font-bold">Escanear QR</span>
+                <span className="text-xs text-purple-100 opacity-90">Usa tu cámara para unirte rápido</span>
+              </div>
+            </button>
+
+            {/* Separador */}
+            <div className="flex items-center gap-3 w-full my-2">
+              <div className="flex-1 h-px bg-gray-700"></div>
+              <span className="text-sm text-gray-500 font-medium">O</span>
+              <div className="flex-1 h-px bg-gray-700"></div>
             </div>
 
-            <div className="flex flex-col gap-3 w-full mt-2">
+            <div className="flex flex-col gap-3 w-full">
               <input
                 className="bg-gray-800 px-6 py-4 rounded-xl text-center text-lg font-semibold uppercase border-2 border-gray-700 focus:border-emerald-500 focus:outline-none transition-colors placeholder:text-gray-500"
                 placeholder="CÓDIGO (6 letras)"
