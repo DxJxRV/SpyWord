@@ -8,6 +8,7 @@ import { useTutorial } from "../contexts/TutorialContext";
 import { tutorialStepsHome } from "../data/tutorialSteps";
 import TutorialButton from "../components/TutorialButton";
 import UserNameBar from "../components/UserNameBar";
+import QRScanner from "../components/QRScanner";
 import { getUserName } from "../utils/nameGenerator";
 
 export default function Home() {
@@ -104,8 +105,27 @@ export default function Home() {
   };
 
   const handleScanQR = () => {
-    toast.info("Funcionalidad de escaneo QR próximamente");
-    // TODO: Implementar scanner de QR con cámara
+    setShowQRScanner(true);
+  };
+
+  const handleQRScanResult = async (roomCode) => {
+    setShowQRScanner(false);
+    toast.success(`Código detectado: ${roomCode}`);
+
+    // Unirse automáticamente
+    setLoading(true);
+    try {
+      const playerName = getUserName();
+      await api.post(`/rooms/${roomCode}/join`, { playerName });
+      toast.success("¡Te uniste a la sala!");
+      navigate(`/room/${roomCode}`);
+      if (navigator.vibrate) navigator.vibrate(40);
+    } catch (error) {
+      console.error("Error al unirse:", error);
+      toast.error("No se pudo unir a la sala. Verifica el código.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -293,6 +313,14 @@ export default function Home() {
 
         {/* Botón flotante para reiniciar tutorial */}
         <TutorialButton />
+
+        {/* Scanner QR */}
+        {showQRScanner && (
+          <QRScanner
+            onScan={handleQRScanResult}
+            onClose={() => setShowQRScanner(false)}
+          />
+        )}
       </div>
     </>
   );

@@ -558,9 +558,15 @@ export default function Room() {
               />
             </div>
 
-            <div className="bg-purple-500/20 px-6 py-3 rounded-lg border-2 border-purple-500/50 mb-6">
+            <div className="bg-purple-500/20 px-6 py-3 rounded-lg border-2 border-purple-500/50 mb-4">
               <p className="text-xs text-purple-300 mb-1 text-center">Código de sala:</p>
               <p className="text-purple-400 font-mono text-3xl font-bold tracking-widest text-center">{roomId}</p>
+            </div>
+
+            <div className="bg-blue-500/20 px-4 py-2 rounded-lg border border-blue-500/30 mb-6">
+              <p className="text-xs text-blue-300 text-center">
+                💡 También puedes usar la cámara nativa de tu teléfono para escanear el QR
+              </p>
             </div>
 
             <button

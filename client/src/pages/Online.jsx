@@ -7,6 +7,7 @@ import { getUserName } from "../utils/nameGenerator";
 import AppHeader from "../components/AppHeader";
 import AdPlaceholder from "../components/AdPlaceholder";
 import InterstitialAd from "../components/InterstitialAd";
+import QRScanner from "../components/QRScanner";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Online() {
@@ -15,6 +16,7 @@ export default function Online() {
   const [roomCode, setRoomCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [showInterstitial, setShowInterstitial] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const { isPremium } = useAuth();
   const isRoomPremium = false; // Premium Pass - false porque aún no hay sala
 
@@ -74,8 +76,27 @@ export default function Online() {
   };
 
   const handleScanQR = () => {
-    toast.info("Funcionalidad de escaneo QR próximamente");
-    // TODO: Implementar scanner de QR con cámara
+    setShowQRScanner(true);
+  };
+
+  const handleQRScanResult = async (roomCode) => {
+    setShowQRScanner(false);
+    toast.success(`Código detectado: ${roomCode}`);
+
+    // Unirse automáticamente
+    setLoading(true);
+    try {
+      const playerName = getUserName();
+      await api.post(`/rooms/${roomCode}/join`, { playerName });
+      toast.success("¡Te uniste a la sala!");
+      navigate(`/room/${roomCode}`);
+      if (navigator.vibrate) navigator.vibrate(40);
+    } catch (error) {
+      console.error("Error al unirse:", error);
+      toast.error("No se pudo unir a la sala. Verifica el código.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -188,6 +209,14 @@ export default function Online() {
             isPremium={isPremium}
             isRoomPremium={isRoomPremium}
             onClose={handleInterstitialClose}
+          />
+        )}
+
+        {/* Scanner QR */}
+        {showQRScanner && (
+          <QRScanner
+            onScan={handleQRScanResult}
+            onClose={() => setShowQRScanner(false)}
           />
         )}
       </div>
