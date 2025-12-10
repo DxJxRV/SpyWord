@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Play, Download } from "lucide-react";
+import { ArrowLeft, Users, Play } from "lucide-react";
 import { toast } from "sonner";
 import ScratchCard from "react-scratchcard-v2";
-import UserNameBar from "../components/UserNameBar";
 import AppHeader from "../components/AppHeader";
 import { palabras } from "../data/palabras";
 import AdPlaceholder from "../components/AdPlaceholder";
 import InterstitialAd from "../components/InterstitialAd";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function PassAndPlay() {
   const navigate = useNavigate();
@@ -19,52 +19,13 @@ export default function PassAndPlay() {
   const [normalWord, setNormalWord] = useState("");
   const [impostorWord, setImpostorWord] = useState("");
   const [showingCard, setShowingCard] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [votingMode, setVotingMode] = useState(false);
   const [alivePlayers, setAlivePlayers] = useState([]);
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState(null);
-  const [isPremium] = useState(false); // Control global de anuncios (banners)
-  const [isRoomPremium] = useState(false); // Premium Pass - false porque es modo local
+  const { isPremium } = useAuth();
+  const isRoomPremium = false; // Premium Pass - false porque es modo local
   const [showNewRoundInterstitial, setShowNewRoundInterstitial] = useState(false);
-
-  // Detect if app is in standalone mode (installed as PWA)
-  useEffect(() => {
-    const isInStandaloneMode =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone ||
-      document.referrer.includes('android-app://');
-
-    setIsStandalone(isInStandaloneMode);
-  }, []);
-
-  // Capture PWA install prompt
-  useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) {
-      toast.info("Abre la app desde tu pantalla de inicio para la mejor experiencia 📱");
-      return;
-    }
-
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-
-    if (outcome === 'accepted') {
-      toast.success("¡App instalada! Ábrela desde tu pantalla de inicio 📱");
-    }
-
-    setDeferredPrompt(null);
-  };
 
   const startGame = () => {
     if (totalPlayers < 3) {
@@ -166,11 +127,10 @@ export default function PassAndPlay() {
     return (
       <>
         <AppHeader />
-        <UserNameBar />
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-32">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
           <button
             onClick={() => navigate('/')}
-            className="absolute top-36 left-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all flex items-center gap-2"
+            className="absolute top-20 left-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all flex items-center gap-2"
           >
             <ArrowLeft size={20} />
             <span>Volver</span>
@@ -214,21 +174,10 @@ export default function PassAndPlay() {
             <AdPlaceholder isPremium={isPremium} format="horizontal" />
           </div>
 
-          {/* PWA Install Banner */}
-          {!isStandalone && (
-            <div className="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 max-w-xs animate-bounce cursor-pointer hover:scale-105 transition-transform"
-              onClick={handleInstallClick}
-            >
-              <Download size={20} />
-              <p className="text-sm font-medium">
-                Guarda la app en tu pantalla de inicio para jugar sin conexión 💾
-              </p>
-            </div>
-          )}
-
           {/* Viñeta Intersticial */}
           {showNewRoundInterstitial && (
             <InterstitialAd
+              isPremium={isPremium}
               isRoomPremium={isRoomPremium}
               onClose={handleStartInterstitialClose}
             />
@@ -246,8 +195,7 @@ export default function PassAndPlay() {
     return (
       <>
         <AppHeader />
-        <UserNameBar />
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-32">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
           <div className="max-w-md w-full space-y-6">
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-2">
@@ -306,18 +254,6 @@ export default function PassAndPlay() {
               Cancelar partida
             </button>
           </div>
-
-          {/* PWA Install Banner */}
-          {!isStandalone && (
-            <div className="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 max-w-xs cursor-pointer hover:scale-105 transition-transform"
-              onClick={handleInstallClick}
-            >
-              <Download size={20} />
-              <p className="text-sm font-medium">
-                Guarda la app en tu pantalla de inicio 💾
-              </p>
-            </div>
-          )}
         </div>
       </>
     );
@@ -328,8 +264,7 @@ export default function PassAndPlay() {
     return (
       <>
         <AppHeader />
-        <UserNameBar />
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-32">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
           <div className="max-w-md w-full text-center space-y-6">
             <div className={`p-8 rounded-2xl ${
               winner === 'IMPOSTOR'
@@ -361,18 +296,6 @@ export default function PassAndPlay() {
               Nueva Partida
             </button>
           </div>
-
-          {/* PWA Install Banner */}
-          {!isStandalone && (
-            <div className="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 max-w-xs cursor-pointer hover:scale-105 transition-transform"
-              onClick={handleInstallClick}
-            >
-              <Download size={20} />
-              <p className="text-sm font-medium">
-                Guarda la app 💾
-              </p>
-            </div>
-          )}
         </div>
       </>
     );
@@ -385,8 +308,7 @@ export default function PassAndPlay() {
     return (
       <>
         <AppHeader />
-        <UserNameBar />
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-32">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
           <div className="max-w-md w-full space-y-6">
             <div className="text-center">
               <h2 className="text-3xl font-bold mb-2">⚖️ Votación</h2>
@@ -419,18 +341,6 @@ export default function PassAndPlay() {
               ← Cancelar votación
             </button>
           </div>
-
-          {/* PWA Install Banner */}
-          {!isStandalone && (
-            <div className="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 max-w-xs cursor-pointer hover:scale-105 transition-transform"
-              onClick={handleInstallClick}
-            >
-              <Download size={20} />
-              <p className="text-sm font-medium">
-                Guarda la app 💾
-              </p>
-            </div>
-          )}
         </div>
       </>
     );
@@ -439,9 +349,8 @@ export default function PassAndPlay() {
   // Discussion Phase
   return (
     <>
-      <UserNameBar />
       <AppHeader />
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-32">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
         <div className="max-w-md w-full text-center space-y-6">
           <h2 className="text-3xl font-bold">💬 Discusión</h2>
           <div className="bg-gray-800/50 p-6 rounded-2xl space-y-4">
@@ -480,18 +389,6 @@ export default function PassAndPlay() {
             Cancelar partida
           </button>
         </div>
-
-        {/* PWA Install Banner */}
-        {!isStandalone && (
-          <div className="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 max-w-xs cursor-pointer hover:scale-105 transition-transform"
-            onClick={handleInstallClick}
-          >
-            <Download size={20} />
-            <p className="text-sm font-medium">
-              Guarda la app 💾
-            </p>
-          </div>
-        )}
       </div>
     </>
   );

@@ -5,6 +5,7 @@ import { User, LogOut, Settings, Crown, Pencil, Check, X } from "lucide-react";
 import { getUserName, setUserName } from "../utils/nameGenerator";
 import { api, authApi } from "../services/api";
 import { toast } from "sonner";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function AppHeader() {
   const location = useLocation();
@@ -15,9 +16,8 @@ export default function AppHeader() {
   const [tempName, setTempName] = useState(name);
   const menuRef = useRef(null);
 
-  // Estado de autenticación
-  const [user, setUser] = useState(null); // { userId, email, isPremium } o null
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  // Usar contexto de autenticación
+  const { user, setUser, isAuthLoading, refreshUser } = useAuth();
 
   // Estado del modal de login
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -27,59 +27,19 @@ export default function AppHeader() {
   const [registerName, setRegisterName] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // Función para refrescar el estado del usuario
-  const refreshUserState = async () => {
-    try {
-      setIsAuthLoading(true);
-      // Primero refrescar el JWT
-      await authApi.post('/auth/refresh');
-      // Luego obtener los datos actualizados
-      const response = await authApi.get('/auth/me');
-      setUser(response.data);
-      toast.success("Estado actualizado correctamente");
-    } catch (error) {
-      console.error("Error al refrescar estado:", error);
-      toast.error("Error al actualizar estado");
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  // Verificar sesión al cargar y manejar redirect de OAuth
+  // Verificar parámetros de autenticación en la URL (OAuth redirect)
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await authApi.get('/auth/me');
-        setUser(response.data);
+    const params = new URLSearchParams(location.search);
+    const authStatus = params.get('auth');
 
-        // Verificar si hay parámetros de autenticación en la URL
-        const params = new URLSearchParams(location.search);
-        const authStatus = params.get('auth');
-
-        if (authStatus === 'success') {
-          toast.success("¡Sesión iniciada correctamente!");
-          // Limpiar el parámetro de la URL
-          window.history.replaceState({}, '', location.pathname);
-        } else if (authStatus === 'error') {
-          toast.error("Error al iniciar sesión");
-          window.history.replaceState({}, '', location.pathname);
-        }
-      } catch (error) {
-        // No autenticado o error
-        setUser(null);
-
-        // Verificar error en URL
-        const params = new URLSearchParams(location.search);
-        const authStatus = params.get('auth');
-        if (authStatus === 'error') {
-          toast.error("Error al iniciar sesión");
-          window.history.replaceState({}, '', location.pathname);
-        }
-      } finally {
-        setIsAuthLoading(false);
-      }
-    };
-    checkAuth();
+    if (authStatus === 'success') {
+      refreshUser();
+      toast.success("¡Sesión iniciada correctamente!");
+      window.history.replaceState({}, '', location.pathname);
+    } else if (authStatus === 'error') {
+      toast.error("Error al iniciar sesión");
+      window.history.replaceState({}, '', location.pathname);
+    }
   }, [location.search, location.pathname]);
 
   // Cerrar menú al hacer click fuera

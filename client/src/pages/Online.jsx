@@ -7,6 +7,7 @@ import { getUserName } from "../utils/nameGenerator";
 import AppHeader from "../components/AppHeader";
 import AdPlaceholder from "../components/AdPlaceholder";
 import InterstitialAd from "../components/InterstitialAd";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Online() {
   const navigate = useNavigate();
@@ -14,8 +15,8 @@ export default function Online() {
   const [roomCode, setRoomCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [showInterstitial, setShowInterstitial] = useState(false);
-  const [isPremium] = useState(false); // Control global de anuncios (banners)
-  const [isRoomPremium] = useState(false); // Premium Pass - false porque aún no hay sala
+  const { isPremium } = useAuth();
+  const isRoomPremium = false; // Premium Pass - false porque aún no hay sala
 
   const handleCreateRoom = () => {
     // Mostrar viñeta intersticial antes de crear la sala
@@ -149,6 +150,7 @@ export default function Online() {
         {/* Viñeta Intersticial */}
         {showInterstitial && (
           <InterstitialAd
+            isPremium={isPremium}
             isRoomPremium={isRoomPremium}
             onClose={handleInterstitialClose}
           />

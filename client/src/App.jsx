@@ -15,6 +15,7 @@ import PremiumSuccess from "./pages/PremiumSuccess";
 import FullscreenButton from "./components/FullscreenButton";
 import Footer from "./components/Footer";
 import { TutorialProvider } from "./contexts/TutorialContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import { getUserName, setUserName as saveUserName } from "./utils/nameGenerator";
 
 function RoomNavbar() {
@@ -152,43 +153,45 @@ function ConditionalFooter() {
 export default function App() {
   return (
     <BrowserRouter>
-      <TutorialProvider>
-        <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden flex flex-col">
-        {/* 🔹 Toaster para notificaciones */}
-        <Toaster
-          theme="dark"
-          position="top-right"
-          richColors
-          closeButton
-        />
+      <AuthProvider>
+        <TutorialProvider>
+          <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden flex flex-col">
+          {/* 🔹 Toaster para notificaciones */}
+          <Toaster
+            theme="dark"
+            position="top-right"
+            richColors
+            closeButton
+          />
 
-        {/* 🔹 Botón de pantalla completa (arriba a la derecha) */}
-        <FullscreenButton />
+          {/* 🔹 Botón de pantalla completa (arriba a la derecha) */}
+          <FullscreenButton />
 
-        {/* 🔹 Navbar condicional de sala */}
-        <RoomNavbar />
+          {/* 🔹 Navbar condicional de sala */}
+          <RoomNavbar />
 
-        {/* 🔹 Contenido de rutas */}
-        <div className="pt-0 flex-1">
-          <Routes>
-            <Route path="/" element={<MainMenu />} />
-            <Route path="/online" element={<Online />} />
-            <Route path="/daily-mode" element={<DailyMode />} />
-            <Route path="/pass-and-play" element={<PassAndPlay />} />
-            <Route path="/room/:roomId" element={<Room />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/premium" element={<Premium />} />
-            <Route path="/premium/success" element={<PremiumSuccess />} />
-            <Route path="/privacy" element={<LegalPages type="privacy" />} />
-            <Route path="/terms" element={<LegalPages type="terms" />} />
-            <Route path="/about" element={<About />} />
-          </Routes>
-        </div>
+          {/* 🔹 Contenido de rutas */}
+          <div className="pt-0 flex-1">
+            <Routes>
+              <Route path="/" element={<MainMenu />} />
+              <Route path="/online" element={<Online />} />
+              <Route path="/daily-mode" element={<DailyMode />} />
+              <Route path="/pass-and-play" element={<PassAndPlay />} />
+              <Route path="/room/:roomId" element={<Room />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/premium" element={<Premium />} />
+              <Route path="/premium/success" element={<PremiumSuccess />} />
+              <Route path="/privacy" element={<LegalPages type="privacy" />} />
+              <Route path="/terms" element={<LegalPages type="terms" />} />
+              <Route path="/about" element={<About />} />
+            </Routes>
+          </div>
 
-        {/* 🔹 Footer condicional */}
-        <ConditionalFooter />
-        </div>
-      </TutorialProvider>
+          {/* 🔹 Footer condicional */}
+          <ConditionalFooter />
+          </div>
+        </TutorialProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

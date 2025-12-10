@@ -6,6 +6,7 @@ import { getUserName } from "../utils/nameGenerator";
 import { toast } from "sonner";
 import AppHeader from "../components/AppHeader";
 import AdPlaceholder from "../components/AdPlaceholder";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function MainMenu() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function MainMenu() {
   const [dailyMode, setDailyMode] = useState(null);
   const [loading, setLoading] = useState(false);
   const isJoining = useRef(false); // Flag to prevent concurrent joins
+  const { isPremium } = useAuth();
 
   // Auto-join feature: detect ?join=CODIGO parameter
   useEffect(() => {
@@ -170,7 +172,7 @@ export default function MainMenu() {
 
           {/* Banner Publicitario */}
           <div className="flex justify-center w-full mt-8">
-            <AdPlaceholder isPremium={false} format="horizontal" />
+            <AdPlaceholder isPremium={isPremium} format="horizontal" />
           </div>
 
           {/* Info adicional */}

@@ -3,23 +3,25 @@ import { X } from 'lucide-react';
 
 /**
  * Componente de viñeta intersticial (pantalla completa)
+ * @param {boolean} isPremium - Usuario premium: si el usuario es premium, no ve anuncios
  * @param {boolean} isRoomPremium - Premium Pass del Anfitrión: si el admin es premium, desactiva interstitials para todos
  * @param {function} onClose - Callback cuando se cierra el anuncio
  */
 export default function InterstitialAd({
+  isPremium = false,
   isRoomPremium = false,
   onClose
 }) {
   useEffect(() => {
-    // Si el anfitrión es premium (Premium Pass), cerrar inmediatamente sin mostrar anuncio
-    if (isRoomPremium) {
+    // Si el usuario es premium O si el anfitrión es premium (Premium Pass), cerrar inmediatamente
+    if (isPremium || isRoomPremium) {
       onClose?.();
       return;
     }
-  }, [isRoomPremium, onClose]);
+  }, [isPremium, isRoomPremium, onClose]);
 
-  // Si el anfitrión es premium (Premium Pass), no renderizar nada
-  if (isRoomPremium) return null;
+  // Si el usuario es premium O si el anfitrión es premium, no renderizar nada
+  if (isPremium || isRoomPremium) return null;
 
   const handleClose = () => {
     onClose?.();

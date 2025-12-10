@@ -6,6 +6,7 @@ import { api } from "../services/api";
 import { toast } from "sonner";
 import Joyride from "react-joyride";
 import { useTutorial } from "../contexts/TutorialContext";
+import { useAuth } from "../contexts/AuthContext";
 import { tutorialStepsRoom } from "../data/tutorialSteps";
 import TutorialButton from "../components/TutorialButton";
 import VotingPanel from "../components/VotingPanel";
@@ -18,6 +19,7 @@ export default function Room() {
   const { roomId } = useParams(); // Solo necesitamos roomId
   const navigate = useNavigate();
   const { runRoom, startRoomTutorial, stopRoomTutorial, dontShowRoomTutorial } = useTutorial();
+  const { isPremium } = useAuth();
   const [word, setWord] = useState("");
   const [currentRound, setCurrentRound] = useState(0);
   const [totalPlayers, setTotalPlayers] = useState(0);
@@ -48,7 +50,6 @@ export default function Room() {
   const [impostorId, setImpostorId] = useState(null); // ID del impostor (solo revelado en game over)
 
   // Estados para anuncios
-  const [isPremium, setIsPremium] = useState(false); // Control de anuncios desde el servidor
   const [isRoomPremium, setIsRoomPremium] = useState(false); // Premium Pass del Anfitrión
   const [showRestartInterstitial, setShowRestartInterstitial] = useState(false);
 
@@ -143,8 +144,7 @@ export default function Room() {
         setWinReason(res.data.winReason || null);
         setImpostorId(res.data.impostorId || null);
 
-        // Actualizar estado de anuncios
-        setIsPremium(res.data.isPremium || false);
+        // Actualizar estado de anuncios (isRoomPremium = Premium Pass del Anfitrión)
         setIsRoomPremium(res.data.isRoomPremium || false);
 
         if (res.data.nextRoundAt && !nextRoundTimestamp.current) {
@@ -599,6 +599,7 @@ export default function Room() {
       {/* Viñeta Intersticial */}
       {showRestartInterstitial && (
         <InterstitialAd
+          isPremium={isPremium}
           isRoomPremium={isRoomPremium}
           onClose={handleRestartInterstitialClose}
         />

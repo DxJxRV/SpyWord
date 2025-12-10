@@ -131,7 +131,7 @@ setInterval(() => {
 }, 60 * 1000); // Revisar cada minuto
 
 // ➕ POST /api/rooms/create
-app.post('/api/rooms/create', async (req, res) => {
+app.post('/api/rooms/create', checkAuth, async (req, res) => {
   try {
     const { adminName } = req.body;
     const roomId = generateRoomId();
@@ -142,6 +142,7 @@ app.post('/api/rooms/create', async (req, res) => {
 
     rooms[roomId] = {
       adminId,
+      adminUserId: req.user ? req.user.userId : null, // Guardar userId del admin si está autenticado
       adminName: adminName || "Admin", // Guardar nombre del admin
       word: wordData.word,
       wordId: wordData.id, // Guardar ID para feedback
@@ -165,6 +166,11 @@ app.post('/api/rooms/create', async (req, res) => {
     };
 
     console.log(`✅ Sala creada: ${roomId} - Admin: ${adminId} (${adminName || "Admin"}) - Palabra: ${wordData.word}`);
+    if (req.user) {
+      console.log(`👑 Admin autenticado: ${req.user.email} (userId: ${req.user.userId}) - Premium: ${req.user.isPremium}`);
+    } else {
+      console.log(`👤 Admin no autenticado - adminUserId: null`);
+    }
 
     // Establecer cookie de sesión
     res.cookie('sid', adminId, {
@@ -699,7 +705,7 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
   }
 
   // 🔍 Función para enviar respuesta con estado actual
-  const sendState = (unchanged = false) => {
+  const sendState = async (unchanged = false) => {
     const word = playerId === room.impostorId ? "???" : room.word;
     const starterName = room.starterPlayerId ? room.players[room.starterPlayerId]?.name : null;
 
@@ -744,14 +750,29 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
       // Control de anuncios
       // Si el usuario está autenticado y es premium, se desactivan los anuncios para él
       isPremium: req.user && req.user.isPremium ? true : IS_PREMIUM_MODE_ACTIVE,
-      // Premium Pass del Anfitrión: si el admin es premium, los interstitials se desactivan para TODOS
-      // Por ahora usa flag global, requiere mapeo de adminId (session) a userId (database)
-      isRoomPremium: IS_PREMIUM_MODE_ACTIVE
+      // Premium Pass del Anfitrión: se verifica si el admin es premium consultando la DB
+      isRoomPremium: false // Se actualiza a continuación si el admin es premium
     };
+
+    // Verificar si el admin de la sala es premium (Premium Pass)
+    if (room.adminUserId) {
+      try {
+        const adminUser = await prisma.user.findUnique({
+          where: { id: room.adminUserId },
+          select: { isPremium: true }
+        });
+        if (adminUser && adminUser.isPremium) {
+          payload.isRoomPremium = true;
+          console.log(`👑 [PREMIUM PASS] Admin de sala ${roomId} es premium - Anuncios desactivados para todos`);
+        }
+      } catch (error) {
+        console.error('Error al verificar premium del admin:', error);
+      }
+    }
 
     // Log para debugging de estado premium
     if (req.user) {
-      console.log(`🎮 [ROOM STATE] Usuario: ${req.user.email} | Premium: ${req.user.isPremium} | Sala: ${roomId}`);
+      console.log(`🎮 [ROOM STATE] Usuario: ${req.user.email} | Premium: ${req.user.isPremium} | Sala: ${roomId} | RoomPremium: ${payload.isRoomPremium}`);
     }
 
     res.json(payload);
@@ -770,14 +791,14 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
   console.log("Client Total Players: ", clientTotalPlayers)
   if (clientRound === 0 && clientNextRound === 0) {
     console.log(`🚀 [INIT] Enviando estado inicial de la sala ${roomId}`);
-    return sendState(false);
+    return await sendState(false);
   }
 
 
   // --- Si algo cambió desde lo que el cliente tiene, responder de inmediato ---
   if (serverRound !== clientRound || serverNextRound !== clientNextRound || serverStatus !== clientStatus || serverTotalPlayers !== clientTotalPlayers) {
     console.log(`⚡ [UPDATE] Cambio detectado en ${roomId} → round=${serverRound}, nextRoundAt=${serverNextRound}, status=${serverStatus}, totalPlayers=${serverTotalPlayers}`);
-    return sendState(false);
+    return await sendState(false);
   }
 
   // --- Si todo sigue igual, "colgar" la conexión hasta que haya cambio o timeout ---
@@ -796,7 +817,7 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
   const clientData = { shouldRespond: false };
 
   // Función para enviar respuesta y limpiar
-  const respondAndCleanup = (unchanged = false) => {
+  const respondAndCleanup = async (unchanged = false) => {
     if (hasResponded) return;
     hasResponded = true;
 
@@ -804,7 +825,7 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
     waitingClients[roomId] = waitingClients[roomId].filter(client => client !== clientData);
 
     clearInterval(interval);
-    sendState(unchanged);
+    await sendState(unchanged);
   };
 
   // Agregar este cliente a la lista de espera

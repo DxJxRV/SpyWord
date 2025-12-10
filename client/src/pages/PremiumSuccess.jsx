@@ -2,26 +2,29 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Crown, Sparkles, CheckCircle2, ArrowRight } from "lucide-react";
 import { authApi } from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function PremiumSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session_id");
   const [countdown, setCountdown] = useState(5);
+  const { refreshUser } = useAuth();
 
   useEffect(() => {
-    // Refrescar el JWT con datos actualizados de la base de datos
+    // Refrescar el JWT y el contexto con datos actualizados de la base de datos
     const refreshAuth = async () => {
       try {
         await authApi.post('/auth/refresh');
-        console.log('✅ Token refrescado con estado Premium actualizado');
+        await refreshUser();
+        console.log('✅ Token y contexto refrescados con estado Premium actualizado');
       } catch (error) {
         console.error('Error al refrescar token:', error);
       }
     };
 
     refreshAuth();
-  }, []);
+  }, [refreshUser]);
 
   useEffect(() => {
     // Countdown para redirigir automáticamente
