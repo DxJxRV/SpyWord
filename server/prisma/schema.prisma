@@ -66,6 +66,7 @@ model User {
   name            String?   @db.VarChar(255)
   googleId        String?   @unique @map("google_id") @db.VarChar(255)
   password        String?   @db.VarChar(255) // Para autenticación con email (bcrypt hash)
+  profilePicture  String?   @map("profile_picture") @db.VarChar(500) // URL de la foto de perfil (Google)
   isPremium       Boolean   @default(false) @map("is_premium") // CRUCIAL para anuncios y Premium Pass
   premiumExpiresAt DateTime? @map("premium_expires_at") // Fecha de expiración del premium
   createdAt       DateTime  @default(now()) @map("created_at")

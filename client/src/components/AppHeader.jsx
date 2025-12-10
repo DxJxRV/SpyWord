@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { User, LogOut, Settings, Crown, Pencil, Check, X } from "lucide-react";
 import { getUserName, setUserName } from "../utils/nameGenerator";
@@ -211,173 +212,183 @@ export default function AppHeader() {
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 z-50">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-        {/* Logo - clickeable para ir al home */}
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
-        >
-          <h1 className="text-xl font-bold flex items-center gap-1">
-            <span className="text-amber-400">Impostor</span>
-            <span className="text-white">Word.com</span>
-            <span className="text-base">🕵️‍♂️</span>
-          </h1>
-        </button>
-
-        {/* Botón de perfil */}
-        <div className="relative" ref={menuRef}>
+    <>
+      <div className="fixed top-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+          {/* Logo - clickeable para ir al home */}
           <button
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center hover:scale-110 transition-transform active:scale-95"
-            aria-label="Menú de perfil"
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
           >
-            <User size={20} className="text-white" />
+            <h1 className="text-xl font-bold flex items-center gap-1">
+              <span className="text-amber-400">Impostor</span>
+              <span className="text-white">Word.com</span>
+              <span className="text-base">🕵️‍♂️</span>
+            </h1>
           </button>
 
-          {/* Tooltip/Dropdown del menú de perfil */}
-          {showProfileMenu && (
-            <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden">
-              {/* Sección de nombre de usuario */}
-              <div className="px-4 py-3 bg-gray-900/50 border-b border-gray-700">
-                {isAuthLoading ? (
-                  <p className="text-sm text-gray-400">Cargando...</p>
-                ) : user ? (
-                  // Usuario autenticado
-                  <>
-                    <p className="text-xs text-gray-400 mb-2">Cuenta de Google</p>
-                    <p className="text-sm font-semibold text-white truncate">{user.email}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {user.isPremium ? (
-                        <span className="text-amber-400">✨ Usuario Premium</span>
+          {/* Botón de perfil */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 overflow-hidden"
+              aria-label="Menú de perfil"
+            >
+              {user && user.profilePicture ? (
+                <img
+                  src={user.profilePicture}
+                  alt="Foto de perfil"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User size={20} className="text-white" />
+              )}
+            </button>
+
+            {/* Tooltip/Dropdown del menú de perfil */}
+            {showProfileMenu && (
+              <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden">
+                {/* Sección de nombre de usuario */}
+                <div className="px-4 py-3 bg-gray-900/50 border-b border-gray-700">
+                  {isAuthLoading ? (
+                    <p className="text-sm text-gray-400">Cargando...</p>
+                  ) : user ? (
+                    // Usuario autenticado
+                    <>
+                      <p className="text-xs text-gray-400 mb-2">Cuenta de Google</p>
+                      <p className="text-sm font-semibold text-white truncate">{user.email}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {user.isPremium ? (
+                          <span className="text-amber-400">✨ Usuario Premium</span>
+                        ) : (
+                          "Usuario Free"
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    // Usuario no autenticado - Mostrar nombre local editable
+                    <>
+                      <p className="text-xs text-gray-400 mb-2">Mi nombre (local)</p>
+                      {isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={tempName}
+                            onChange={(e) => setTempName(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            className="bg-gray-700 text-white px-2 py-1 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm flex-1"
+                            maxLength={25}
+                            autoFocus
+                          />
+                          <button
+                            onClick={handleSaveName}
+                            className="bg-emerald-500/80 hover:bg-emerald-600 p-1.5 rounded-lg transition-all"
+                            title="Guardar"
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="bg-red-500/80 hover:bg-red-600 p-1.5 rounded-lg transition-all"
+                            title="Cancelar"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       ) : (
-                        "Usuario Free"
+                        <button
+                          onClick={handleEditName}
+                          className="group flex items-center gap-2 hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-all w-full"
+                        >
+                          <span className="text-sm font-semibold text-white flex-1 text-left">
+                            {name}
+                          </span>
+                          <Pencil size={14} className="text-gray-400 group-hover:text-white transition-colors" />
+                        </button>
                       )}
-                    </p>
-                  </>
-                ) : (
-                  // Usuario no autenticado - Mostrar nombre local editable
-                  <>
-                    <p className="text-xs text-gray-400 mb-2">Mi nombre (local)</p>
-                    {isEditing ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={tempName}
-                          onChange={(e) => setTempName(e.target.value)}
-                          onKeyDown={handleKeyDown}
-                          className="bg-gray-700 text-white px-2 py-1 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm flex-1"
-                          maxLength={25}
-                          autoFocus
-                        />
-                        <button
-                          onClick={handleSaveName}
-                          className="bg-emerald-500/80 hover:bg-emerald-600 p-1.5 rounded-lg transition-all"
-                          title="Guardar"
-                        >
-                          <Check size={14} />
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          className="bg-red-500/80 hover:bg-red-600 p-1.5 rounded-lg transition-all"
-                          title="Cancelar"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">No autenticado</p>
+                    </>
+                  )}
+                </div>
+
+                <div className="py-2">
+                  {!isAuthLoading && !user && (
+                    // Usuario no autenticado - Mostrar botón de login
+                    <>
                       <button
-                        onClick={handleEditName}
-                        className="group flex items-center gap-2 hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-all w-full"
+                        className="w-full px-4 py-3 text-left hover:bg-blue-500/10 transition-colors flex items-center gap-3 group"
+                        onClick={handleLogin}
                       >
-                        <span className="text-sm font-semibold text-white flex-1 text-left">
-                          {name}
-                        </span>
-                        <Pencil size={14} className="text-gray-400 group-hover:text-white transition-colors" />
+                        <User size={18} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                        <div>
+                          <p className="text-white font-medium">Iniciar sesión</p>
+                          <p className="text-xs text-gray-400">Accede con Google</p>
+                        </div>
                       </button>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">No autenticado</p>
-                  </>
-                )}
-              </div>
+                    </>
+                  )}
 
-              <div className="py-2">
-                {!isAuthLoading && !user && (
-                  // Usuario no autenticado - Mostrar botón de login
-                  <>
+                  {!isAuthLoading && user && !user.isPremium && (
+                    // Usuario autenticado no premium - Mostrar opción de Premium
                     <button
-                      className="w-full px-4 py-3 text-left hover:bg-blue-500/10 transition-colors flex items-center gap-3 group"
-                      onClick={handleLogin}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors flex items-center gap-3 group"
+                      onClick={() => {
+                        navigate("/premium");
+                        setShowProfileMenu(false);
+                      }}
                     >
-                      <User size={18} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                      <Crown size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
                       <div>
-                        <p className="text-white font-medium">Iniciar sesión</p>
-                        <p className="text-xs text-gray-400">Accede con Google</p>
+                        <p className="text-white font-medium">Hazte Premium</p>
+                        <p className="text-xs text-gray-400">Sin anuncios y beneficios</p>
                       </div>
                     </button>
-                  </>
-                )}
+                  )}
 
-                {!isAuthLoading && user && !user.isPremium && (
-                  // Usuario autenticado no premium - Mostrar opción de Premium
-                  <button
-                    className="w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors flex items-center gap-3 group"
-                    onClick={() => {
-                      navigate("/premium");
-                      setShowProfileMenu(false);
-                    }}
-                  >
-                    <Crown size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <p className="text-white font-medium">Hazte Premium</p>
-                      <p className="text-xs text-gray-400">Sin anuncios y beneficios</p>
-                    </div>
-                  </button>
-                )}
-
-                {!isAuthLoading && user && (
-                  // Usuario autenticado - Mostrar configuración
-                  <button
-                    className="w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors flex items-center gap-3 group"
-                    onClick={() => {
-                      // TODO: Implementar navegación a configuración
-                      alert("Próximamente: Página de configuración");
-                      setShowProfileMenu(false);
-                    }}
-                  >
-                    <Settings size={18} className="text-gray-400 group-hover:text-white transition-colors" />
-                    <div>
-                      <p className="text-white font-medium">Configuración</p>
-                      <p className="text-xs text-gray-400">Ajustes de la cuenta</p>
-                    </div>
-                  </button>
-                )}
-
-                {!isAuthLoading && user && (
-                  // Usuario autenticado - Mostrar logout
-                  <>
-                    <div className="my-2 border-t border-gray-700"></div>
+                  {!isAuthLoading && user && (
+                    // Usuario autenticado - Mostrar configuración
                     <button
-                      className="w-full px-4 py-3 text-left hover:bg-red-500/10 transition-colors flex items-center gap-3 group"
-                      onClick={handleLogout}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors flex items-center gap-3 group"
+                      onClick={() => {
+                        // TODO: Implementar navegación a configuración
+                        alert("Próximamente: Página de configuración");
+                        setShowProfileMenu(false);
+                      }}
                     >
-                      <LogOut size={18} className="text-red-400 group-hover:scale-110 transition-transform" />
+                      <Settings size={18} className="text-gray-400 group-hover:text-white transition-colors" />
                       <div>
-                        <p className="text-red-400 font-medium">Cerrar sesión</p>
+                        <p className="text-white font-medium">Configuración</p>
+                        <p className="text-xs text-gray-400">Ajustes de la cuenta</p>
                       </div>
                     </button>
-                  </>
-                )}
+                  )}
+
+                  {!isAuthLoading && user && (
+                    // Usuario autenticado - Mostrar logout
+                    <>
+                      <div className="my-2 border-t border-gray-700"></div>
+                      <button
+                        className="w-full px-4 py-3 text-left hover:bg-red-500/10 transition-colors flex items-center gap-3 group"
+                        onClick={handleLogout}
+                      >
+                        <LogOut size={18} className="text-red-400 group-hover:scale-110 transition-transform" />
+                        <div>
+                          <p className="text-red-400 font-medium">Cerrar sesión</p>
+                        </div>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Modal de Login/Registro */}
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-gray-800 rounded-xl border border-gray-700 max-w-md w-full p-6 relative">
+      {/* Modal de Login/Registro - Renderizado con Portal fuera del AppHeader */}
+      {showLoginModal && createPortal(
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-gray-900 rounded-lg border border-gray-700 max-w-md w-full p-6 relative">
             {/* Botón cerrar */}
             <button
               onClick={() => {
@@ -387,7 +398,7 @@ export default function AppHeader() {
                 setLoginPassword("");
                 setRegisterName("");
               }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              className="absolute top-3 right-3 text-gray-400 hover:text-white"
             >
               <X size={20} />
             </button>
@@ -395,7 +406,7 @@ export default function AppHeader() {
             {/* Opciones de autenticación */}
             {loginMode === "options" && (
               <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-white mb-6">Iniciar Sesión</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">Iniciar Sesión</h2>
 
                 {/* Google OAuth */}
                 <button
@@ -413,7 +424,7 @@ export default function AppHeader() {
                     <div className="w-full border-t border-gray-700"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-800 text-gray-400">o</span>
+                    <span className="px-2 bg-gray-900 text-gray-400">o</span>
                   </div>
                 </div>
 
@@ -440,15 +451,15 @@ export default function AppHeader() {
 
             {/* Formulario de Login */}
             {loginMode === "login" && (
-              <div>
+              <div className="space-y-4">
                 <button
                   onClick={() => setLoginMode("options")}
-                  className="mb-4 text-gray-400 hover:text-white flex items-center gap-2"
+                  className="text-gray-400 hover:text-white flex items-center gap-1 text-sm"
                 >
                   ← Volver
                 </button>
 
-                <h2 className="text-2xl font-bold text-white mb-6">Iniciar Sesión</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">Iniciar Sesión</h2>
 
                 <form onSubmit={handleEmailLogin} className="space-y-4">
                   <div>
@@ -457,7 +468,7 @@ export default function AppHeader() {
                       type="email"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
                       placeholder="tu@email.com"
                       required
                     />
@@ -469,7 +480,7 @@ export default function AppHeader() {
                       type="password"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
                       placeholder="••••••••"
                       minLength={6}
                       required
@@ -479,13 +490,13 @@ export default function AppHeader() {
                   <button
                     type="submit"
                     disabled={loginLoading}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50"
                   >
-                    {loginLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+                    {loginLoading ? "Iniciando..." : "Iniciar Sesión"}
                   </button>
                 </form>
 
-                <p className="text-center text-sm text-gray-400 mt-4">
+                <p className="text-center text-sm text-gray-400">
                   ¿No tienes cuenta?{" "}
                   <button
                     onClick={() => {
@@ -493,7 +504,7 @@ export default function AppHeader() {
                       setLoginEmail("");
                       setLoginPassword("");
                     }}
-                    className="text-purple-400 hover:text-purple-300 font-medium"
+                    className="text-purple-400 hover:text-purple-300"
                   >
                     Regístrate
                   </button>
@@ -503,15 +514,15 @@ export default function AppHeader() {
 
             {/* Formulario de Registro */}
             {loginMode === "register" && (
-              <div>
+              <div className="space-y-4">
                 <button
                   onClick={() => setLoginMode("options")}
-                  className="mb-4 text-gray-400 hover:text-white flex items-center gap-2"
+                  className="text-gray-400 hover:text-white flex items-center gap-1 text-sm"
                 >
                   ← Volver
                 </button>
 
-                <h2 className="text-2xl font-bold text-white mb-6">Crear Cuenta</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">Crear Cuenta</h2>
 
                 <form onSubmit={handleEmailRegister} className="space-y-4">
                   <div>
@@ -520,7 +531,7 @@ export default function AppHeader() {
                       type="text"
                       value={registerName}
                       onChange={(e) => setRegisterName(e.target.value)}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
                       placeholder="Tu nombre"
                       maxLength={50}
                     />
@@ -532,7 +543,7 @@ export default function AppHeader() {
                       type="email"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
                       placeholder="tu@email.com"
                       required
                     />
@@ -544,7 +555,7 @@ export default function AppHeader() {
                       type="password"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
                       placeholder="••••••••"
                       minLength={6}
                       required
@@ -555,13 +566,13 @@ export default function AppHeader() {
                   <button
                     type="submit"
                     disabled={loginLoading}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50"
                   >
-                    {loginLoading ? "Creando cuenta..." : "Crear Cuenta"}
+                    {loginLoading ? "Creando..." : "Crear Cuenta"}
                   </button>
                 </form>
 
-                <p className="text-center text-sm text-gray-400 mt-4">
+                <p className="text-center text-sm text-gray-400">
                   ¿Ya tienes cuenta?{" "}
                   <button
                     onClick={() => {
@@ -570,7 +581,7 @@ export default function AppHeader() {
                       setLoginPassword("");
                       setRegisterName("");
                     }}
-                    className="text-purple-400 hover:text-purple-300 font-medium"
+                    className="text-purple-400 hover:text-purple-300"
                   >
                     Inicia sesión
                   </button>
@@ -578,8 +589,9 @@ export default function AppHeader() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }

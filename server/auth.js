@@ -55,6 +55,7 @@ passport.use(
         const googleId = profile.id;
         const email = profile.emails && profile.emails[0] ? profile.emails[0].value : null;
         const name = profile.displayName;
+        const profilePicture = profile.photos && profile.photos[0] ? profile.photos[0].value : null;
 
         if (!email) {
           return done(new Error('No se pudo obtener el email del perfil de Google'), null);
@@ -72,16 +73,17 @@ passport.use(
               googleId,
               email,
               name,
+              profilePicture,
               isPremium: false, // Por defecto, usuarios no son premium
             },
           });
           console.log(`✅ Nuevo usuario creado: ${email} (ID: ${user.id})`);
         } else {
-          // Usuario existe, actualizar información si es necesario
-          if (user.email !== email || user.name !== name) {
+          // Usuario existe, actualizar información si es necesario (incluyendo foto de perfil)
+          if (user.email !== email || user.name !== name || user.profilePicture !== profilePicture) {
             user = await prisma.user.update({
               where: { id: user.id },
-              data: { email, name },
+              data: { email, name, profilePicture },
             });
             console.log(`🔄 Usuario actualizado: ${email} (ID: ${user.id})`);
           } else {
@@ -128,6 +130,7 @@ function generateJWT(user) {
     userId: user.id,
     isPremium: user.isPremium,
     email: user.email,
+    profilePicture: user.profilePicture || null,
   };
 
   const token = jwt.sign(payload, JWT_SECRET, {
@@ -183,6 +186,7 @@ function checkAuth(req, res, next) {
     userId: decoded.userId,
     isPremium: decoded.isPremium,
     email: decoded.email,
+    profilePicture: decoded.profilePicture || null,
   };
 
   next();
@@ -427,6 +431,7 @@ function setupAuthRoutes(app) {
         userId: userFromDB.id,
         email: userFromDB.email,
         isPremium: userFromDB.isPremium,
+        profilePicture: userFromDB.profilePicture || null,
       });
     } catch (error) {
       console.error('❌ Error al obtener usuario:', error);
@@ -466,7 +471,8 @@ function setupAuthRoutes(app) {
       res.json({
         userId: user.id,
         email: user.email,
-        isPremium: user.isPremium
+        isPremium: user.isPremium,
+        profilePicture: user.profilePicture || null
       });
     } catch (error) {
       console.error('❌ Error al refrescar token:', error);
