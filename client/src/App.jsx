@@ -10,6 +10,8 @@ import Room from "./pages/Room";
 import Admin from "./pages/Admin";
 import LegalPages from "./pages/LegalPages";
 import About from "./pages/About";
+import Premium from "./pages/Premium";
+import PremiumSuccess from "./pages/PremiumSuccess";
 import FullscreenButton from "./components/FullscreenButton";
 import Footer from "./components/Footer";
 import { TutorialProvider } from "./contexts/TutorialContext";
@@ -175,6 +177,8 @@ export default function App() {
             <Route path="/pass-and-play" element={<PassAndPlay />} />
             <Route path="/room/:roomId" element={<Room />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/premium" element={<Premium />} />
+            <Route path="/premium/success" element={<PremiumSuccess />} />
             <Route path="/privacy" element={<LegalPages type="privacy" />} />
             <Route path="/terms" element={<LegalPages type="terms" />} />
             <Route path="/about" element={<About />} />

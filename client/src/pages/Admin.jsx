@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X } from "lucide-react";
+import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen } from "lucide-react";
 import { api } from "../services/api";
+import UserManagement from "../components/UserManagement";
 
 export default function Admin() {
+  const [activeTab, setActiveTab] = useState("words"); // "words" o "users"
   const [words, setWords] = useState([]);
   const [categories, setCategories] = useState([]);
   const [stats, setStats] = useState(null);
@@ -116,24 +118,57 @@ export default function Admin() {
     <div className="min-h-screen bg-gray-950 text-white p-6">
       {/* Header */}
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               Panel de Administración
             </h1>
-            <p className="text-gray-400 mt-2">Gestiona las palabras del juego</p>
+            <p className="text-gray-400 mt-2">
+              {activeTab === "words" ? "Gestiona las palabras del juego" : "Gestiona usuarios y suscripciones"}
+            </p>
           </div>
+          {activeTab === "words" && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all"
+            >
+              <Plus size={20} />
+              Agregar Palabras
+            </button>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-8 border-b border-gray-800">
           <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all"
+            onClick={() => setActiveTab("words")}
+            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
+              activeTab === "words"
+                ? "text-purple-400 border-b-2 border-purple-400"
+                : "text-gray-400 hover:text-gray-300"
+            }`}
           >
-            <Plus size={20} />
-            Agregar Palabras
+            <BookOpen size={20} />
+            Palabras
+          </button>
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
+              activeTab === "users"
+                ? "text-purple-400 border-b-2 border-purple-400"
+                : "text-gray-400 hover:text-gray-300"
+            }`}
+          >
+            <Users size={20} />
+            Usuarios
           </button>
         </div>
 
-        {/* Estadísticas */}
-        {stats && (
+        {/* Contenido de la tab de Palabras */}
+        {activeTab === "words" && (
+          <>
+            {/* Estadísticas */}
+            {stats && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 p-6 rounded-xl border border-purple-500/30">
               <div className="flex items-center justify-between">
@@ -244,9 +279,8 @@ export default function Admin() {
             <p className="text-gray-400 text-lg">No hay palabras en esta categoría</p>
           </div>
         )}
-      </div>
 
-      {/* Modal para agregar palabras */}
+        {/* Modal para agregar palabras */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-2xl border-2 border-purple-500/50 max-w-2xl w-full p-8 relative">
@@ -346,6 +380,14 @@ export default function Admin() {
           </div>
         </div>
       )}
+          </>
+        )}
+
+        {/* Contenido de la tab de Usuarios */}
+        {activeTab === "users" && (
+          <UserManagement />
+        )}
+      </div>
     </div>
   );
 }

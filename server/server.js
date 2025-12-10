@@ -9,6 +9,8 @@ import {
   getTopWords,
   getWordStats,
 } from './services/word.service.js';
+import { passport, checkAuth, setupAuthRoutes, requireAuth } from './auth.js';
+import { setupPaymentRoutes } from './payment.js';
 dotenv.config();
 
 // --- Control de Anuncios ---
@@ -18,8 +20,17 @@ const IS_PREMIUM_MODE_ACTIVE = false; // TRUE desactiva todos los anuncios globa
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(express.json());
+// Middleware - IMPORTANTE: El webhook de Stripe necesita el body raw
+app.use((req, res, next) => {
+  if (req.originalUrl === '/webhook') {
+    next(); // No parsear el body para el webhook
+  } else {
+    express.json()(req, res, next);
+  }
+});
+
+// Para el webhook, usar raw body
+app.use('/webhook', express.raw({ type: 'application/json' }));
 
 const allowedOrigins = [
   "http://impostorword.com",
@@ -54,6 +65,15 @@ app.use(
   })
 );
 app.use(cookieParser());
+
+// Inicializar Passport para autenticación
+app.use(passport.initialize());
+
+// Configurar rutas de autenticación
+setupAuthRoutes(app);
+
+// Configurar rutas de pago con Stripe
+setupPaymentRoutes(app, checkAuth, requireAuth);
 
 // Almacenamiento en memoria
 const rooms = {};
@@ -636,7 +656,7 @@ function notifyWaitingClients(roomId) {
 }
 
 // 📡 GET /api/rooms/:roomId/state  (Long Polling)
-app.get('/api/rooms/:roomId/state', async (req, res) => {
+app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
   const { roomId } = req.params;
   const playerId = req.cookies.sid; // ID del jugador
   const clientRound = Number(req.query.round || 0);
@@ -722,11 +742,17 @@ app.get('/api/rooms/:roomId/state', async (req, res) => {
       winReason: room.winReason || null,
       impostorId: room.status === 'GAME_OVER' ? room.impostorId : null, // Solo revelar al impostor cuando termina el juego
       // Control de anuncios
-      isPremium: IS_PREMIUM_MODE_ACTIVE, // Flag global para desactivar anuncios
+      // Si el usuario está autenticado y es premium, se desactivan los anuncios para él
+      isPremium: req.user && req.user.isPremium ? true : IS_PREMIUM_MODE_ACTIVE,
       // Premium Pass del Anfitrión: si el admin es premium, los interstitials se desactivan para TODOS
-      // TODO: Cuando JWT esté listo, verificar: await verifyUserPremium(room.adminId)
-      isRoomPremium: IS_PREMIUM_MODE_ACTIVE // Por ahora usa flag global, luego será JWT del adminId
+      // Por ahora usa flag global, requiere mapeo de adminId (session) a userId (database)
+      isRoomPremium: IS_PREMIUM_MODE_ACTIVE
     };
+
+    // Log para debugging de estado premium
+    if (req.user) {
+      console.log(`🎮 [ROOM STATE] Usuario: ${req.user.email} | Premium: ${req.user.isPremium} | Sala: ${roomId}`);
+    }
 
     res.json(payload);
   };
@@ -838,6 +864,177 @@ app.get('/api/health', (req, res) => {
 // Importar PrismaClient para operaciones CRUD
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
+
+// ============================================
+// 👥 ENDPOINTS DE ADMINISTRACIÓN DE USUARIOS
+// ============================================
+
+// 📋 GET /api/admin/users - Obtener todos los usuarios
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        googleId: true,
+        isPremium: true,
+        premiumExpiresAt: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    // Calcular stats
+    const totalUsers = users.length;
+    const premiumUsers = users.filter(u => u.isPremium).length;
+    const googleUsers = users.filter(u => u.googleId).length;
+    const emailUsers = users.filter(u => !u.googleId).length;
+
+    res.json({
+      users,
+      stats: {
+        totalUsers,
+        premiumUsers,
+        googleUsers,
+        emailUsers
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener usuarios:', error);
+    res.status(500).json({ error: 'Error al obtener usuarios' });
+  }
+});
+
+// ⚡ PUT /api/admin/users/:id/premium - Actualizar estado premium
+app.put('/api/admin/users/:id/premium', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isPremium, daysToAdd } = req.body;
+
+    let updateData = {};
+
+    if (typeof isPremium === 'boolean') {
+      updateData.isPremium = isPremium;
+
+      // Si se activa premium y se especifican días
+      if (isPremium && daysToAdd) {
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+        updateData.premiumExpiresAt = expiresAt;
+      }
+
+      // Si se desactiva premium, limpiar fecha de expiración
+      if (!isPremium) {
+        updateData.premiumExpiresAt = null;
+      }
+    }
+
+    // Si solo se especifican días (extender suscripción existente)
+    if (daysToAdd && typeof isPremium === 'undefined') {
+      const user = await prisma.user.findUnique({
+        where: { id },
+        select: { premiumExpiresAt: true }
+      });
+
+      const baseDate = user.premiumExpiresAt && user.premiumExpiresAt > new Date()
+        ? user.premiumExpiresAt
+        : new Date();
+
+      const newExpiresAt = new Date(baseDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+      updateData.premiumExpiresAt = newExpiresAt;
+      updateData.isPremium = true;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isPremium: true,
+        premiumExpiresAt: true
+      }
+    });
+
+    console.log(`✅ Usuario premium actualizado: ${updatedUser.email} (Premium: ${updatedUser.isPremium})`);
+
+    res.json({
+      success: true,
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('❌ Error al actualizar premium:', error);
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+    } else {
+      res.status(500).json({ error: 'Error al actualizar premium' });
+    }
+  }
+});
+
+// ✏️ PUT /api/admin/users/:id - Actualizar información del usuario
+app.put('/api/admin/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email } = req.body;
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isPremium: true,
+        premiumExpiresAt: true
+      }
+    });
+
+    res.json({
+      success: true,
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('❌ Error al actualizar usuario:', error);
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+    } else if (error.code === 'P2002') {
+      res.status(400).json({ error: 'El email ya está en uso' });
+    } else {
+      res.status(500).json({ error: 'Error al actualizar usuario' });
+    }
+  }
+});
+
+// 🗑️ DELETE /api/admin/users/:id - Eliminar usuario
+app.delete('/api/admin/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    res.json({
+      success: true,
+      message: 'Usuario eliminado correctamente'
+    });
+  } catch (error) {
+    console.error('❌ Error al eliminar usuario:', error);
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+    } else {
+      res.status(500).json({ error: 'Error al eliminar usuario' });
+    }
+  }
+});
 
 // 📊 GET /api/admin/stats - Obtener estadísticas
 app.get('/api/admin/stats', async (req, res) => {

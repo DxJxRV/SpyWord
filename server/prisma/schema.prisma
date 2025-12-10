@@ -58,3 +58,21 @@ model GameMode {
   @@map("game_modes")
   @@index([isActive, isDailyMode])
 }
+
+// Modelo de Usuario para autenticación y premium
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique @db.VarChar(255)
+  name            String?   @db.VarChar(255)
+  googleId        String?   @unique @map("google_id") @db.VarChar(255)
+  password        String?   @db.VarChar(255) // Para autenticación con email (bcrypt hash)
+  isPremium       Boolean   @default(false) @map("is_premium") // CRUCIAL para anuncios y Premium Pass
+  premiumExpiresAt DateTime? @map("premium_expires_at") // Fecha de expiración del premium
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+  @@index([googleId])
+  @@index([isPremium])
+  @@index([email])
+}

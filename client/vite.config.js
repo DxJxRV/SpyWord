@@ -51,6 +51,18 @@ export default defineConfig({
         secure: false,
         cookieDomainRewrite: '',
         cookiePathRewrite: '/'
+      },
+      '/auth': {
+        target: `http://localhost:${process.env.VITE_SERVER_PORT || 3003}`,
+        changeOrigin: true,
+        secure: false,
+        cookieDomainRewrite: '',
+        cookiePathRewrite: '/'
+      },
+      '/webhook': {
+        target: `http://localhost:${process.env.VITE_SERVER_PORT || 3003}`,
+        changeOrigin: true,
+        secure: false
       }
     }
   }

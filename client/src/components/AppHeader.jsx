@@ -1,17 +1,85 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { User, LogOut, Settings, Crown, Pencil, Check, X } from "lucide-react";
 import { getUserName, setUserName } from "../utils/nameGenerator";
-import { api } from "../services/api";
+import { api, authApi } from "../services/api";
 import { toast } from "sonner";
 
 export default function AppHeader() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [name, setName] = useState(getUserName());
   const [isEditing, setIsEditing] = useState(false);
   const [tempName, setTempName] = useState(name);
   const menuRef = useRef(null);
+
+  // Estado de autenticación
+  const [user, setUser] = useState(null); // { userId, email, isPremium } o null
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // Estado del modal de login
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginMode, setLoginMode] = useState("options"); // "options", "login", "register"
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [registerName, setRegisterName] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Función para refrescar el estado del usuario
+  const refreshUserState = async () => {
+    try {
+      setIsAuthLoading(true);
+      // Primero refrescar el JWT
+      await authApi.post('/auth/refresh');
+      // Luego obtener los datos actualizados
+      const response = await authApi.get('/auth/me');
+      setUser(response.data);
+      toast.success("Estado actualizado correctamente");
+    } catch (error) {
+      console.error("Error al refrescar estado:", error);
+      toast.error("Error al actualizar estado");
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  // Verificar sesión al cargar y manejar redirect de OAuth
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await authApi.get('/auth/me');
+        setUser(response.data);
+
+        // Verificar si hay parámetros de autenticación en la URL
+        const params = new URLSearchParams(location.search);
+        const authStatus = params.get('auth');
+
+        if (authStatus === 'success') {
+          toast.success("¡Sesión iniciada correctamente!");
+          // Limpiar el parámetro de la URL
+          window.history.replaceState({}, '', location.pathname);
+        } else if (authStatus === 'error') {
+          toast.error("Error al iniciar sesión");
+          window.history.replaceState({}, '', location.pathname);
+        }
+      } catch (error) {
+        // No autenticado o error
+        setUser(null);
+
+        // Verificar error en URL
+        const params = new URLSearchParams(location.search);
+        const authStatus = params.get('auth');
+        if (authStatus === 'error') {
+          toast.error("Error al iniciar sesión");
+          window.history.replaceState({}, '', location.pathname);
+        }
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+    checkAuth();
+  }, [location.search, location.pathname]);
 
   // Cerrar menú al hacer click fuera
   useEffect(() => {
@@ -70,17 +138,92 @@ export default function AppHeader() {
     }
   };
 
+  const handleLogin = () => {
+    setShowLoginModal(true);
+    setShowProfileMenu(false);
+  };
+
+  const handleGoogleLogin = () => {
+    // Redirigir a Google OAuth (usa URL relativa para proxy de Vite en desarrollo)
+    window.location.href = '/auth/google';
+  };
+
+  const handleEmailLogin = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true);
+
+    try {
+      const response = await authApi.post('/auth/login', {
+        email: loginEmail,
+        password: loginPassword
+      });
+
+      setUser(response.data);
+      toast.success("¡Sesión iniciada correctamente!");
+      setShowLoginModal(false);
+      setLoginEmail("");
+      setLoginPassword("");
+      setLoginMode("options");
+    } catch (error) {
+      console.error("Error al iniciar sesión:", error);
+      toast.error(error.response?.data?.error || "Error al iniciar sesión");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleEmailRegister = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true);
+
+    try {
+      const response = await authApi.post('/auth/register', {
+        email: loginEmail,
+        password: loginPassword,
+        name: registerName || null
+      });
+
+      setUser(response.data);
+      toast.success("¡Cuenta creada correctamente!");
+      setShowLoginModal(false);
+      setLoginEmail("");
+      setLoginPassword("");
+      setRegisterName("");
+      setLoginMode("options");
+    } catch (error) {
+      console.error("Error al registrarse:", error);
+      toast.error(error.response?.data?.error || "Error al crear cuenta");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authApi.post('/auth/logout');
+      setUser(null);
+      toast.success("Sesión cerrada");
+      setShowProfileMenu(false);
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+      toast.error("Error al cerrar sesión");
+    }
+  };
+
   return (
     <div className="fixed top-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 z-50">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-        {/* Logo */}
-        <div className="flex items-center gap-2">
+        {/* Logo - clickeable para ir al home */}
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+        >
           <h1 className="text-xl font-bold flex items-center gap-1">
             <span className="text-amber-400">Impostor</span>
             <span className="text-white">Word.com</span>
             <span className="text-base">🕵️‍♂️</span>
           </h1>
-        </div>
+        </button>
 
         {/* Botón de perfil */}
         <div className="relative" ref={menuRef}>
@@ -97,102 +240,346 @@ export default function AppHeader() {
             <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden">
               {/* Sección de nombre de usuario */}
               <div className="px-4 py-3 bg-gray-900/50 border-b border-gray-700">
-                <p className="text-xs text-gray-400 mb-2">Mi nombre</p>
-                {isEditing ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={tempName}
-                      onChange={(e) => setTempName(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      className="bg-gray-700 text-white px-2 py-1 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm flex-1"
-                      maxLength={25}
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleSaveName}
-                      className="bg-emerald-500/80 hover:bg-emerald-600 p-1.5 rounded-lg transition-all"
-                      title="Guardar"
-                    >
-                      <Check size={14} />
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="bg-red-500/80 hover:bg-red-600 p-1.5 rounded-lg transition-all"
-                      title="Cancelar"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
+                {isAuthLoading ? (
+                  <p className="text-sm text-gray-400">Cargando...</p>
+                ) : user ? (
+                  // Usuario autenticado
+                  <>
+                    <p className="text-xs text-gray-400 mb-2">Cuenta de Google</p>
+                    <p className="text-sm font-semibold text-white truncate">{user.email}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {user.isPremium ? (
+                        <span className="text-amber-400">✨ Usuario Premium</span>
+                      ) : (
+                        "Usuario Free"
+                      )}
+                    </p>
+                  </>
                 ) : (
-                  <button
-                    onClick={handleEditName}
-                    className="group flex items-center gap-2 hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-all w-full"
-                  >
-                    <span className="text-sm font-semibold text-white flex-1 text-left">
-                      {name}
-                    </span>
-                    <Pencil size={14} className="text-gray-400 group-hover:text-white transition-colors" />
-                  </button>
+                  // Usuario no autenticado - Mostrar nombre local editable
+                  <>
+                    <p className="text-xs text-gray-400 mb-2">Mi nombre (local)</p>
+                    {isEditing ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={tempName}
+                          onChange={(e) => setTempName(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          className="bg-gray-700 text-white px-2 py-1 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm flex-1"
+                          maxLength={25}
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleSaveName}
+                          className="bg-emerald-500/80 hover:bg-emerald-600 p-1.5 rounded-lg transition-all"
+                          title="Guardar"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="bg-red-500/80 hover:bg-red-600 p-1.5 rounded-lg transition-all"
+                          title="Cancelar"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleEditName}
+                        className="group flex items-center gap-2 hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-all w-full"
+                      >
+                        <span className="text-sm font-semibold text-white flex-1 text-left">
+                          {name}
+                        </span>
+                        <Pencil size={14} className="text-gray-400 group-hover:text-white transition-colors" />
+                      </button>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">No autenticado</p>
+                  </>
                 )}
-                <p className="text-xs text-gray-500 mt-1">Usuario Free</p>
               </div>
 
               <div className="py-2">
-                {/* Opción: Hazte Premium */}
-                <button
-                  className="w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors flex items-center gap-3 group"
-                  onClick={() => {
-                    // TODO: Implementar navegación a página de premium
-                    alert("Próximamente: Página de suscripción Premium");
-                    setShowProfileMenu(false);
-                  }}
-                >
-                  <Crown size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
-                  <div>
-                    <p className="text-white font-medium">Hazte Premium</p>
-                    <p className="text-xs text-gray-400">Sin anuncios y beneficios</p>
-                  </div>
-                </button>
+                {!isAuthLoading && !user && (
+                  // Usuario no autenticado - Mostrar botón de login
+                  <>
+                    <button
+                      className="w-full px-4 py-3 text-left hover:bg-blue-500/10 transition-colors flex items-center gap-3 group"
+                      onClick={handleLogin}
+                    >
+                      <User size={18} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                      <div>
+                        <p className="text-white font-medium">Iniciar sesión</p>
+                        <p className="text-xs text-gray-400">Accede con Google</p>
+                      </div>
+                    </button>
+                  </>
+                )}
 
-                {/* Opción: Configuración */}
-                <button
-                  className="w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors flex items-center gap-3 group"
-                  onClick={() => {
-                    // TODO: Implementar navegación a configuración
-                    alert("Próximamente: Página de configuración");
-                    setShowProfileMenu(false);
-                  }}
-                >
-                  <Settings size={18} className="text-gray-400 group-hover:text-white transition-colors" />
-                  <div>
-                    <p className="text-white font-medium">Configuración</p>
-                    <p className="text-xs text-gray-400">Ajustes de la cuenta</p>
-                  </div>
-                </button>
+                {!isAuthLoading && user && !user.isPremium && (
+                  // Usuario autenticado no premium - Mostrar opción de Premium
+                  <button
+                    className="w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors flex items-center gap-3 group"
+                    onClick={() => {
+                      navigate("/premium");
+                      setShowProfileMenu(false);
+                    }}
+                  >
+                    <Crown size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <p className="text-white font-medium">Hazte Premium</p>
+                      <p className="text-xs text-gray-400">Sin anuncios y beneficios</p>
+                    </div>
+                  </button>
+                )}
 
-                {/* Separador */}
-                <div className="my-2 border-t border-gray-700"></div>
+                {!isAuthLoading && user && (
+                  // Usuario autenticado - Mostrar configuración
+                  <button
+                    className="w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors flex items-center gap-3 group"
+                    onClick={() => {
+                      // TODO: Implementar navegación a configuración
+                      alert("Próximamente: Página de configuración");
+                      setShowProfileMenu(false);
+                    }}
+                  >
+                    <Settings size={18} className="text-gray-400 group-hover:text-white transition-colors" />
+                    <div>
+                      <p className="text-white font-medium">Configuración</p>
+                      <p className="text-xs text-gray-400">Ajustes de la cuenta</p>
+                    </div>
+                  </button>
+                )}
 
-                {/* Opción: Cerrar sesión */}
-                <button
-                  className="w-full px-4 py-3 text-left hover:bg-red-500/10 transition-colors flex items-center gap-3 group"
-                  onClick={() => {
-                    // TODO: Implementar logout
-                    alert("Próximamente: Sistema de autenticación");
-                    setShowProfileMenu(false);
-                  }}
-                >
-                  <LogOut size={18} className="text-red-400 group-hover:scale-110 transition-transform" />
-                  <div>
-                    <p className="text-red-400 font-medium">Cerrar sesión</p>
-                  </div>
-                </button>
+                {!isAuthLoading && user && (
+                  // Usuario autenticado - Mostrar logout
+                  <>
+                    <div className="my-2 border-t border-gray-700"></div>
+                    <button
+                      className="w-full px-4 py-3 text-left hover:bg-red-500/10 transition-colors flex items-center gap-3 group"
+                      onClick={handleLogout}
+                    >
+                      <LogOut size={18} className="text-red-400 group-hover:scale-110 transition-transform" />
+                      <div>
+                        <p className="text-red-400 font-medium">Cerrar sesión</p>
+                      </div>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Modal de Login/Registro */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 max-w-md w-full p-6 relative">
+            {/* Botón cerrar */}
+            <button
+              onClick={() => {
+                setShowLoginModal(false);
+                setLoginMode("options");
+                setLoginEmail("");
+                setLoginPassword("");
+                setRegisterName("");
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Opciones de autenticación */}
+            {loginMode === "options" && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-white mb-6">Iniciar Sesión</h2>
+
+                {/* Google OAuth */}
+                <button
+                  onClick={handleGoogleLogin}
+                  className="w-full bg-white hover:bg-gray-100 text-gray-900 px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-3 transition-all"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2 C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
+                  </svg>
+                  Continuar con Google
+                </button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-700"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-gray-800 text-gray-400">o</span>
+                  </div>
+                </div>
+
+                {/* Email/Password */}
+                <button
+                  onClick={() => setLoginMode("login")}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-3 transition-all"
+                >
+                  <User size={20} />
+                  Continuar con Email
+                </button>
+
+                <p className="text-center text-sm text-gray-400 mt-4">
+                  ¿No tienes cuenta?{" "}
+                  <button
+                    onClick={() => setLoginMode("register")}
+                    className="text-purple-400 hover:text-purple-300 font-medium"
+                  >
+                    Regístrate
+                  </button>
+                </p>
+              </div>
+            )}
+
+            {/* Formulario de Login */}
+            {loginMode === "login" && (
+              <div>
+                <button
+                  onClick={() => setLoginMode("options")}
+                  className="mb-4 text-gray-400 hover:text-white flex items-center gap-2"
+                >
+                  ← Volver
+                </button>
+
+                <h2 className="text-2xl font-bold text-white mb-6">Iniciar Sesión</h2>
+
+                <form onSubmit={handleEmailLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Email</label>
+                    <input
+                      type="email"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      placeholder="tu@email.com"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Contraseña</label>
+                    <input
+                      type="password"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      placeholder="••••••••"
+                      minLength={6}
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loginLoading}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loginLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+                  </button>
+                </form>
+
+                <p className="text-center text-sm text-gray-400 mt-4">
+                  ¿No tienes cuenta?{" "}
+                  <button
+                    onClick={() => {
+                      setLoginMode("register");
+                      setLoginEmail("");
+                      setLoginPassword("");
+                    }}
+                    className="text-purple-400 hover:text-purple-300 font-medium"
+                  >
+                    Regístrate
+                  </button>
+                </p>
+              </div>
+            )}
+
+            {/* Formulario de Registro */}
+            {loginMode === "register" && (
+              <div>
+                <button
+                  onClick={() => setLoginMode("options")}
+                  className="mb-4 text-gray-400 hover:text-white flex items-center gap-2"
+                >
+                  ← Volver
+                </button>
+
+                <h2 className="text-2xl font-bold text-white mb-6">Crear Cuenta</h2>
+
+                <form onSubmit={handleEmailRegister} className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Nombre (opcional)</label>
+                    <input
+                      type="text"
+                      value={registerName}
+                      onChange={(e) => setRegisterName(e.target.value)}
+                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      placeholder="Tu nombre"
+                      maxLength={50}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Email</label>
+                    <input
+                      type="email"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      placeholder="tu@email.com"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Contraseña</label>
+                    <input
+                      type="password"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none"
+                      placeholder="••••••••"
+                      minLength={6}
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Mínimo 6 caracteres</p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loginLoading}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loginLoading ? "Creando cuenta..." : "Crear Cuenta"}
+                  </button>
+                </form>
+
+                <p className="text-center text-sm text-gray-400 mt-4">
+                  ¿Ya tienes cuenta?{" "}
+                  <button
+                    onClick={() => {
+                      setLoginMode("login");
+                      setLoginEmail("");
+                      setLoginPassword("");
+                      setRegisterName("");
+                    }}
+                    className="text-purple-400 hover:text-purple-300 font-medium"
+                  >
+                    Inicia sesión
+                  </button>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
