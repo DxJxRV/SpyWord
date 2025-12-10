@@ -6,8 +6,7 @@ export default function TutorialButton({ isRoom = false }) {
 
   const handleClick = () => {
     if (isRoom) {
-      // Forzar inicio del tutorial cuando se hace click manualmente
-      startRoomTutorial(true);
+      startRoomTutorial();
     } else {
       startTutorial();
     }

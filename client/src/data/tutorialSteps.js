@@ -89,10 +89,4 @@ export const tutorialStepsRoom = [
     content: "¡Todo listo! 🎉\n\nCómo jugar:\n\n1. Hablen por turnos\n\n2. Describan su palabra\n\n3. Descubran al impostor\n\n¡Diviértete!",
     placement: "center",
   },
-  {
-    target: '[data-tutorial="tutorial-button"]',
-    content: "¿Necesitas ver el tutorial de nuevo?\n\nPresiona este botón en cualquier momento para repetir el tutorial.",
-    placement: "top",
-    showDontShowAgain: true, // Flag para el checkbox
-  },
 ];

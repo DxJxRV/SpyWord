@@ -7,9 +7,8 @@ export function TutorialProvider({ children }) {
   const [run, setRun] = useState(false);
   const [hasSeenTutorial, setHasSeenTutorial] = useState(false);
 
-  // Tutorial de Room (siempre se muestra, a menos que marquen "no volver a mostrar")
+  // Tutorial de Room (solo se muestra cuando el usuario hace clic en el botón de ayuda)
   const [runRoom, setRunRoom] = useState(false);
-  const [dontShowRoomTutorial, setDontShowRoomTutorial] = useState(false);
 
   // Verificar si el usuario ya vio el tutorial de Home (localStorage)
   useEffect(() => {
@@ -21,12 +20,6 @@ export function TutorialProvider({ children }) {
       }, 1000);
     } else {
       setHasSeenTutorial(true);
-    }
-
-    // Verificar si marcaron "no volver a mostrar" para Room
-    const dontShowRoom = localStorage.getItem("spyword_room_tutorial_disabled");
-    if (dontShowRoom === "true") {
-      setDontShowRoomTutorial(true);
     }
   }, []);
 
@@ -46,25 +39,12 @@ export function TutorialProvider({ children }) {
     setHasSeenTutorial(false);
   };
 
-  const startRoomTutorial = (force = false) => {
-    // Si es forzado (click manual del botón), siempre mostrar
-    // Si no, respetar la preferencia del usuario
-    if (force || !dontShowRoomTutorial) {
-      setRunRoom(true);
-    }
+  const startRoomTutorial = () => {
+    setRunRoom(true);
   };
 
-  const stopRoomTutorial = (dontShowAgain = false) => {
+  const stopRoomTutorial = () => {
     setRunRoom(false);
-    if (dontShowAgain) {
-      localStorage.setItem("spyword_room_tutorial_disabled", "true");
-      setDontShowRoomTutorial(true);
-    }
-  };
-
-  const resetRoomTutorial = () => {
-    localStorage.removeItem("spyword_room_tutorial_disabled");
-    setDontShowRoomTutorial(false);
   };
 
   return (
@@ -80,8 +60,6 @@ export function TutorialProvider({ children }) {
         setRunRoom,
         startRoomTutorial,
         stopRoomTutorial,
-        resetRoomTutorial,
-        dontShowRoomTutorial,
       }}
     >
       {children}

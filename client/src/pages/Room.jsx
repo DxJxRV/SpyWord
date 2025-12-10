@@ -18,7 +18,7 @@ import AppHeader from "../components/AppHeader";
 export default function Room() {
   const { roomId } = useParams(); // Solo necesitamos roomId
   const navigate = useNavigate();
-  const { runRoom, startRoomTutorial, stopRoomTutorial, dontShowRoomTutorial } = useTutorial();
+  const { runRoom, stopRoomTutorial } = useTutorial();
   const { isPremium } = useAuth();
   const [word, setWord] = useState("");
   const [currentRound, setCurrentRound] = useState(0);
@@ -33,7 +33,6 @@ export default function Room() {
   const [previousStarterName, setPreviousStarterName] = useState(null); // Nombre anterior para comparar
   const [previousWord, setPreviousWord] = useState(null); // Palabra anterior para comparar
   const [wordHidden, setWordHidden] = useState(false); // Estado para ocultar/mostrar la palabra
-  const [dontShowAgainChecked, setDontShowAgainChecked] = useState(false); // Checkbox del tutorial
   const nextRoundTimestamp = useRef(null); // Guardar el timestamp original
 
   // Estados para votación
@@ -87,15 +86,6 @@ export default function Room() {
     // Actualizar la referencia
     previousPlayerIds.current = currentPlayerIds;
   }, [players, myId]);
-
-  // Iniciar tutorial automáticamente al entrar a la sala
-  useEffect(() => {
-    if (!dontShowRoomTutorial) {
-      setTimeout(() => {
-        startRoomTutorial();
-      }, 1000);
-    }
-  }, [dontShowRoomTutorial, startRoomTutorial]);
 
   useEffect(() => {
     let isActive = true;
@@ -581,29 +571,7 @@ export default function Room() {
 
       {/* Tutorial */}
       <Joyride
-        steps={tutorialStepsRoom.map((step, idx) => {
-          // Si es el último step, agregar checkbox
-          if (idx === tutorialStepsRoom.length - 1) {
-            return {
-              ...step,
-              content: (
-                <div>
-                  <p style={{ marginBottom: '16px' }}>{step.content}</p>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={dontShowAgainChecked}
-                      onChange={(e) => setDontShowAgainChecked(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>No volver a mostrar este tutorial automáticamente</span>
-                  </label>
-                </div>
-              )
-            };
-          }
-          return step;
-        })}
+        steps={tutorialStepsRoom}
         run={runRoom}
         continuous
         showProgress={false}
@@ -611,15 +579,8 @@ export default function Room() {
         callback={(data) => {
           const { status } = data;
 
-          if (status === "finished") {
-            // Usar el valor del checkbox cuando se termina normalmente
-            stopRoomTutorial(dontShowAgainChecked);
-            // Resetear el checkbox para la próxima vez
-            setDontShowAgainChecked(false);
-          } else if (status === "skipped") {
-            // Si se salta, siempre marcar como "no volver a mostrar"
-            stopRoomTutorial(true);
-            setDontShowAgainChecked(false);
+          if (status === "finished" || status === "skipped") {
+            stopRoomTutorial();
           }
         }}
         styles={{

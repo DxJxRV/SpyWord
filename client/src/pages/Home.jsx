@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Play, Link2, QrCode, Camera } from "lucide-react";
+import { Play, Link2, QrCode, Camera, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../services/api";
 import Joyride from "react-joyride";
@@ -20,6 +20,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [dontShowAgainChecked, setDontShowAgainChecked] = useState(false); // Checkbox del tutorial
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Detectar si viene de un link compartido con parámetro ?join=CODIGO
   useEffect(() => {
@@ -169,7 +170,34 @@ export default function Home() {
       )}
       {mode === "join" && (
         <div className="flex flex-col items-center gap-4 mt-4 max-w-md w-full">
-          <p className="text-xl font-semibold">Únete a una partida</p>
+          {/* Título con botón de ayuda */}
+          <div className="flex items-center gap-2">
+            <p className="text-xl font-semibold">Únete a una partida</p>
+            <button
+              onClick={() => setShowHelp(!showHelp)}
+              className="bg-blue-500/20 hover:bg-blue-500/30 p-2 rounded-lg transition-all"
+            >
+              <HelpCircle size={20} className="text-blue-400" />
+            </button>
+          </div>
+
+          {/* Mensaje de ayuda */}
+          {showHelp && (
+            <div className="bg-blue-500/20 px-4 py-3 rounded-lg border border-blue-500/30 w-full relative">
+              <button
+                onClick={() => setShowHelp(false)}
+                className="absolute top-2 right-2 text-blue-300 hover:text-blue-100 transition-colors"
+              >
+                ✕
+              </button>
+              <p className="text-sm text-blue-200 text-center pr-6">
+                <strong className="block mb-2">¿Cómo unirse?</strong>
+                📱 <strong>Escanear QR:</strong> Usa tu cámara para escanear el código QR de la sala
+                <br />
+                ⌨️ <strong>Código de sala:</strong> Ingresa manualmente el código de 6 caracteres
+              </p>
+            </div>
+          )}
 
           {/* Botón Escanear QR con Cámara */}
           <button
