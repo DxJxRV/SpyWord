@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Play, HelpCircle } from "lucide-react";
+import { ArrowLeft, Users, Play, HelpCircle, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import ScratchCard from "react-scratchcard-v2";
 import Joyride, { ACTIONS, EVENTS, STATUS } from "react-joyride";
@@ -208,7 +208,7 @@ export default function PassAndPlay() {
   };
 
   const startGame = () => {
-    if (totalPlayers < 3) {
+    if (totalPlayers === '' || totalPlayers < 3 || isNaN(totalPlayers)) {
       toast.error("Se necesitan al menos 3 jugadores");
       return;
     }
@@ -384,17 +384,67 @@ export default function PassAndPlay() {
                 <Users size={24} />
                 <span>Número de jugadores</span>
               </label>
-              <input
-                type="number"
-                min="3"
-                max="12"
-                value={totalPlayers}
-                onChange={(e) => setTotalPlayers(parseInt(e.target.value) || 3)}
-                className="w-full bg-gray-700 text-white px-4 py-3 rounded-xl text-center text-2xl font-bold border-2 border-gray-600 focus:border-emerald-500 focus:outline-none"
-              />
-              <p className="text-sm text-gray-400 mt-2 text-center">
-                Mínimo 3 jugadores
-              </p>
+
+              <div className="flex items-center gap-3">
+                {/* Botón decrementar */}
+                <button
+                  onClick={() => {
+                    const current = totalPlayers === '' ? 4 : totalPlayers;
+                    setTotalPlayers(Math.max(3, current - 1));
+                  }}
+                  disabled={totalPlayers <= 3 && totalPlayers !== ''}
+                  className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all active:scale-95"
+                >
+                  <ChevronDown size={24} />
+                </button>
+
+                {/* Input de número */}
+                <input
+                  type="number"
+                  min="3"
+                  max="12"
+                  value={totalPlayers}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setTotalPlayers('');
+                    } else {
+                      const num = parseInt(val);
+                      if (!isNaN(num)) {
+                        setTotalPlayers(Math.min(12, Math.max(0, num)));
+                      }
+                    }
+                  }}
+                  className={`flex-1 bg-gray-700 text-white px-4 py-3 rounded-xl text-center text-2xl font-bold border-2 focus:outline-none transition-colors ${
+                    totalPlayers < 3 || totalPlayers === ''
+                      ? 'border-red-500 focus:border-red-400'
+                      : 'border-gray-600 focus:border-emerald-500'
+                  }`}
+                />
+
+                {/* Botón incrementar */}
+                <button
+                  onClick={() => {
+                    const current = totalPlayers === '' ? 3 : totalPlayers;
+                    setTotalPlayers(Math.min(12, current + 1));
+                  }}
+                  disabled={totalPlayers >= 12}
+                  className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all active:scale-95"
+                >
+                  <ChevronUp size={24} />
+                </button>
+              </div>
+
+              {/* Mensaje de error o ayuda */}
+              {(totalPlayers < 3 || totalPlayers === '') ? (
+                <p className="text-sm text-red-400 mt-2 text-center font-semibold">
+                  ⚠️ Mínimo 3 jugadores
+                </p>
+              ) : (
+                <p className="text-sm text-gray-400 mt-2 text-center">
+                  De 3 a 12 jugadores
+                </p>
+              )}
             </div>
 
             <button
