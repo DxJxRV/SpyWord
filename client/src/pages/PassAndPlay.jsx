@@ -320,6 +320,25 @@ export default function PassAndPlay() {
     setWinner(null);
   };
 
+  // Deshabilitar scroll cuando se muestra la tarjeta de raspado en mobile
+  useEffect(() => {
+    if (showingCard) {
+      // Guardar el overflow actual
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+
+      // Deshabilitar scroll
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+
+      // Restaurar al desmontar o cuando showingCard cambie
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.touchAction = originalTouchAction;
+      };
+    }
+  }, [showingCard]);
+
   // Renderizar el botón de ayuda (disponible en todas las pantallas)
   const HelpButton = () => (
     <button
@@ -521,35 +540,44 @@ export default function PassAndPlay() {
               </p>
             </div>
 
-            <div className="pnp-scratch-container relative flex justify-center">
-              <ScratchCard
-                key={currentPlayerIndex}
-                width={320}
-                height={240}
-                image="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='240'%3E%3Crect width='320' height='240' fill='%23374151'/%3E%3Ctext x='160' y='120' font-family='Arial' font-size='20' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'%3ERaspa aquí 👆%3C/text%3E%3C/svg%3E"
-                finishPercent={50}
-                onComplete={() => {
-                  if (navigator.vibrate) navigator.vibrate(40);
-                }}
-              >
-                <div className={`w-full h-full flex flex-col items-center justify-center px-4 ${
-                  isImpostor
-                    ? 'bg-gradient-to-br from-red-600 to-red-800'
-                    : 'bg-gradient-to-br from-emerald-600 to-emerald-800'
-                }`}>
-                  <p className={`font-black text-white text-center ${
-                    currentWord.length > 15 ? 'text-3xl' : currentWord.length > 10 ? 'text-4xl' : 'text-5xl'
-                  }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                    {currentWord}
-                  </p>
-                  {isImpostor && (
-                    <p className="text-lg font-semibold bg-red-900/50 px-3 py-2 rounded-lg mt-3 text-center">
-                      🎭 Eres el IMPOSTOR<br/>
-                      <span className="text-xs">Descubre la palabra secreta</span>
+            <div className="pnp-scratch-container relative flex justify-center" style={{ touchAction: 'none' }}>
+              <div style={{ touchAction: 'none' }}>
+                <ScratchCard
+                  key={currentPlayerIndex}
+                  width={320}
+                  height={240}
+                  image="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='240'%3E%3Crect width='320' height='240' fill='%23475569'/%3E%3Ctext x='160' y='120' font-family='Arial' font-size='20' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'%3ERaspa aquí 👆%3C/text%3E%3C/svg%3E"
+                  finishPercent={50}
+                  onComplete={() => {
+                    if (navigator.vibrate) navigator.vibrate(40);
+                  }}
+                >
+                  <div
+                    className="flex flex-col items-center justify-center px-4"
+                    style={{
+                      width: '320px',
+                      height: '240px',
+                      margin: 0,
+                      padding: '0 16px',
+                      background: isImpostor
+                        ? 'linear-gradient(to bottom right, rgb(220 38 38), rgb(153 27 27))'
+                        : 'linear-gradient(to bottom right, rgb(5 150 105), rgb(4 120 87))'
+                    }}
+                  >
+                    <p className={`font-black text-white text-center ${
+                      currentWord.length > 15 ? 'text-3xl' : currentWord.length > 10 ? 'text-4xl' : 'text-5xl'
+                    }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                      {currentWord}
                     </p>
-                  )}
-                </div>
-              </ScratchCard>
+                    {isImpostor && (
+                      <p className="text-lg font-semibold bg-red-900/50 px-3 py-2 rounded-lg mt-3 text-center">
+                        🎭 Eres el IMPOSTOR<br/>
+                        <span className="text-xs">Descubre la palabra secreta</span>
+                      </p>
+                    )}
+                  </div>
+                </ScratchCard>
+              </div>
             </div>
 
             <button
