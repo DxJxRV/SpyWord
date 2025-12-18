@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import { PrismaClient } from '@prisma/client';
 import {
@@ -13,14 +14,22 @@ import {
 
 const prisma = new PrismaClient();
 
+// Obtener __dirname en ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Configuración de Multer para upload de imágenes
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
-    const uploadPath = './uploads/';
+    // Usar ruta absoluta en lugar de relativa
+    const uploadPath = path.join(__dirname, 'uploads');
     try {
+      console.log(`📁 Intentando crear directorio: ${uploadPath}`);
       await fs.mkdir(uploadPath, { recursive: true });
+      console.log(`✅ Directorio verificado/creado: ${uploadPath}`);
       cb(null, uploadPath);
     } catch (error) {
+      console.error(`❌ Error al crear directorio ${uploadPath}:`, error);
       cb(error);
     }
   },
@@ -55,37 +64,58 @@ const upload = multer({
 export function setupModesRoutes(app) {
 
   // 📸 POST /api/admin/upload-image - Subir imagen al servidor
-  app.post('/api/admin/upload-image', upload.single('image'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No se proporcionó ninguna imagen' });
-      }
-
-      // Guardar solo la ruta relativa, no la URL completa
-      const relativePath = `uploads/${req.file.filename}`;
-
-      // Guardar en BD
-      const savedImage = await prisma.modeImage.create({
-        data: {
-          filename: req.file.filename,
-          originalName: req.file.originalname,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
-          path: req.file.path,
-          url: relativePath // Ahora guardamos ruta relativa en lugar de URL completa
+  app.post('/api/admin/upload-image', (req, res) => {
+    upload.single('image')(req, res, async (err) => {
+      try {
+        // Manejar errores de Multer
+        if (err instanceof multer.MulterError) {
+          console.error('❌ Error de Multer:', err);
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'El archivo es demasiado grande. Máximo 5MB.' });
+          }
+          return res.status(400).json({ error: `Error al subir archivo: ${err.message}` });
+        } else if (err) {
+          console.error('❌ Error general al subir:', err);
+          return res.status(500).json({ error: err.message || 'Error al subir la imagen' });
         }
-      });
 
-      console.log(`✅ Imagen subida: ${req.file.filename} -> ${relativePath}`);
-      res.json({
-        message: 'Imagen subida exitosamente',
-        image: savedImage
-      });
+        if (!req.file) {
+          return res.status(400).json({ error: 'No se proporcionó ninguna imagen' });
+        }
 
-    } catch (error) {
-      console.error('❌ Error al subir imagen:', error);
-      res.status(500).json({ error: 'Error al subir la imagen' });
-    }
+        // Guardar solo la ruta relativa, no la URL completa
+        const relativePath = `uploads/${req.file.filename}`;
+
+        console.log(`📦 Archivo recibido: ${req.file.filename}`);
+        console.log(`📂 Guardado en: ${req.file.path}`);
+
+        // Guardar en BD
+        const savedImage = await prisma.modeImage.create({
+          data: {
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            mimeType: req.file.mimetype,
+            size: req.file.size,
+            path: req.file.path,
+            url: relativePath // Ahora guardamos ruta relativa en lugar de URL completa
+          }
+        });
+
+        console.log(`✅ Imagen subida exitosamente: ${req.file.filename} -> ${relativePath}`);
+        res.json({
+          message: 'Imagen subida exitosamente',
+          image: savedImage
+        });
+
+      } catch (error) {
+        console.error('❌ Error al procesar imagen:', error);
+        console.error('Stack:', error.stack);
+        res.status(500).json({
+          error: 'Error al subir la imagen',
+          details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+      }
+    });
   });
 
   // 🎮 GET /api/modes/active - Obtener modos activos (público)
@@ -163,20 +193,28 @@ export function setupModesRoutes(app) {
         isActive
       } = req.body;
 
+      console.log(`📝 Creando nuevo modo: ${name}`);
+      console.log(`📊 Items recibidos:`, items?.length || 0);
+
       if (!name || !type) {
+        console.warn('⚠️ Faltan campos requeridos: nombre o tipo');
         return res.status(400).json({ error: 'Se requiere nombre y tipo' });
       }
 
       if (!items || items.length === 0) {
+        console.warn('⚠️ No se proporcionaron items');
         return res.status(400).json({ error: 'Se requiere al menos un item' });
       }
 
       // Validar items
       for (const item of items) {
         if (!item.label) {
+          console.warn('⚠️ Item sin label encontrado');
           return res.status(400).json({ error: 'Cada item debe tener un label' });
         }
       }
+
+      console.log(`💾 Guardando modo en base de datos...`);
 
       const newMode = await prisma.gameMode.create({
         data: {
@@ -191,7 +229,7 @@ export function setupModesRoutes(app) {
         }
       });
 
-      console.log(`✅ Modo creado: ${name} (ID: ${newMode.id})`);
+      console.log(`✅ Modo creado exitosamente: ${name} (ID: ${newMode.id})`);
       res.json({
         message: 'Modo creado exitosamente',
         mode: newMode
@@ -199,12 +237,16 @@ export function setupModesRoutes(app) {
 
     } catch (error) {
       console.error('❌ Error al crear modo:', error);
+      console.error('Stack:', error.stack);
 
       if (error.code === 'P2002') {
         return res.status(400).json({ error: 'Ya existe un modo con ese nombre' });
       }
 
-      res.status(500).json({ error: 'Error al crear modo' });
+      res.status(500).json({
+        error: 'Error al crear modo',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
