@@ -36,6 +36,12 @@ export default function Admin() {
   const [newItem, setNewItem] = useState({ label: "", imageUrl: "", weight: 100 });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState(null);
+  const [selectedItemIndex, setSelectedItemIndex] = useState(null); // Item seleccionado para paste rápido
+  const [pendingImageFile, setPendingImageFile] = useState(null); // Archivo pendiente para nuevo item
+  const [pendingEditImageFiles, setPendingEditImageFiles] = useState({}); // {index: File} para items en edición
+  const [pendingButtonImageFile, setPendingButtonImageFile] = useState(null); // Archivo pendiente para botón
+  const [bulkAddMode, setBulkAddMode] = useState(false); // Modo agregar en lote
+  const [bulkLabels, setBulkLabels] = useState(""); // Labels separados por comas
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -131,7 +137,6 @@ export default function Admin() {
       const response = await api.post("/admin/upload-image", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
-      toast.success("Imagen subida correctamente");
       return response.data.image.url;
     } catch (error) {
       console.error("Error al subir imagen:", error);
@@ -140,6 +145,70 @@ export default function Admin() {
     } finally {
       setUploadingImage(false);
     }
+  }
+
+  async function handleDeleteImage(imageUrl) {
+    if (!imageUrl) return;
+
+    // Extraer el filename de la URL
+    const filename = imageUrl.split('/uploads/')[1];
+    if (!filename) return;
+
+    try {
+      // Buscar la imagen en la lista de imágenes
+      const image = images.find(img => img.filename === filename);
+      if (image) {
+        await api.delete(`/admin/images/${image.id}`);
+      }
+    } catch (error) {
+      console.error("Error al eliminar imagen:", error);
+    }
+  }
+
+  function handlePasteImage(e, target) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          if (target === 'newItem') {
+            setPendingImageFile(file);
+            toast.success("Imagen del portapapeles lista para subir");
+          } else if (target === 'button') {
+            setPendingButtonImageFile(file);
+            toast.success("Imagen del portapapeles lista para subir");
+          } else if (typeof target === 'number') {
+            setPendingEditImageFiles({ ...pendingEditImageFiles, [target]: file });
+            toast.success("Imagen del portapapeles lista para subir");
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  function handleDropImage(e, target) {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.indexOf('image') !== -1) {
+      if (target === 'newItem') {
+        setPendingImageFile(file);
+        toast.success("Imagen lista para subir");
+      } else if (target === 'button') {
+        setPendingButtonImageFile(file);
+        toast.success("Imagen lista para subir");
+      } else if (typeof target === 'number') {
+        setPendingEditImageFiles({ ...pendingEditImageFiles, [target]: file });
+        toast.success("Imagen lista para subir");
+      }
+    }
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
   }
 
   function handleOpenModeModal(mode = null) {
@@ -182,15 +251,35 @@ export default function Admin() {
       return;
     }
 
+    let updatedButtonImage = modeForm.buttonImage;
+
+    // Si hay una imagen pendiente para el botón, subirla
+    if (pendingButtonImageFile) {
+      const newButtonImage = await handleUploadImage(pendingButtonImageFile);
+      if (newButtonImage) {
+        // Si había una imagen anterior, eliminarla
+        if (editingMode && editingMode.buttonImage) {
+          await handleDeleteImage(editingMode.buttonImage);
+        }
+        updatedButtonImage = newButtonImage;
+      }
+    }
+
     try {
+      const dataToSave = {
+        ...modeForm,
+        buttonImage: updatedButtonImage
+      };
+
       if (editingMode) {
-        await api.put(`/admin/modes/${editingMode.id}`, modeForm);
+        await api.put(`/admin/modes/${editingMode.id}`, dataToSave);
         toast.success("Modo actualizado correctamente");
       } else {
-        await api.post("/admin/modes", modeForm);
+        await api.post("/admin/modes", dataToSave);
         toast.success("Modo creado correctamente");
       }
       setShowModeModal(false);
+      setPendingButtonImageFile(null);
       loadData();
     } catch (error) {
       console.error("Error al guardar modo:", error);
@@ -222,17 +311,58 @@ export default function Admin() {
     }
   }
 
-  function handleAddItem() {
+  async function handleAddItem() {
     if (!newItem.label.trim()) {
       toast.error("El label del item es requerido");
       return;
     }
 
+    let imageUrl = newItem.imageUrl;
+
+    // Si hay una imagen pendiente, subirla primero
+    if (pendingImageFile) {
+      imageUrl = await handleUploadImage(pendingImageFile);
+      if (!imageUrl) {
+        return; // Error al subir
+      }
+    }
+
     setModeForm({
       ...modeForm,
-      items: [...modeForm.items, { ...newItem }]
+      items: [...modeForm.items, { ...newItem, imageUrl }]
     });
     setNewItem({ label: "", imageUrl: "", weight: 100 });
+    setPendingImageFile(null);
+    toast.success("Item agregado");
+  }
+
+  function handleBulkAddItems() {
+    if (!bulkLabels.trim()) {
+      toast.error("Ingresa al menos un label");
+      return;
+    }
+
+    const labels = bulkLabels.split(',').map(l => l.trim()).filter(l => l);
+
+    if (labels.length === 0) {
+      toast.error("No se encontraron labels válidos");
+      return;
+    }
+
+    const newItems = labels.map(label => ({
+      label,
+      imageUrl: "",
+      weight: 100
+    }));
+
+    setModeForm({
+      ...modeForm,
+      items: [...modeForm.items, ...newItems]
+    });
+
+    setBulkLabels("");
+    setBulkAddMode(false);
+    toast.success(`${newItems.length} items agregados`);
   }
 
   function handleRemoveItem(index) {
@@ -255,6 +385,33 @@ export default function Admin() {
       ...modeForm,
       items: updatedItems
     });
+  }
+
+  async function handleSaveItemEdit(index) {
+    const item = modeForm.items[index];
+
+    // Si hay una imagen pendiente para este item
+    if (pendingEditImageFiles[index]) {
+      // Subir la nueva imagen
+      const newImageUrl = await handleUploadImage(pendingEditImageFiles[index]);
+      if (newImageUrl) {
+        // Si había una imagen anterior, eliminarla
+        if (item.imageUrl) {
+          await handleDeleteImage(item.imageUrl);
+        }
+
+        // Actualizar el item con la nueva URL
+        handleUpdateItem(index, 'imageUrl', newImageUrl);
+      }
+
+      // Limpiar el archivo pendiente
+      const newPending = { ...pendingEditImageFiles };
+      delete newPending[index];
+      setPendingEditImageFiles(newPending);
+    }
+
+    setEditingItemIndex(null);
+    toast.success("Item actualizado");
   }
 
   const filteredWords = words;
@@ -719,38 +876,96 @@ export default function Admin() {
                         <Palette size={18} className="text-purple-400" />
                         <span className="text-sm sm:text-base">Apariencia del Botón</span>
                       </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-2">URL de Imagen (opcional)</label>
-                          <input
-                            type="text"
-                            value={modeForm.buttonImage}
-                            onChange={(e) => setModeForm({ ...modeForm, buttonImage: e.target.value })}
-                            placeholder="https://..."
-                            className="w-full bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Color</label>
-                          <input
-                            type="color"
-                            value={modeForm.buttonColor}
-                            onChange={(e) => setModeForm({ ...modeForm, buttonColor: e.target.value })}
-                            className="w-full h-10 bg-gray-800 rounded-lg border border-gray-700 cursor-pointer"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Estado</label>
-                          <label className="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-2">URL de Imagen (opcional)</label>
                             <input
-                              type="checkbox"
-                              checked={modeForm.isActive}
-                              onChange={(e) => setModeForm({ ...modeForm, isActive: e.target.checked })}
-                              className="w-4 h-4"
+                              type="text"
+                              value={modeForm.buttonImage}
+                              onChange={(e) => setModeForm({ ...modeForm, buttonImage: e.target.value })}
+                              placeholder="https://..."
+                              className="w-full bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
                             />
-                            <span className="text-sm">Activo</span>
-                          </label>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Color</label>
+                            <input
+                              type="color"
+                              value={modeForm.buttonColor}
+                              onChange={(e) => setModeForm({ ...modeForm, buttonColor: e.target.value })}
+                              className="w-full h-10 bg-gray-800 rounded-lg border border-gray-700 cursor-pointer"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Estado</label>
+                            <label className="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={modeForm.isActive}
+                                onChange={(e) => setModeForm({ ...modeForm, isActive: e.target.checked })}
+                                className="w-4 h-4"
+                              />
+                              <span className="text-sm">Activo</span>
+                            </label>
+                          </div>
                         </div>
+
+                        {/* Área de drag & drop para imagen del botón */}
+                        <div
+                          className="border-2 border-dashed border-blue-500/50 rounded-lg p-4 bg-blue-500/5 hover:bg-blue-500/10 transition-all cursor-pointer"
+                          onDrop={(e) => handleDropImage(e, 'button')}
+                          onDragOver={handleDragOver}
+                          onPaste={(e) => handlePasteImage(e, 'button')}
+                          tabIndex={0}
+                        >
+                          <div className="text-center">
+                            <Upload size={24} className="mx-auto mb-2 text-blue-400" />
+                            <p className="text-sm text-blue-400 font-medium">
+                              Arrastra, pega (Ctrl+V) o haz clic para subir imagen del botón
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">La imagen se subirá al guardar el modo</p>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setPendingButtonImageFile(file);
+                                  toast.success("Imagen lista para subir");
+                                }
+                                e.target.value = '';
+                              }}
+                              className="hidden"
+                              id="button-image-upload"
+                            />
+                            <label
+                              htmlFor="button-image-upload"
+                              className="inline-block mt-2 text-xs text-blue-400 hover:text-blue-300 cursor-pointer underline"
+                            >
+                              o selecciona archivo
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Preview de imagen pendiente del botón */}
+                        {pendingButtonImageFile && (
+                          <div className="bg-emerald-500/10 border border-emerald-500/50 rounded-lg p-3">
+                            <div className="flex items-center gap-3">
+                              <ImageIcon size={20} className="text-emerald-400" />
+                              <div className="flex-1">
+                                <p className="text-sm text-emerald-400 font-medium">Imagen lista para subir</p>
+                                <p className="text-xs text-gray-400">{pendingButtonImageFile.name}</p>
+                              </div>
+                              <button
+                                onClick={() => setPendingButtonImageFile(null)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <X size={18} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -763,64 +978,152 @@ export default function Admin() {
 
                       {/* Agregar nuevo item */}
                       <div className="bg-gray-800/50 p-4 rounded-lg mb-4">
-                        <p className="text-sm font-medium mb-3">Agregar nuevo item</p>
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-                            <input
-                              type="text"
-                              value={newItem.label}
-                              onChange={(e) => setNewItem({ ...newItem, label: e.target.value })}
-                              placeholder="Label (ej: Mago)"
-                              className="lg:col-span-4 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
-                            />
-                            <input
-                              type="text"
-                              value={newItem.imageUrl}
-                              onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
-                              placeholder="URL imagen (opcional)"
-                              className="lg:col-span-5 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
-                            />
-                            <input
-                              type="number"
-                              value={newItem.weight}
-                              onChange={(e) => setNewItem({ ...newItem, weight: parseInt(e.target.value) || 100 })}
-                              placeholder="Peso"
-                              min="10"
-                              max="500"
-                              className="lg:col-span-2 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
-                            />
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-medium">Agregar items</p>
+                          <div className="flex gap-2">
                             <button
-                              onClick={handleAddItem}
-                              disabled={uploadingImage}
-                              className="lg:col-span-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 px-3 py-2 rounded-lg transition-all flex items-center justify-center"
+                              onClick={() => setBulkAddMode(false)}
+                              className={`px-3 py-1 text-xs rounded-lg transition-all ${
+                                !bulkAddMode
+                                  ? 'bg-purple-500 text-white'
+                                  : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                              }`}
                             >
-                              <Plus size={18} />
+                              Individual
+                            </button>
+                            <button
+                              onClick={() => setBulkAddMode(true)}
+                              className={`px-3 py-1 text-xs rounded-lg transition-all ${
+                                bulkAddMode
+                                  ? 'bg-purple-500 text-white'
+                                  : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                              }`}
+                            >
+                              En lote
                             </button>
                           </div>
-                          {/* Botón para subir imagen */}
-                          <label className="block cursor-pointer">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const url = await handleUploadImage(file);
-                                  if (url) {
-                                    setNewItem({ ...newItem, imageUrl: url });
-                                  }
-                                  e.target.value = '';
-                                }
-                              }}
-                              className="hidden"
-                              disabled={uploadingImage}
-                            />
-                            <div className="bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 px-4 py-2 rounded-lg text-sm text-blue-400 hover:text-blue-300 transition-all flex items-center justify-center gap-2">
-                              <Upload size={16} />
-                              {uploadingImage ? "Subiendo..." : "O subir imagen al servidor"}
-                            </div>
-                          </label>
                         </div>
+
+                        {bulkAddMode ? (
+                          // Modo agregar en lote
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-2">
+                                Ingresa los labels separados por comas (sin imágenes)
+                              </label>
+                              <textarea
+                                value={bulkLabels}
+                                onChange={(e) => setBulkLabels(e.target.value)}
+                                placeholder="Mago, Dragón, Gigante, Caballero, ..."
+                                rows={3}
+                                className="w-full bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm resize-none"
+                              />
+                            </div>
+                            <button
+                              onClick={handleBulkAddItems}
+                              className="w-full bg-emerald-500 hover:bg-emerald-600 px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
+                            >
+                              <Plus size={16} />
+                              Agregar todos
+                            </button>
+                            <p className="text-xs text-gray-500 text-center">
+                              Después puedes agregar imágenes editando cada item
+                            </p>
+                          </div>
+                        ) : (
+                          // Modo individual
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+                              <input
+                                type="text"
+                                value={newItem.label}
+                                onChange={(e) => setNewItem({ ...newItem, label: e.target.value })}
+                                placeholder="Label (ej: Mago)"
+                                className="lg:col-span-4 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+                              />
+                              <input
+                                type="text"
+                                value={newItem.imageUrl}
+                                onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
+                                placeholder="URL imagen (opcional)"
+                                className="lg:col-span-5 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+                              />
+                              <input
+                                type="number"
+                                value={newItem.weight}
+                                onChange={(e) => setNewItem({ ...newItem, weight: parseInt(e.target.value) || 100 })}
+                                placeholder="Peso"
+                                min="10"
+                                max="500"
+                                className="lg:col-span-2 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+                              />
+                              <button
+                                onClick={handleAddItem}
+                                disabled={uploadingImage}
+                                className="lg:col-span-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 px-3 py-2 rounded-lg transition-all flex items-center justify-center"
+                              >
+                                <Plus size={18} />
+                              </button>
+                            </div>
+
+                            {/* Área de drag & drop para imagen del item */}
+                            <div
+                              className="border-2 border-dashed border-blue-500/50 rounded-lg p-3 bg-blue-500/5 hover:bg-blue-500/10 transition-all cursor-pointer"
+                              onDrop={(e) => handleDropImage(e, 'newItem')}
+                              onDragOver={handleDragOver}
+                              onPaste={(e) => handlePasteImage(e, 'newItem')}
+                              tabIndex={0}
+                            >
+                              <div className="text-center">
+                                <Upload size={20} className="mx-auto mb-1 text-blue-400" />
+                                <p className="text-xs text-blue-400 font-medium">
+                                  Arrastra, pega (Ctrl+V) o haz clic para añadir imagen
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">La imagen se subirá al agregar el item</p>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      setPendingImageFile(file);
+                                      toast.success("Imagen lista para subir");
+                                    }
+                                    e.target.value = '';
+                                  }}
+                                  className="hidden"
+                                  id="newitem-image-upload"
+                                  disabled={uploadingImage}
+                                />
+                                <label
+                                  htmlFor="newitem-image-upload"
+                                  className="inline-block mt-1 text-xs text-blue-400 hover:text-blue-300 cursor-pointer underline"
+                                >
+                                  o selecciona archivo
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* Preview de imagen pendiente */}
+                            {pendingImageFile && (
+                              <div className="bg-emerald-500/10 border border-emerald-500/50 rounded-lg p-2">
+                                <div className="flex items-center gap-2">
+                                  <ImageIcon size={16} className="text-emerald-400" />
+                                  <div className="flex-1">
+                                    <p className="text-xs text-emerald-400 font-medium">Imagen lista para subir</p>
+                                    <p className="text-xs text-gray-400">{pendingImageFile.name}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => setPendingImageFile(null)}
+                                    className="text-red-400 hover:text-red-300"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Lista de items */}
@@ -868,35 +1171,75 @@ export default function Admin() {
                                       className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm"
                                     />
                                   </div>
-                                  {/* Botón para subir nueva imagen */}
-                                  <label className="block cursor-pointer">
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={async (e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                          const url = await handleUploadImage(file);
-                                          if (url) {
-                                            handleUpdateItem(index, 'imageUrl', url);
+
+                                  {/* Área de drag & drop para editar imagen */}
+                                  <div
+                                    className="border-2 border-dashed border-blue-500/50 rounded-lg p-2 bg-blue-500/5 hover:bg-blue-500/10 transition-all cursor-pointer"
+                                    onDrop={(e) => handleDropImage(e, index)}
+                                    onDragOver={handleDragOver}
+                                    onPaste={(e) => handlePasteImage(e, index)}
+                                    tabIndex={0}
+                                  >
+                                    <div className="text-center">
+                                      <Upload size={16} className="mx-auto mb-1 text-blue-400" />
+                                      <p className="text-xs text-blue-400 font-medium">
+                                        Arrastra, pega (Ctrl+V) o haz clic para cambiar imagen
+                                      </p>
+                                      <p className="text-xs text-gray-500 mt-1">La imagen se subirá al guardar</p>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            setPendingEditImageFiles({ ...pendingEditImageFiles, [index]: file });
+                                            toast.success("Imagen lista para subir");
                                           }
                                           e.target.value = '';
-                                        }
-                                      }}
-                                      className="hidden"
-                                      disabled={uploadingImage}
-                                    />
-                                    <div className="bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 px-3 py-2 rounded-lg text-xs text-blue-400 hover:text-blue-300 transition-all flex items-center justify-center gap-2">
-                                      <Upload size={14} />
-                                      {uploadingImage ? "Subiendo..." : "Subir nueva imagen"}
+                                        }}
+                                        className="hidden"
+                                        id={`edititem-image-upload-${index}`}
+                                        disabled={uploadingImage}
+                                      />
+                                      <label
+                                        htmlFor={`edititem-image-upload-${index}`}
+                                        className="inline-block mt-1 text-xs text-blue-400 hover:text-blue-300 cursor-pointer underline"
+                                      >
+                                        o selecciona archivo
+                                      </label>
                                     </div>
-                                  </label>
+                                  </div>
+
+                                  {/* Preview de imagen pendiente para edición */}
+                                  {pendingEditImageFiles[index] && (
+                                    <div className="bg-emerald-500/10 border border-emerald-500/50 rounded-lg p-2">
+                                      <div className="flex items-center gap-2">
+                                        <ImageIcon size={16} className="text-emerald-400" />
+                                        <div className="flex-1">
+                                          <p className="text-xs text-emerald-400 font-medium">Nueva imagen lista</p>
+                                          <p className="text-xs text-gray-400">{pendingEditImageFiles[index].name}</p>
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            const newPending = { ...pendingEditImageFiles };
+                                            delete newPending[index];
+                                            setPendingEditImageFiles(newPending);
+                                          }}
+                                          className="text-red-400 hover:text-red-300"
+                                        >
+                                          <X size={16} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+
                                   <div className="flex gap-2">
                                     <button
-                                      onClick={() => setEditingItemIndex(null)}
-                                      className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-400 px-3 py-2 rounded-lg text-sm transition-all"
+                                      onClick={() => handleSaveItemEdit(index)}
+                                      disabled={uploadingImage}
+                                      className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-400 px-3 py-2 rounded-lg text-sm transition-all disabled:opacity-50"
                                     >
-                                      Guardar
+                                      {uploadingImage ? "Guardando..." : "Guardar"}
                                     </button>
                                     <button
                                       onClick={() => handleRemoveItem(index)}
