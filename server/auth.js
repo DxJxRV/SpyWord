@@ -129,6 +129,7 @@ function generateJWT(user) {
   const payload = {
     userId: user.id,
     isPremium: user.isPremium,
+    isAdmin: user.isAdmin || false,
     email: user.email,
     profilePicture: user.profilePicture || null,
   };
@@ -411,8 +412,8 @@ function setupAuthRoutes(app) {
         return res.status(404).json({ error: 'Usuario no encontrado' });
       }
 
-      // Verificar si el estado premium cambió
-      if (userFromDB.isPremium !== req.user.isPremium) {
+      // Verificar si el estado premium o admin cambió
+      if (userFromDB.isPremium !== req.user.isPremium || userFromDB.isAdmin !== req.user.isAdmin) {
         // El estado cambió, regenerar JWT con datos actualizados
         const newToken = generateJWT(userFromDB);
 
@@ -423,7 +424,7 @@ function setupAuthRoutes(app) {
           maxAge: 30 * 24 * 60 * 60 * 1000 // 30 días
         });
 
-        console.log(`✅ JWT regenerado automáticamente para ${userFromDB.email} - Premium actualizado: ${userFromDB.isPremium}`);
+        console.log(`✅ JWT regenerado automáticamente para ${userFromDB.email} - Premium: ${userFromDB.isPremium}, Admin: ${userFromDB.isAdmin}`);
       }
 
       // Devolver datos frescos de la base de datos
@@ -431,6 +432,7 @@ function setupAuthRoutes(app) {
         userId: userFromDB.id,
         email: userFromDB.email,
         isPremium: userFromDB.isPremium,
+        isAdmin: userFromDB.isAdmin,
         profilePicture: userFromDB.profilePicture || null,
       });
     } catch (error) {

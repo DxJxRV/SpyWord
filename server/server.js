@@ -1033,6 +1033,7 @@ app.get('/api/admin/users', async (req, res) => {
         googleId: true,
         isPremium: true,
         premiumExpiresAt: true,
+        isAdmin: true,
         createdAt: true,
         updatedAt: true
       }
@@ -1123,6 +1124,45 @@ app.put('/api/admin/users/:id/premium', async (req, res) => {
       res.status(404).json({ error: 'Usuario no encontrado' });
     } else {
       res.status(500).json({ error: 'Error al actualizar premium' });
+    }
+  }
+});
+
+// 🛡️ PUT /api/admin/users/:id/admin - Actualizar permisos de admin
+app.put('/api/admin/users/:id/admin', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isAdmin } = req.body;
+
+    if (typeof isAdmin !== 'boolean') {
+      return res.status(400).json({ error: 'isAdmin debe ser un booleano' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: { isAdmin },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isPremium: true,
+        premiumExpiresAt: true,
+        isAdmin: true
+      }
+    });
+
+    console.log(`✅ Permisos de admin actualizados: ${updatedUser.email} (Admin: ${updatedUser.isAdmin})`);
+
+    res.json({
+      success: true,
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('❌ Error al actualizar permisos de admin:', error);
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+    } else {
+      res.status(500).json({ error: 'Error al actualizar permisos de admin' });
     }
   }
 });

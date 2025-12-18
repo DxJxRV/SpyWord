@@ -198,6 +198,109 @@ export default function UserManagement() {
         </button>
       </div>
 
+      {/* Barra de búsqueda y filtros */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700 p-4 space-y-4">
+        {/* Buscador */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <input
+            type="text"
+            placeholder="Buscar por email o nombre..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-gray-700 text-white pl-10 pr-4 py-2.5 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none transition-colors"
+          />
+        </div>
+
+        {/* Filtros */}
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Filter size={16} className="text-gray-400" />
+            <span className="text-sm text-gray-400 font-medium">Filtros:</span>
+          </div>
+
+          {/* Filtro Admin */}
+          <div className="flex items-center gap-2">
+            <Shield size={16} className="text-purple-400" />
+            <div className="flex gap-1">
+              <button
+                onClick={() => setFilterAdmin("all")}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  filterAdmin === "all"
+                    ? "bg-purple-500 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => setFilterAdmin("admin")}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  filterAdmin === "admin"
+                    ? "bg-purple-500 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}
+              >
+                Admins
+              </button>
+              <button
+                onClick={() => setFilterAdmin("non-admin")}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  filterAdmin === "non-admin"
+                    ? "bg-purple-500 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}
+              >
+                No admins
+              </button>
+            </div>
+          </div>
+
+          {/* Filtro Premium */}
+          <div className="flex items-center gap-2">
+            <Crown size={16} className="text-amber-400" />
+            <div className="flex gap-1">
+              <button
+                onClick={() => setFilterPremium("all")}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  filterPremium === "all"
+                    ? "bg-amber-500 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => setFilterPremium("premium")}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  filterPremium === "premium"
+                    ? "bg-amber-500 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}
+              >
+                Premium
+              </button>
+              <button
+                onClick={() => setFilterPremium("free")}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  filterPremium === "free"
+                    ? "bg-amber-500 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}
+              >
+                Free
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Contador de resultados */}
+        <div className="text-sm text-gray-400">
+          Mostrando {paginatedUsers.length} de {filteredUsers.length} usuarios
+          {filteredUsers.length !== users.length && ` (${users.length} totales)`}
+        </div>
+      </div>
+
       {/* Tabla de usuarios */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
@@ -208,12 +311,13 @@ export default function UserManagement() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Nombre</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Tipo</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Estado</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Admin</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Expira</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {users.map((user) => (
+              {paginatedUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-700/50 transition-colors">
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium text-white">{user.email}</p>
@@ -253,6 +357,18 @@ export default function UserManagement() {
                       </span>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-center">
+                    {user.isAdmin ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/20 text-purple-400 text-xs font-medium">
+                        <Shield size={12} />
+                        Admin
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-gray-700 text-gray-400 text-xs font-medium">
+                        Usuario
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {user.premiumExpiresAt ? (
                       <div>
@@ -269,6 +385,19 @@ export default function UserManagement() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => toggleAdmin(user.id, user.isAdmin)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          user.isAdmin
+                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                            : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+                        }`}
+                        title={user.isAdmin ? "Quitar Admin" : "Dar Admin"}
+                      >
+                        <Shield size={14} className="inline mr-1" />
+                        {user.isAdmin ? "Quitar" : "Dar"} Admin
+                      </button>
+
                       <button
                         onClick={() => togglePremium(user.id, user.isPremium)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -307,12 +436,79 @@ export default function UserManagement() {
           </table>
         </div>
 
-        {users.length === 0 && (
+        {paginatedUsers.length === 0 && filteredUsers.length === 0 && (
           <div className="text-center py-8 text-gray-400">
-            No hay usuarios registrados
+            {searchTerm || filterAdmin !== "all" || filterPremium !== "all"
+              ? "No se encontraron usuarios con los filtros aplicados"
+              : "No hay usuarios registrados"}
           </div>
         )}
       </div>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between bg-gray-800 rounded-lg border border-gray-700 px-4 py-3">
+          <div className="text-sm text-gray-400">
+            Página {currentPage} de {totalPages}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Página anterior"
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            {/* Números de página */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                // Mostrar solo páginas cercanas a la actual
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        currentPage === page
+                          ? "bg-blue-500 text-white"
+                          : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                } else if (
+                  page === currentPage - 2 ||
+                  page === currentPage + 2
+                ) {
+                  return (
+                    <span key={page} className="text-gray-500 px-2">
+                      ...
+                    </span>
+                  );
+                }
+                return null;
+              })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Página siguiente"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal para agregar días de premium */}
       {showPremiumModal && selectedUser && (
