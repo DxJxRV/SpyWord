@@ -25,6 +25,14 @@ export default function DailyMode() {
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState(null);
 
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = "SpyWord - Modo del Día";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, []);
+
   // Fetch daily mode on mount
   useEffect(() => {
     const fetchDailyMode = async () => {

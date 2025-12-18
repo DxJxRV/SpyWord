@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Play, ArrowLeft, Link2, Camera, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +20,14 @@ export default function Online() {
   const [showHelp, setShowHelp] = useState(false);
   const { isPremium } = useAuth();
   const isRoomPremium = false; // Premium Pass - false porque aún no hay sala
+
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = "SpyWord - Juego Online";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, []);
 
   const handleCreateRoom = () => {
     // Mostrar viñeta intersticial antes de crear la sala

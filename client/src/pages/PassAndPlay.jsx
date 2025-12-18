@@ -28,6 +28,14 @@ export default function PassAndPlay() {
   const isRoomPremium = false; // Premium Pass - false porque es modo local
   const [showNewRoundInterstitial, setShowNewRoundInterstitial] = useState(false);
 
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = "SpyWord - Pasa y Juega";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, []);
+
   // Estados del tutorial
   const [runTutorial, setRunTutorial] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);

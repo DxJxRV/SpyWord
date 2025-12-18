@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Crown, Check, Sparkles, Zap, Shield, X } from "lucide-react";
 import { api } from "../services/api";
@@ -10,6 +10,14 @@ export default function Premium() {
   const [loading, setLoading] = useState(null); // 'weekly' o 'lifetime'
 
   const canceled = searchParams.get("canceled");
+
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = "SpyWord - Premium";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, []);
 
   const handlePurchase = async (planType) => {
     setLoading(planType);

@@ -11,6 +11,14 @@ export default function PremiumSuccess() {
   const [countdown, setCountdown] = useState(5);
   const { refreshUser } = useAuth();
 
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = "SpyWord - ¡Premium Activado!";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, []);
+
   useEffect(() => {
     // Refrescar el JWT y el contexto con datos actualizados de la base de datos
     const refreshAuth = async () => {

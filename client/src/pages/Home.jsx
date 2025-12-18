@@ -22,6 +22,14 @@ export default function Home() {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = "SpyWord - Juego de Palabras";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, []);
+
   // Detectar si viene de un link compartido con parámetro ?join=CODIGO
   useEffect(() => {
     // Con hash routing, los parámetros están en location.hash, no en location.search

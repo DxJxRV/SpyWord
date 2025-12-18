@@ -857,11 +857,29 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
       votesTally[targetId] = room.votes[targetId].length;
     }
 
+    // Obtener nombre del modo si no existe pero hay modeId (para salas antiguas)
+    let modeName = room.modeName;
+    console.log(`🔍 [DEBUG modeName] Room ${roomId} - modeName inicial:`, modeName, '| modeId:', room.modeId);
+    if (!modeName && room.modeId) {
+      try {
+        const mode = await getModeById(room.modeId);
+        if (mode) {
+          modeName = mode.name;
+          room.modeName = mode.name; // Actualizar el room para futuras peticiones
+          console.log(`✅ [DEBUG modeName] Mode name obtenido de DB:`, modeName);
+        }
+      } catch (err) {
+        console.error('Error al obtener nombre del modo:', err);
+      }
+    }
+    console.log(`📤 [DEBUG modeName] Enviando modeName en payload:`, modeName);
+
     const payload = {
       round: room.round,
       word,
       itemImageUrl: room.itemImageUrl || null, // URL de imagen para modos especiales
       modeType: room.modeType || null, // Tipo de modo: 'word', 'image', 'hybrid'
+      modeName: modeName || null, // Nombre del modo especial
       totalPlayers: activePlayers.length,
       nextRoundAt: room.nextRoundAt || null,
       isAdmin: playerId === room.adminId,

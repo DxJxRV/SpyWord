@@ -51,6 +51,14 @@ export default function Admin() {
   const [bulkAddMode, setBulkAddMode] = useState(false); // Modo agregar en lote
   const [bulkLabels, setBulkLabels] = useState(""); // Labels separados por comas
 
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = "SpyWord - Panel de Admin";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, []);
+
   // Verificar acceso al panel de admin
   useEffect(() => {
     if (isAuthLoading) return; // Esperar a que termine de cargar la auth

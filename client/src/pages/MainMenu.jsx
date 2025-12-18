@@ -19,6 +19,14 @@ export default function MainMenu() {
   const { isPremium } = useAuth();
 
   // Auto-join feature: detect ?join=CODIGO parameter
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = "SpyWord - Menú Principal";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, []);
+
   useEffect(() => {
     // Con hash routing, los parámetros están en location.hash, no en location.search
     const hash = location.hash; // Ej: "#/?join=8EBIRH"

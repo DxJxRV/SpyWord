@@ -23,6 +23,7 @@ export default function Room() {
   const [word, setWord] = useState("");
   const [itemImageUrl, setItemImageUrl] = useState(null); // URL de la imagen del item (modos especiales)
   const [modeType, setModeType] = useState(null); // Tipo de modo: 'word', 'image', 'hybrid'
+  const [modeName, setModeName] = useState(null); // Nombre del modo especial
   const [currentRound, setCurrentRound] = useState(0);
   const [totalPlayers, setTotalPlayers] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -48,6 +49,19 @@ export default function Room() {
   // Estados para game over
   const [winner, setWinner] = useState(null); // 'IMPOSTOR' o 'PLAYERS'
   const [winReason, setWinReason] = useState(null); // 'impostor_eliminated' o 'impostor_survived'
+
+  // Cambiar título de la página según el modo de juego
+  useEffect(() => {
+    if (modeName) {
+      document.title = `SpyWord - Modo ${modeName}`;
+    } else {
+      document.title = "SpyWord - Juego Online";
+    }
+
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, [modeName]);
   const [impostorId, setImpostorId] = useState(null); // ID del impostor (solo revelado en game over)
 
   // Estados para anuncios
@@ -132,6 +146,7 @@ export default function Room() {
         setWord(res.data.word);
         setItemImageUrl(res.data.itemImageUrl || null); // Capturar URL de imagen (modos especiales)
         setModeType(res.data.modeType || null); // Capturar tipo de modo
+        setModeName(res.data.modeName || null); // Capturar nombre del modo
         setTotalPlayers(res.data.totalPlayers);
         setIsAdmin(res.data.isAdmin);
         setStarterName(res.data.starterName);

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Heart, Code, Users, Sparkles } from "lucide-react";
 import { ABOUT_US } from "../data/legalData";
@@ -12,6 +13,14 @@ export default function About() {
     { component: Sparkles, color: "from-yellow-500 to-orange-500" },
     { component: Heart, color: "from-purple-500 to-violet-500" }
   ];
+
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = "SpyWord - Acerca de";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">

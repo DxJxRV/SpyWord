@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Scale, Shield } from "lucide-react";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "../data/legalData";
@@ -6,6 +7,16 @@ export default function LegalPages({ type }) {
   const navigate = useNavigate();
   const data = type === 'privacy' ? PRIVACY_POLICY : TERMS_OF_SERVICE;
   const Icon = type === 'privacy' ? Shield : Scale;
+
+  // Cambiar título de la página
+  useEffect(() => {
+    document.title = type === 'privacy'
+      ? "SpyWord - Política de Privacidad"
+      : "SpyWord - Términos de Servicio";
+    return () => {
+      document.title = "SpyWord";
+    };
+  }, [type]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
