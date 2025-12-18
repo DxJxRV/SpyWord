@@ -168,7 +168,7 @@ export default function MainMenu() {
               </button>
             ) : (
               // Botón dividido con modos destacados
-              <div className="w-full rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(59,130,246,0.3)] grid"
+              <div className="w-full rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(59,130,246,0.3)] grid gap-[2px] bg-gray-800/50"
                 style={{
                   gridTemplateColumns: `repeat(${featuredModes.length + 1}, 1fr)`
                 }}
@@ -179,9 +179,9 @@ export default function MainMenu() {
                     key={mode.id}
                     onClick={() => handleCreateRoomWithMode(mode.id)}
                     disabled={creatingRoom}
-                    className="relative h-32 bg-gradient-to-br from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center overflow-hidden group"
+                    className="relative py-4 bg-gradient-to-br from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center overflow-hidden group"
                     style={{
-                      borderRight: index < featuredModes.length ? '2px solid rgba(255,255,255,0.2)' : 'none'
+                      borderRadius: index === 0 ? '16px 0 0 16px' : 'none'
                     }}
                   >
                     {/* Fondo con imagen o color del modo */}
@@ -217,7 +217,10 @@ export default function MainMenu() {
                 {/* Botón "Más modos" */}
                 <button
                   onClick={() => navigate('/special-modes')}
-                  className="relative h-32 bg-gradient-to-br from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 transition-all active:scale-95 flex flex-col items-center justify-center gap-2 group"
+                  className="relative py-4 bg-gradient-to-br from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-2 group"
+                  style={{
+                    borderRadius: '0 16px 16px 0'
+                  }}
                 >
                   <Gamepad2 size={24} className="text-white group-hover:scale-110 transition-transform" />
                   <p className="text-sm font-bold text-white">Más modos</p>

@@ -40,6 +40,7 @@ export function AuthProvider({ children }) {
     isAuthLoading,
     refreshUser,
     isPremium: user?.isPremium || false,
+    isAdmin: user?.isAdmin || false,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

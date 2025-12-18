@@ -1,10 +1,17 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette, Star } from "lucide-react";
+import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette, Star, Lock } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import UserManagement from "../components/UserManagement";
+import { useAuth } from "../contexts/AuthContext";
+
+const ADMIN_PIN = "5523";
 
 export default function Admin() {
+  const { isAdmin, isAuthLoading } = useAuth();
+  const [hasAccess, setHasAccess] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
+
   const [activeTab, setActiveTab] = useState("words"); // "words", "users", "modes"
   const [words, setWords] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -20,6 +27,7 @@ export default function Admin() {
 
   // Estado para modos especiales
   const [modes, setModes] = useState([]);
+  const [modesFilter, setModesFilter] = useState("active"); // "active" | "inactive"
   const [images, setImages] = useState([]);
   const [showModeModal, setShowModeModal] = useState(false);
   const [editingMode, setEditingMode] = useState(null);
@@ -43,10 +51,35 @@ export default function Admin() {
   const [bulkAddMode, setBulkAddMode] = useState(false); // Modo agregar en lote
   const [bulkLabels, setBulkLabels] = useState(""); // Labels separados por comas
 
+  // Verificar acceso al panel de admin
+  useEffect(() => {
+    if (isAuthLoading) return; // Esperar a que termine de cargar la auth
+
+    if (isAdmin) {
+      // Si el usuario está loggeado con permisos de admin, dar acceso directo
+      setHasAccess(true);
+      setCheckingAccess(false);
+    } else {
+      // Si no es admin, pedir PIN
+      const pin = prompt("🔒 Panel de Administración\n\nIngresa el PIN para acceder:");
+      if (pin === ADMIN_PIN) {
+        setHasAccess(true);
+        toast.success("Acceso concedido");
+      } else {
+        setHasAccess(false);
+        toast.error("PIN incorrecto");
+        window.location.href = "/"; // Redirigir al home
+      }
+      setCheckingAccess(false);
+    }
+  }, [isAdmin, isAuthLoading]);
+
   // Cargar datos iniciales
   useEffect(() => {
-    loadData();
-  }, [selectedCategory, activeTab]);
+    if (hasAccess) {
+      loadData();
+    }
+  }, [selectedCategory, activeTab, hasAccess]);
 
   // Global paste listener para quick paste en item cards
   useEffect(() => {
@@ -331,11 +364,11 @@ export default function Admin() {
   }
 
   async function handleDeleteMode(id) {
-    if (!confirm("¿Estás seguro de eliminar este modo?")) return;
+    if (!confirm("⚠️ ADVERTENCIA: Esta acción es permanente e irreversible.\n\n¿Estás seguro de eliminar este modo completamente?\n\nTodos sus datos (items, imágenes, configuración) se perderán para siempre.")) return;
 
     try {
       await api.delete(`/admin/modes/${id}`);
-      toast.success("Modo eliminado");
+      toast.success("Modo eliminado permanentemente");
       loadData();
     } catch (error) {
       console.error("Error al eliminar modo:", error);
@@ -345,8 +378,9 @@ export default function Admin() {
 
   async function handleToggleMode(id) {
     try {
+      const mode = modes.find(m => m.id === id);
       await api.put(`/admin/modes/${id}/toggle`);
-      toast.success("Estado del modo actualizado");
+      toast.success(mode?.isActive ? "Modo desactivado (no eliminado)" : "Modo reactivado");
       loadData();
     } catch (error) {
       console.error("Error al cambiar estado del modo:", error);
@@ -357,6 +391,12 @@ export default function Admin() {
   async function handleToggleFeatured(mode) {
     try {
       const newFeaturedStatus = !mode.isFeaturedOnHome;
+
+      // No permitir destacar modos inactivos
+      if (newFeaturedStatus && !mode.isActive) {
+        toast.error("No puedes destacar un modo desactivado. Actívalo primero.");
+        return;
+      }
 
       // Si se está marcando como destacado, calcular el siguiente orden disponible
       let featuredOrder = null;
@@ -499,6 +539,23 @@ export default function Admin() {
     acc[word.category].push(word);
     return acc;
   }, {});
+
+  // Mostrar loader mientras se verifica el acceso
+  if (checkingAccess || isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <Lock size={48} className="mx-auto mb-4 text-purple-400 animate-pulse" />
+          <p className="text-gray-400">Verificando acceso...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no tiene acceso, no renderizar nada (ya fue redirigido)
+  if (!hasAccess) {
+    return null;
+  }
 
   if (loading) {
     return (
@@ -805,16 +862,42 @@ export default function Admin() {
         {/* Contenido de la tab de Modos Especiales */}
         {activeTab === "modes" && (
           <>
+            {/* Filtros de modos */}
+            <div className="flex gap-2 mb-6">
+              <button
+                onClick={() => setModesFilter("active")}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  modesFilter === "active"
+                    ? "bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/30"
+                    : "bg-gray-800/50 text-gray-400 border-2 border-gray-700 hover:border-gray-600"
+                }`}
+              >
+                Activos ({modes.filter(m => m.isActive).length})
+              </button>
+              <button
+                onClick={() => setModesFilter("inactive")}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  modesFilter === "inactive"
+                    ? "bg-gray-500/20 text-gray-400 border-2 border-gray-500/30"
+                    : "bg-gray-800/50 text-gray-400 border-2 border-gray-700 hover:border-gray-600"
+                }`}
+              >
+                Desactivados ({modes.filter(m => !m.isActive).length})
+              </button>
+            </div>
+
             {/* Lista de modos */}
             <div className="space-y-4">
-              {modes.length === 0 ? (
+              {modes.filter(m => modesFilter === "active" ? m.isActive : !m.isActive).length === 0 ? (
                 <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-gray-700">
                   <Gamepad2 size={48} className="mx-auto text-gray-600 mb-4" />
                   <p className="text-gray-400 text-lg">No hay modos especiales creados</p>
-                  <p className="text-gray-500 text-sm mt-2">Crea tu primer modo con imágenes</p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    {modesFilter === "active" ? "No hay modos activos" : "No hay modos desactivados"}
+                  </p>
                 </div>
               ) : (
-                modes.map(mode => (
+                modes.filter(m => modesFilter === "active" ? m.isActive : !m.isActive).map(mode => (
                   <div
                     key={mode.id}
                     className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6 hover:border-purple-500/50 transition-all"
@@ -877,21 +960,23 @@ export default function Admin() {
                         >
                           <Edit size={18} className="text-blue-400" />
                         </button>
-                        <button
-                          onClick={() => handleToggleFeatured(mode)}
-                          className={`p-2 rounded-lg transition-all ${
-                            mode.isFeaturedOnHome
-                              ? "bg-yellow-500/30 hover:bg-yellow-500/40"
-                              : "bg-yellow-500/10 hover:bg-yellow-500/20"
-                          }`}
-                          title={mode.isFeaturedOnHome ? "Quitar de destacados" : "Destacar en home"}
-                        >
-                          <Star
-                            size={18}
-                            className="text-yellow-400"
-                            fill={mode.isFeaturedOnHome ? "currentColor" : "none"}
-                          />
-                        </button>
+                        {mode.isActive && (
+                          <button
+                            onClick={() => handleToggleFeatured(mode)}
+                            className={`p-2 rounded-lg transition-all ${
+                              mode.isFeaturedOnHome
+                                ? "bg-yellow-500/30 hover:bg-yellow-500/40"
+                                : "bg-yellow-500/10 hover:bg-yellow-500/20"
+                            }`}
+                            title={mode.isFeaturedOnHome ? "Quitar de destacados" : "Destacar en home"}
+                          >
+                            <Star
+                              size={18}
+                              className="text-yellow-400"
+                              fill={mode.isFeaturedOnHome ? "currentColor" : "none"}
+                            />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleToggleMode(mode.id)}
                           className="bg-amber-500/20 hover:bg-amber-500/30 p-2 rounded-lg transition-all"
@@ -899,13 +984,15 @@ export default function Admin() {
                         >
                           {mode.isActive ? <EyeOff size={18} className="text-amber-400" /> : <Eye size={18} className="text-amber-400" />}
                         </button>
-                        <button
-                          onClick={() => handleDeleteMode(mode.id)}
-                          className="bg-red-500/20 hover:bg-red-500/30 p-2 rounded-lg transition-all"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={18} className="text-red-400" />
-                        </button>
+                        {!mode.isActive && (
+                          <button
+                            onClick={() => handleDeleteMode(mode.id)}
+                            className="bg-red-500/20 hover:bg-red-500/30 p-2 rounded-lg transition-all"
+                            title="Eliminar permanentemente"
+                          >
+                            <Trash2 size={18} className="text-red-400" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

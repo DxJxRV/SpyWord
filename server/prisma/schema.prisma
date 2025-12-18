@@ -46,17 +46,48 @@ enum WordSuggestionStatus {
 
 // Modelo para Modos de Juego Especiales
 model GameMode {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique @db.VarChar(100)
-  description String?  @db.Text
-  isActive    Boolean  @default(true) @map("is_active")
-  wordList    String   @db.Text // JSON string de la lista de palabras para este modo
-  isDailyMode Boolean  @default(false) @map("is_daily_mode") // Solo uno debe ser true
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  name           String   @unique @db.VarChar(100)
+  description    String?  @db.Text
+  type           String   @default("word") @db.VarChar(20) // 'word' | 'image' | 'hybrid'
+  isActive       Boolean  @default(true) @map("is_active")
+
+  // Legacy field para compatibilidad (modos antiguos)
+  wordList       String?  @db.Text @map("word_list") // JSON string de palabras (deprecated)
+
+  // Nuevo sistema de items genérico
+  items          Json?    // Array de items: [{label, imageUrl?, weight}]
+
+  // Configuración visual del botón del modo
+  buttonImage    String?  @db.VarChar(500) @map("button_image") // URL de imagen
+  buttonColor    String?  @db.VarChar(7) @map("button_color") // Color hex (#RRGGBB)
+  buttonGradient Json?    @map("button_gradient") // {from: "#xxx", to: "#yyy"}
+
+  isDailyMode       Boolean  @default(false) @map("is_daily_mode") // Solo uno debe ser true
+  isFeaturedOnHome  Boolean  @default(false) @map("is_featured_on_home") // Aparece en botón del home
+  featuredOrder     Int?     @map("featured_order") // Orden de aparición (1-3) en home
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("game_modes")
   @@index([isActive, isDailyMode])
+  @@index([type])
+  @@index([isFeaturedOnHome, featuredOrder])
+}
+
+// Modelo para almacenar imágenes subidas al servidor
+model ModeImage {
+  id           Int      @id @default(autoincrement())
+  filename     String   @unique @db.VarChar(255) // Nombre del archivo en /uploads
+  originalName String   @db.VarChar(255) @map("original_name") // Nombre original
+  mimeType     String   @db.VarChar(50) @map("mime_type") // image/jpeg, image/png
+  size         Int      // Tamaño en bytes
+  path         String   @db.VarChar(500) // Ruta relativa: uploads/xxxx.jpg
+  url          String   @db.VarChar(500) // URL completa para acceder
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("mode_images")
+  @@index([filename])
 }
 
 // Modelo de Usuario para autenticación y premium
@@ -69,6 +100,7 @@ model User {
   profilePicture  String?   @map("profile_picture") @db.VarChar(500) // URL de la foto de perfil (Google)
   isPremium       Boolean   @default(false) @map("is_premium") // CRUCIAL para anuncios y Premium Pass
   premiumExpiresAt DateTime? @map("premium_expires_at") // Fecha de expiración del premium
+  isAdmin         Boolean   @default(false) @map("is_admin") // Permisos de administrador
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
@@ -76,4 +108,5 @@ model User {
   @@index([googleId])
   @@index([isPremium])
   @@index([email])
+  @@index([isAdmin])
 }

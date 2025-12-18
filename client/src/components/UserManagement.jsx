@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Crown, Trash2, Calendar, RefreshCw, Users, Mail } from "lucide-react";
+import { Crown, Trash2, Calendar, RefreshCw, Users, Mail, Search, Filter, Shield, ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "../services/api";
+
+const USERS_PER_PAGE = 10;
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -10,6 +12,12 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [daysToAdd, setDaysToAdd] = useState(30);
+
+  // Nuevos estados para filtros y paginación
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterAdmin, setFilterAdmin] = useState("all"); // "all" | "admin" | "non-admin"
+  const [filterPremium, setFilterPremium] = useState("all"); // "all" | "premium" | "free"
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadUsers();
@@ -69,6 +77,52 @@ export default function UserManagement() {
       toast.error("Error al eliminar usuario");
     }
   }
+
+  async function toggleAdmin(userId, currentStatus) {
+    try {
+      await api.put(`/admin/users/${userId}/admin`, {
+        isAdmin: !currentStatus
+      });
+      toast.success(currentStatus ? "Permisos de admin removidos" : "Permisos de admin otorgados");
+      loadUsers();
+    } catch (error) {
+      console.error("Error al cambiar permisos de admin:", error);
+      toast.error("Error al cambiar permisos de admin");
+    }
+  }
+
+  // Filtrar usuarios
+  const filteredUsers = users.filter(user => {
+    // Filtro de búsqueda
+    const matchesSearch = searchTerm === "" ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    // Filtro de admin
+    const matchesAdmin =
+      filterAdmin === "all" ||
+      (filterAdmin === "admin" && user.isAdmin) ||
+      (filterAdmin === "non-admin" && !user.isAdmin);
+
+    // Filtro de premium
+    const matchesPremium =
+      filterPremium === "all" ||
+      (filterPremium === "premium" && user.isPremium) ||
+      (filterPremium === "free" && !user.isPremium);
+
+    return matchesSearch && matchesAdmin && matchesPremium;
+  });
+
+  // Paginación
+  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
+  const startIndex = (currentPage - 1) * USERS_PER_PAGE;
+  const endIndex = startIndex + USERS_PER_PAGE;
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+  // Reset página cuando cambien los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterAdmin, filterPremium]);
 
   function formatDate(dateString) {
     if (!dateString) return "Sin fecha";

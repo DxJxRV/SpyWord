@@ -11,8 +11,14 @@ import {
   getTopWords,
   getWordStats,
 } from './services/word.service.js';
+import {
+  getRandomItemWeighted,
+  logItemFeedback,
+  getModeById
+} from './services/mode.service.js';
 import { passport, checkAuth, setupAuthRoutes, requireAuth } from './auth.js';
 import { setupPaymentRoutes } from './payment.js';
+import { setupModesRoutes } from './modes.js';
 
 // --- Control de Anuncios ---
 const IS_PREMIUM_MODE_ACTIVE = false; // TRUE desactiva todos los anuncios globalmente
@@ -76,6 +82,12 @@ setupAuthRoutes(app);
 // Configurar rutas de pago con Stripe
 setupPaymentRoutes(app, checkAuth, requireAuth);
 
+// Configurar rutas de modos especiales
+setupModesRoutes(app);
+
+// Servir archivos estáticos de /uploads
+app.use('/uploads', express.static('uploads'));
+
 // Almacenamiento en memoria
 const rooms = {};
 
@@ -134,39 +146,78 @@ setInterval(() => {
 // ➕ POST /api/rooms/create
 app.post('/api/rooms/create', checkAuth, async (req, res) => {
   try {
-    const { adminName } = req.body;
+    const { adminName, modeId } = req.body; // modeId es opcional
     const roomId = generateRoomId();
     const adminId = uuidv4();
 
-    // Obtener palabra aleatoria ponderada de la base de datos
-    const wordData = await getRandomWordWeighted();
-
-    rooms[roomId] = {
+    let roomData = {
       adminId,
-      adminUserId: req.user ? req.user.userId : null, // Guardar userId del admin si está autenticado
-      adminName: adminName || "Admin", // Guardar nombre del admin
-      word: wordData.word,
-      wordId: wordData.id, // Guardar ID para feedback
-      category: wordData.category,
+      adminUserId: req.user ? req.user.userId : null,
+      adminName: adminName || "Admin",
       round: 1,
       players: {
-        // El admin también es un jugador
         [adminId]: { lastSeen: Date.now(), name: adminName || "Admin", isAlive: true, hasVoted: false }
       },
-      impostorId: null, // ID del impostor actual
-      starterPlayerId: null, // ID del jugador que inicia la partida
-      lastStarterPlayerId: null, // ID del último jugador que inició (para no repetir)
-      lastWord: wordData.word, // Última palabra usada (para no repetir)
+      impostorId: null,
+      starterPlayerId: null,
+      lastStarterPlayerId: null,
       lastActivity: Date.now(),
-      nextRoundAt: null, // Timestamp para countdown sincronizado
-      // Campos de votación
-      status: 'IN_GAME', // Estados: 'IN_GAME', 'VOTING', 'RESULTS'
-      votes: {}, // { "target-id": ["voter-id-1", "voter-id-2"], ... }
+      nextRoundAt: null,
+      status: 'IN_GAME',
+      votes: {},
       votersRemaining: 0,
       eliminatedPlayerId: null
     };
 
-    console.log(`✅ Sala creada: ${roomId} - Admin: ${adminId} (${adminName || "Admin"}) - Palabra: ${wordData.word}`);
+    // Si hay modeId, usar modo especial con imágenes
+    if (modeId) {
+      const mode = await getModeById(modeId);
+
+      if (!mode || !mode.isActive) {
+        return res.status(400).json({ error: 'Modo no encontrado o inactivo' });
+      }
+
+      const itemData = await getRandomItemWeighted(modeId);
+
+      roomData = {
+        ...roomData,
+        // Datos del modo especial
+        modeId: mode.id,
+        modeName: mode.name,
+        modeType: mode.type,
+        // Item actual (puede tener imagen)
+        word: itemData.label, // El label es la "palabra secreta"
+        itemImageUrl: itemData.imageUrl,
+        itemIndex: itemData.index, // Para feedback posterior
+        wordId: null, // No hay wordId en modos especiales
+        category: mode.name, // La categoría es el nombre del modo
+        lastWord: itemData.label
+      };
+
+      console.log(`✅ Sala creada con modo especial: ${roomId} - Modo: ${mode.name} - Item: ${itemData.label}`);
+    } else {
+      // Modo normal: usar palabra de la BD
+      const wordData = await getRandomWordWeighted();
+
+      roomData = {
+        ...roomData,
+        // Datos de palabra normal
+        modeId: null,
+        modeName: null,
+        modeType: 'word',
+        word: wordData.word,
+        itemImageUrl: null,
+        itemIndex: null,
+        wordId: wordData.id,
+        category: wordData.category,
+        lastWord: wordData.word
+      };
+
+      console.log(`✅ Sala creada: ${roomId} - Admin: ${adminId} (${adminName || "Admin"}) - Palabra: ${wordData.word}`);
+    }
+
+    rooms[roomId] = roomData;
+
     if (req.user) {
       console.log(`👑 Admin autenticado: ${req.user.email} (userId: ${req.user.userId}) - Premium: ${req.user.isPremium}`);
     } else {
@@ -183,7 +234,10 @@ app.post('/api/rooms/create', checkAuth, async (req, res) => {
 
     res.json({
       roomId,
-      word: wordData.word,
+      word: roomData.word,
+      imageUrl: roomData.itemImageUrl || null,
+      modeType: roomData.modeType,
+      modeName: roomData.modeName || null,
       round: 1
     });
   } catch (error) {
@@ -282,12 +336,24 @@ app.post('/api/rooms/:roomId/restart', async (req, res) => {
     room.nextRoundAt = nextRoundAt;
     room.lastActivity = Date.now();
 
-    // Obtener nueva palabra de la base de datos
-    const wordData = await getRandomWordWeighted();
-    room.word = wordData.word;
-    room.wordId = wordData.id;
-    room.category = wordData.category;
-    room.lastWord = wordData.word;
+    // Obtener nueva palabra/item según el tipo de modo
+    if (room.modeId) {
+      // Modo especial: obtener item aleatorio
+      const itemData = await getRandomItemWeighted(room.modeId);
+      room.word = itemData.label;
+      room.itemImageUrl = itemData.imageUrl;
+      room.itemIndex = itemData.index;
+      room.lastWord = itemData.label;
+      // wordId se mantiene en null para modos especiales
+    } else {
+      // Modo normal: obtener palabra de la BD
+      const wordData = await getRandomWordWeighted();
+      room.word = wordData.word;
+      room.wordId = wordData.id;
+      room.category = wordData.category;
+      room.lastWord = wordData.word;
+    }
+
     const activePlayers = cleanInactivePlayers(room);
 
   // Seleccionar el jugador que va a iniciar la partida (al azar, sin repetir el anterior)
@@ -794,6 +860,8 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
     const payload = {
       round: room.round,
       word,
+      itemImageUrl: room.itemImageUrl || null, // URL de imagen para modos especiales
+      modeType: room.modeType || null, // Tipo de modo: 'word', 'image', 'hybrid'
       totalPlayers: activePlayers.length,
       nextRoundAt: room.nextRoundAt || null,
       isAdmin: playerId === room.adminId,
@@ -1230,6 +1298,14 @@ app.get('/api/modes/daily', async (req, res) => {
   }
 });
 
+// ============================================================================
+// LEGACY ENDPOINTS - COMENTADOS (reemplazados por modes.js)
+// ============================================================================
+// Estos endpoints usan el sistema antiguo con wordList en lugar de items
+// Los nuevos endpoints están en modes.js y se cargan mediante setupModesRoutes()
+// ============================================================================
+
+/*
 // 📋 GET /api/admin/modes - Obtener todos los modos (Admin)
 app.get('/api/admin/modes', async (req, res) => {
   try {
@@ -1360,6 +1436,11 @@ app.delete('/api/admin/modes/:id', async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar modo' });
   }
 });
+*/
+
+// ============================================================================
+// FIN DE LEGACY ENDPOINTS
+// ============================================================================
 
 // ➕ POST /api/admin/words - Agregar nuevas palabras
 app.post('/api/admin/words', async (req, res) => {

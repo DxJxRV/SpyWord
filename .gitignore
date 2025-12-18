@@ -19,6 +19,10 @@ dist-ssr
 
 STRIPE-SETUP.md
 
+# Uploaded images (modos especiales)
+server/uploads/
+!server/uploads/.gitkeep
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
