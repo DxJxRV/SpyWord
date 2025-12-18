@@ -21,6 +21,8 @@ export default function Room() {
   const { runRoom, stopRoomTutorial } = useTutorial();
   const { isPremium } = useAuth();
   const [word, setWord] = useState("");
+  const [itemImageUrl, setItemImageUrl] = useState(null); // URL de la imagen del item (modos especiales)
+  const [modeType, setModeType] = useState(null); // Tipo de modo: 'word', 'image', 'hybrid'
   const [currentRound, setCurrentRound] = useState(0);
   const [totalPlayers, setTotalPlayers] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -128,6 +130,8 @@ export default function Room() {
 
         setCurrentRound(res.data.round);
         setWord(res.data.word);
+        setItemImageUrl(res.data.itemImageUrl || null); // Capturar URL de imagen (modos especiales)
+        setModeType(res.data.modeType || null); // Capturar tipo de modo
         setTotalPlayers(res.data.totalPlayers);
         setIsAdmin(res.data.isAdmin);
         setStarterName(res.data.starterName);
@@ -412,10 +416,25 @@ export default function Room() {
             {roomStatus === 'VOTING' ? (
               // Vista colapsada durante votación
               <div className="flex items-center justify-center gap-2">
-                <p className="text-xs text-purple-300">Tu palabra:</p>
-                <h1 className="text-xl font-bold text-white">
-                  {wordHidden ? "***" : word || "..."}
-                </h1>
+                <p className="text-xs text-purple-300">{modeType === 'image' ? 'Tu imagen:' : 'Tu palabra:'}</p>
+                {wordHidden ? (
+                  <h1 className="text-xl font-bold text-white">***</h1>
+                ) : (
+                  <>
+                    {itemImageUrl && (
+                      <img
+                        src={itemImageUrl}
+                        alt={word}
+                        className="h-12 w-12 object-cover rounded-lg border-2 border-purple-400"
+                      />
+                    )}
+                    {(modeType !== 'image' || !itemImageUrl) && (
+                      <h1 className="text-xl font-bold text-white">
+                        {word || "..."}
+                      </h1>
+                    )}
+                  </>
+                )}
                 {!wordHidden && word === "???" && (
                   <span className="text-amber-400 text-xs font-semibold">🕵️</span>
                 )}
@@ -423,12 +442,27 @@ export default function Room() {
             ) : (
               // Vista normal
               <>
-                <p className="text-sm text-purple-300 mb-2">Tu palabra es:</p>
-                <h1 className="text-5xl font-bold text-white mb-2">
-                  {wordHidden ? "***" : word || "..."}
-                </h1>
+                <p className="text-sm text-purple-300 mb-2">{modeType === 'image' ? 'Tu imagen es:' : 'Tu palabra es:'}</p>
+                {wordHidden ? (
+                  <h1 className="text-5xl font-bold text-white mb-2">***</h1>
+                ) : (
+                  <div className="flex flex-col items-center gap-3">
+                    {itemImageUrl && (
+                      <img
+                        src={itemImageUrl}
+                        alt={word}
+                        className="max-h-48 max-w-full object-contain rounded-xl border-2 border-purple-400 shadow-lg"
+                      />
+                    )}
+                    {(modeType !== 'image' || !itemImageUrl) && (
+                      <h1 className="text-5xl font-bold text-white">
+                        {word || "..."}
+                      </h1>
+                    )}
+                  </div>
+                )}
                 {!wordHidden && word === "???" && (
-                  <p className="text-amber-400 text-sm font-semibold animate-pulse">
+                  <p className="text-amber-400 text-sm font-semibold animate-pulse mt-2">
                     🕵️ ¡Eres el impostor!
                   </p>
                 )}

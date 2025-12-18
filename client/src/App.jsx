@@ -6,6 +6,7 @@ import MainMenu from "./pages/MainMenu";
 import Online from "./pages/Online";
 import DailyMode from "./pages/DailyMode";
 import PassAndPlay from "./pages/PassAndPlay";
+import SpecialModes from "./pages/SpecialModes";
 import Room from "./pages/Room";
 import Admin from "./pages/Admin";
 import LegalPages from "./pages/LegalPages";
@@ -177,6 +178,7 @@ export default function App() {
               <Route path="/online" element={<Online />} />
               <Route path="/daily-mode" element={<DailyMode />} />
               <Route path="/pass-and-play" element={<PassAndPlay />} />
+              <Route path="/special-modes" element={<SpecialModes />} />
               <Route path="/room/:roomId" element={<Room />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/premium" element={<Premium />} />

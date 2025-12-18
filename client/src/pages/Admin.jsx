@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen } from "lucide-react";
+import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette } from "lucide-react";
 import { api } from "../services/api";
 import UserManagement from "../components/UserManagement";
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState("words"); // "words" o "users"
+  const [activeTab, setActiveTab] = useState("words"); // "words", "users", "modes"
   const [words, setWords] = useState([]);
   const [categories, setCategories] = useState([]);
   const [stats, setStats] = useState(null);
@@ -18,23 +18,50 @@ export default function Admin() {
   const [newCategory, setNewCategory] = useState("");
   const [isNewCategory, setIsNewCategory] = useState(false);
 
+  // Estado para modos especiales
+  const [modes, setModes] = useState([]);
+  const [images, setImages] = useState([]);
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [editingMode, setEditingMode] = useState(null);
+  const [modeForm, setModeForm] = useState({
+    name: "",
+    description: "",
+    type: "image",
+    items: [],
+    buttonImage: "",
+    buttonColor: "#8B5CF6",
+    buttonGradient: null,
+    isActive: true
+  });
+  const [newItem, setNewItem] = useState({ label: "", imageUrl: "", weight: 100 });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState(null);
+
   // Cargar datos iniciales
   useEffect(() => {
     loadData();
-  }, [selectedCategory]);
+  }, [selectedCategory, activeTab]);
 
   async function loadData() {
     setLoading(true);
     try {
-      const [wordsRes, categoriesRes, statsRes] = await Promise.all([
-        api.get(`/admin/words${selectedCategory !== "all" ? `?category=${selectedCategory}` : ""}`),
-        api.get("/admin/categories"),
-        api.get("/admin/stats")
-      ]);
-
-      setWords(wordsRes.data.words);
-      setCategories(categoriesRes.data.categories);
-      setStats(statsRes.data);
+      if (activeTab === "modes") {
+        const [modesRes, imagesRes] = await Promise.all([
+          api.get("/admin/modes"),
+          api.get("/admin/images")
+        ]);
+        setModes(modesRes.data);
+        setImages(imagesRes.data);
+      } else if (activeTab === "words") {
+        const [wordsRes, categoriesRes, statsRes] = await Promise.all([
+          api.get(`/admin/words${selectedCategory !== "all" ? `?category=${selectedCategory}` : ""}`),
+          api.get("/admin/categories"),
+          api.get("/admin/stats")
+        ]);
+        setWords(wordsRes.data.words);
+        setCategories(categoriesRes.data.categories);
+        setStats(statsRes.data);
+      }
     } catch (error) {
       console.error("Error al cargar datos:", error);
       toast.error("Error al cargar datos");
@@ -92,6 +119,144 @@ export default function Admin() {
     }
   }
 
+  // Funciones para modos especiales
+  async function handleUploadImage(file) {
+    if (!file) return null;
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    setUploadingImage(true);
+    try {
+      const response = await api.post("/admin/upload-image", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      toast.success("Imagen subida correctamente");
+      return response.data.image.url;
+    } catch (error) {
+      console.error("Error al subir imagen:", error);
+      toast.error("Error al subir imagen");
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  function handleOpenModeModal(mode = null) {
+    if (mode) {
+      setEditingMode(mode);
+      setModeForm({
+        name: mode.name,
+        description: mode.description || "",
+        type: mode.type,
+        items: mode.items || [],
+        buttonImage: mode.buttonImage || "",
+        buttonColor: mode.buttonColor || "#8B5CF6",
+        buttonGradient: mode.buttonGradient || null,
+        isActive: mode.isActive
+      });
+    } else {
+      setEditingMode(null);
+      setModeForm({
+        name: "",
+        description: "",
+        type: "image",
+        items: [],
+        buttonImage: "",
+        buttonColor: "#8B5CF6",
+        buttonGradient: null,
+        isActive: true
+      });
+    }
+    setShowModeModal(true);
+  }
+
+  async function handleSaveMode() {
+    if (!modeForm.name.trim()) {
+      toast.error("El nombre del modo es requerido");
+      return;
+    }
+
+    if (modeForm.items.length === 0) {
+      toast.error("Agrega al menos un item al modo");
+      return;
+    }
+
+    try {
+      if (editingMode) {
+        await api.put(`/admin/modes/${editingMode.id}`, modeForm);
+        toast.success("Modo actualizado correctamente");
+      } else {
+        await api.post("/admin/modes", modeForm);
+        toast.success("Modo creado correctamente");
+      }
+      setShowModeModal(false);
+      loadData();
+    } catch (error) {
+      console.error("Error al guardar modo:", error);
+      toast.error(error.response?.data?.error || "Error al guardar modo");
+    }
+  }
+
+  async function handleDeleteMode(id) {
+    if (!confirm("¿Estás seguro de eliminar este modo?")) return;
+
+    try {
+      await api.delete(`/admin/modes/${id}`);
+      toast.success("Modo eliminado");
+      loadData();
+    } catch (error) {
+      console.error("Error al eliminar modo:", error);
+      toast.error("Error al eliminar modo");
+    }
+  }
+
+  async function handleToggleMode(id) {
+    try {
+      await api.put(`/admin/modes/${id}/toggle`);
+      toast.success("Estado del modo actualizado");
+      loadData();
+    } catch (error) {
+      console.error("Error al cambiar estado del modo:", error);
+      toast.error("Error al cambiar estado del modo");
+    }
+  }
+
+  function handleAddItem() {
+    if (!newItem.label.trim()) {
+      toast.error("El label del item es requerido");
+      return;
+    }
+
+    setModeForm({
+      ...modeForm,
+      items: [...modeForm.items, { ...newItem }]
+    });
+    setNewItem({ label: "", imageUrl: "", weight: 100 });
+  }
+
+  function handleRemoveItem(index) {
+    setModeForm({
+      ...modeForm,
+      items: modeForm.items.filter((_, i) => i !== index)
+    });
+    if (editingItemIndex === index) {
+      setEditingItemIndex(null);
+    }
+  }
+
+  function handleUpdateItem(index, field, value) {
+    const updatedItems = [...modeForm.items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      [field]: value
+    };
+    setModeForm({
+      ...modeForm,
+      items: updatedItems
+    });
+  }
+
   const filteredWords = words;
 
   // Agrupar palabras por categoría
@@ -124,7 +289,9 @@ export default function Admin() {
               Panel de Administración
             </h1>
             <p className="text-gray-400 mt-2">
-              {activeTab === "words" ? "Gestiona las palabras del juego" : "Gestiona usuarios y suscripciones"}
+              {activeTab === "words" && "Gestiona las palabras del juego"}
+              {activeTab === "users" && "Gestiona usuarios y suscripciones"}
+              {activeTab === "modes" && "Gestiona modos especiales con imágenes"}
             </p>
           </div>
           {activeTab === "words" && (
@@ -134,6 +301,15 @@ export default function Admin() {
             >
               <Plus size={20} />
               Agregar Palabras
+            </button>
+          )}
+          {activeTab === "modes" && (
+            <button
+              onClick={() => handleOpenModeModal()}
+              className="bg-purple-500 hover:bg-purple-600 px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all"
+            >
+              <Plus size={20} />
+              Crear Modo
             </button>
           )}
         </div>
@@ -150,6 +326,17 @@ export default function Admin() {
           >
             <BookOpen size={20} />
             Palabras
+          </button>
+          <button
+            onClick={() => setActiveTab("modes")}
+            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
+              activeTab === "modes"
+                ? "text-purple-400 border-b-2 border-purple-400"
+                : "text-gray-400 hover:text-gray-300"
+            }`}
+          >
+            <Gamepad2 size={20} />
+            Modos Especiales
           </button>
           <button
             onClick={() => setActiveTab("users")}
@@ -380,6 +567,400 @@ export default function Admin() {
           </div>
         </div>
       )}
+          </>
+        )}
+
+        {/* Contenido de la tab de Modos Especiales */}
+        {activeTab === "modes" && (
+          <>
+            {/* Lista de modos */}
+            <div className="space-y-4">
+              {modes.length === 0 ? (
+                <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-gray-700">
+                  <Gamepad2 size={48} className="mx-auto text-gray-600 mb-4" />
+                  <p className="text-gray-400 text-lg">No hay modos especiales creados</p>
+                  <p className="text-gray-500 text-sm mt-2">Crea tu primer modo con imágenes</p>
+                </div>
+              ) : (
+                modes.map(mode => (
+                  <div
+                    key={mode.id}
+                    className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700 p-6 hover:border-purple-500/50 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      {/* Información del modo */}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-2xl font-bold text-white">{mode.name}</h3>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            mode.isActive
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+                          }`}>
+                            {mode.isActive ? "Activo" : "Inactivo"}
+                          </span>
+                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                            {mode.type === "image" ? "Imágenes" : mode.type === "word" ? "Palabras" : "Híbrido"}
+                          </span>
+                        </div>
+                        {mode.description && (
+                          <p className="text-gray-400 mb-3">{mode.description}</p>
+                        )}
+                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                          <span>{mode.items?.length || 0} items</span>
+                          <span>•</span>
+                          <span>Creado: {new Date(mode.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+
+                      {/* Preview del botón */}
+                      <div className="flex flex-col items-center gap-2">
+                        <p className="text-xs text-gray-500">Vista previa</p>
+                        <div
+                          className="w-24 h-24 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg"
+                          style={{
+                            background: mode.buttonGradient
+                              ? `linear-gradient(135deg, ${mode.buttonGradient.from}, ${mode.buttonGradient.to})`
+                              : mode.buttonImage
+                              ? `url(${mode.buttonImage}) center/cover`
+                              : mode.buttonColor || "#8B5CF6"
+                          }}
+                        >
+                          {!mode.buttonImage && mode.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      </div>
+
+                      {/* Acciones */}
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => handleOpenModeModal(mode)}
+                          className="bg-blue-500/20 hover:bg-blue-500/30 p-2 rounded-lg transition-all"
+                          title="Editar"
+                        >
+                          <Edit size={18} className="text-blue-400" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleMode(mode.id)}
+                          className="bg-amber-500/20 hover:bg-amber-500/30 p-2 rounded-lg transition-all"
+                          title={mode.isActive ? "Desactivar" : "Activar"}
+                        >
+                          {mode.isActive ? <EyeOff size={18} className="text-amber-400" /> : <Eye size={18} className="text-amber-400" />}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMode(mode.id)}
+                          className="bg-red-500/20 hover:bg-red-500/30 p-2 rounded-lg transition-all"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={18} className="text-red-400" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal para crear/editar modo */}
+            {showModeModal && (
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                <div className="bg-gray-900 rounded-2xl border-2 border-purple-500/50 max-w-4xl w-full p-4 sm:p-6 lg:p-8 relative my-4 sm:my-8 max-h-[95vh] overflow-y-auto">
+                  <button
+                    onClick={() => setShowModeModal(false)}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+
+                  <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent pr-8">
+                    {editingMode ? "Editar Modo" : "Crear Nuevo Modo"}
+                  </h2>
+
+                  <div className="space-y-4 sm:space-y-6">
+                    {/* Información básica */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Nombre del modo</label>
+                        <input
+                          type="text"
+                          value={modeForm.name}
+                          onChange={(e) => setModeForm({ ...modeForm, name: e.target.value })}
+                          placeholder="Ej: Clash Royale, Disney, etc."
+                          className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Tipo</label>
+                        <select
+                          value={modeForm.type}
+                          onChange={(e) => setModeForm({ ...modeForm, type: e.target.value })}
+                          className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none"
+                        >
+                          <option value="image">Solo Imágenes</option>
+                          <option value="word">Solo Palabras</option>
+                          <option value="hybrid">Híbrido</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Descripción (opcional)</label>
+                      <textarea
+                        value={modeForm.description}
+                        onChange={(e) => setModeForm({ ...modeForm, description: e.target.value })}
+                        placeholder="Describe este modo de juego..."
+                        rows={2}
+                        className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none resize-none"
+                      />
+                    </div>
+
+                    {/* Apariencia del botón */}
+                    <div className="border border-gray-700 rounded-lg p-3 sm:p-4">
+                      <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+                        <Palette size={18} className="text-purple-400" />
+                        <span className="text-sm sm:text-base">Apariencia del Botón</span>
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">URL de Imagen (opcional)</label>
+                          <input
+                            type="text"
+                            value={modeForm.buttonImage}
+                            onChange={(e) => setModeForm({ ...modeForm, buttonImage: e.target.value })}
+                            placeholder="https://..."
+                            className="w-full bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Color</label>
+                          <input
+                            type="color"
+                            value={modeForm.buttonColor}
+                            onChange={(e) => setModeForm({ ...modeForm, buttonColor: e.target.value })}
+                            className="w-full h-10 bg-gray-800 rounded-lg border border-gray-700 cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Estado</label>
+                          <label className="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={modeForm.isActive}
+                              onChange={(e) => setModeForm({ ...modeForm, isActive: e.target.checked })}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm">Activo</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Gestión de items */}
+                    <div className="border border-gray-700 rounded-lg p-3 sm:p-4">
+                      <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+                        <ImageIcon size={18} className="text-purple-400" />
+                        <span className="text-sm sm:text-base">Items del Modo ({modeForm.items.length})</span>
+                      </h3>
+
+                      {/* Agregar nuevo item */}
+                      <div className="bg-gray-800/50 p-4 rounded-lg mb-4">
+                        <p className="text-sm font-medium mb-3">Agregar nuevo item</p>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+                            <input
+                              type="text"
+                              value={newItem.label}
+                              onChange={(e) => setNewItem({ ...newItem, label: e.target.value })}
+                              placeholder="Label (ej: Mago)"
+                              className="lg:col-span-4 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+                            />
+                            <input
+                              type="text"
+                              value={newItem.imageUrl}
+                              onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
+                              placeholder="URL imagen (opcional)"
+                              className="lg:col-span-5 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+                            />
+                            <input
+                              type="number"
+                              value={newItem.weight}
+                              onChange={(e) => setNewItem({ ...newItem, weight: parseInt(e.target.value) || 100 })}
+                              placeholder="Peso"
+                              min="10"
+                              max="500"
+                              className="lg:col-span-2 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none text-sm"
+                            />
+                            <button
+                              onClick={handleAddItem}
+                              disabled={uploadingImage}
+                              className="lg:col-span-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 px-3 py-2 rounded-lg transition-all flex items-center justify-center"
+                            >
+                              <Plus size={18} />
+                            </button>
+                          </div>
+                          {/* Botón para subir imagen */}
+                          <label className="block cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const url = await handleUploadImage(file);
+                                  if (url) {
+                                    setNewItem({ ...newItem, imageUrl: url });
+                                  }
+                                  e.target.value = '';
+                                }
+                              }}
+                              className="hidden"
+                              disabled={uploadingImage}
+                            />
+                            <div className="bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 px-4 py-2 rounded-lg text-sm text-blue-400 hover:text-blue-300 transition-all flex items-center justify-center gap-2">
+                              <Upload size={16} />
+                              {uploadingImage ? "Subiendo..." : "O subir imagen al servidor"}
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Lista de items */}
+                      <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {modeForm.items.length === 0 ? (
+                          <p className="text-gray-500 text-center py-4 text-sm">No hay items agregados</p>
+                        ) : (
+                          modeForm.items.map((item, index) => (
+                            <div
+                              key={index}
+                              className="bg-gray-800 p-3 rounded-lg"
+                            >
+                              {editingItemIndex === index ? (
+                                // Modo edición
+                                <div className="space-y-3">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs text-gray-400 mb-1">Label</label>
+                                      <input
+                                        type="text"
+                                        value={item.label}
+                                        onChange={(e) => handleUpdateItem(index, 'label', e.target.value)}
+                                        className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-400 mb-1">Peso</label>
+                                      <input
+                                        type="number"
+                                        value={item.weight}
+                                        onChange={(e) => handleUpdateItem(index, 'weight', parseInt(e.target.value) || 100)}
+                                        min="10"
+                                        max="500"
+                                        className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-400 mb-1">URL de Imagen</label>
+                                    <input
+                                      type="text"
+                                      value={item.imageUrl || ''}
+                                      onChange={(e) => handleUpdateItem(index, 'imageUrl', e.target.value)}
+                                      placeholder="URL de la imagen"
+                                      className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm"
+                                    />
+                                  </div>
+                                  {/* Botón para subir nueva imagen */}
+                                  <label className="block cursor-pointer">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          const url = await handleUploadImage(file);
+                                          if (url) {
+                                            handleUpdateItem(index, 'imageUrl', url);
+                                          }
+                                          e.target.value = '';
+                                        }
+                                      }}
+                                      className="hidden"
+                                      disabled={uploadingImage}
+                                    />
+                                    <div className="bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 px-3 py-2 rounded-lg text-xs text-blue-400 hover:text-blue-300 transition-all flex items-center justify-center gap-2">
+                                      <Upload size={14} />
+                                      {uploadingImage ? "Subiendo..." : "Subir nueva imagen"}
+                                    </div>
+                                  </label>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => setEditingItemIndex(null)}
+                                      className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-400 px-3 py-2 rounded-lg text-sm transition-all"
+                                    >
+                                      Guardar
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveItem(index)}
+                                      className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-400 px-3 py-2 rounded-lg text-sm transition-all"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                // Modo vista
+                                <div className="flex items-center gap-3">
+                                  {item.imageUrl && (
+                                    <img
+                                      src={item.imageUrl}
+                                      alt={item.label}
+                                      className="w-12 h-12 object-cover rounded"
+                                    />
+                                  )}
+                                  <div className="flex-1">
+                                    <p className="font-medium text-sm">{item.label}</p>
+                                    <p className="text-xs text-gray-500">Peso: {item.weight}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => setEditingItemIndex(index)}
+                                    className="bg-blue-500/20 hover:bg-blue-500/30 p-2 rounded transition-all"
+                                    title="Editar"
+                                  >
+                                    <Edit size={14} className="text-blue-400" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleRemoveItem(index)}
+                                    className="bg-red-500/20 hover:bg-red-500/30 p-2 rounded transition-all"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 size={14} className="text-red-400" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Botones de acción */}
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 sticky bottom-0 bg-gray-900 pb-2">
+                      <button
+                        onClick={handleSaveMode}
+                        className="flex-1 bg-purple-500 hover:bg-purple-600 px-4 sm:px-6 py-3 rounded-xl font-semibold transition-all text-sm sm:text-base"
+                      >
+                        {editingMode ? "Actualizar Modo" : "Crear Modo"}
+                      </button>
+                      <button
+                        onClick={() => setShowModeModal(false)}
+                        className="px-4 sm:px-6 py-3 rounded-xl font-semibold bg-gray-700 hover:bg-gray-600 transition-all text-sm sm:text-base"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 

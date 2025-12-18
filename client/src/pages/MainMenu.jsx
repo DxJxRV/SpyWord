@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Users, Star, Smartphone } from "lucide-react";
+import { Users, Star, Smartphone, Gamepad2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { api } from "../services/api";
 import { getUserName } from "../utils/nameGenerator";
@@ -107,6 +107,23 @@ export default function MainMenu() {
                 <div className="text-left">
                   <p className="text-2xl font-bold">Juego Online</p>
                   <p className="text-sm text-emerald-100 opacity-90">Juega con amigos en tiempo real</p>
+                </div>
+              </div>
+              <span className="text-3xl group-hover:translate-x-1 transition-transform">→</span>
+            </button>
+
+            {/* Modos Especiales */}
+            <button
+              onClick={() => navigate('/special-modes')}
+              className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 px-6 py-4 rounded-2xl text-xl font-bold transition-all active:scale-95 shadow-[0_0_30px_rgba(59,130,246,0.3)] flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 p-3 rounded-xl">
+                  <Gamepad2 size={32} />
+                </div>
+                <div className="text-left">
+                  <p className="text-2xl font-bold">Modos Especiales</p>
+                  <p className="text-sm text-blue-100 opacity-90">Juega con imágenes temáticas</p>
                 </div>
               </div>
               <span className="text-3xl group-hover:translate-x-1 transition-transform">→</span>
