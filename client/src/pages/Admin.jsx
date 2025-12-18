@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette } from "lucide-react";
-import { api } from "../services/api";
+import { api, buildImageUrl } from "../services/api";
 import UserManagement from "../components/UserManagement";
 
 export default function Admin() {
@@ -47,6 +47,48 @@ export default function Admin() {
   useEffect(() => {
     loadData();
   }, [selectedCategory, activeTab]);
+
+  // Global paste listener para quick paste en item cards
+  useEffect(() => {
+    const handleGlobalPaste = async (e) => {
+      // Solo actuar si hay un item seleccionado y no estamos en modo edición
+      if (selectedItemIndex === null || editingItemIndex !== null) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+
+            // Upload inmediato de la imagen
+            const newImageUrl = await handleUploadImage(file);
+            if (newImageUrl) {
+              const item = modeForm.items[selectedItemIndex];
+
+              // Si había una imagen anterior, eliminarla
+              if (item.imageUrl) {
+                await handleDeleteImage(item.imageUrl);
+              }
+
+              // Actualizar el item con la nueva imagen
+              handleUpdateItem(selectedItemIndex, 'imageUrl', newImageUrl);
+              toast.success(`Imagen actualizada para "${item.label}"`);
+            }
+
+            // Deseleccionar el item después de pegar
+            setSelectedItemIndex(null);
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [selectedItemIndex, editingItemIndex, modeForm.items]);
 
   async function loadData() {
     setLoading(true);
@@ -237,6 +279,7 @@ export default function Admin() {
         isActive: true
       });
     }
+    setSelectedItemIndex(null);
     setShowModeModal(true);
   }
 
@@ -372,6 +415,9 @@ export default function Admin() {
     });
     if (editingItemIndex === index) {
       setEditingItemIndex(null);
+    }
+    if (selectedItemIndex === index) {
+      setSelectedItemIndex(null);
     }
   }
 
@@ -779,7 +825,7 @@ export default function Admin() {
                             background: mode.buttonGradient
                               ? `linear-gradient(135deg, ${mode.buttonGradient.from}, ${mode.buttonGradient.to})`
                               : mode.buttonImage
-                              ? `url(${mode.buttonImage}) center/cover`
+                              ? `url(${buildImageUrl(mode.buttonImage)}) center/cover`
                               : mode.buttonColor || "#8B5CF6"
                           }}
                         >
@@ -1252,19 +1298,46 @@ export default function Admin() {
                               ) : (
                                 // Modo vista
                                 <div className="flex items-center gap-3">
-                                  {item.imageUrl && (
-                                    <img
-                                      src={item.imageUrl}
-                                      alt={item.label}
-                                      className="w-12 h-12 object-cover rounded"
-                                    />
-                                  )}
-                                  <div className="flex-1">
-                                    <p className="font-medium text-sm">{item.label}</p>
-                                    <p className="text-xs text-gray-500">Peso: {item.weight}</p>
+                                  {/* Área clickable para seleccionar y pegar */}
+                                  <div
+                                    onClick={() => {
+                                      setSelectedItemIndex(selectedItemIndex === index ? null : index);
+                                      if (selectedItemIndex !== index) {
+                                        toast.info("Presiona Ctrl+V para pegar una imagen", { duration: 2000 });
+                                      }
+                                    }}
+                                    className={`flex items-center gap-3 flex-1 cursor-pointer p-2 -m-2 rounded transition-all ${
+                                      selectedItemIndex === index
+                                        ? 'bg-purple-500/20 border-2 border-purple-500'
+                                        : 'hover:bg-gray-700/50 border-2 border-transparent'
+                                    }`}
+                                    title="Click para seleccionar y pegar imagen"
+                                  >
+                                    {item.imageUrl && (
+                                      <img
+                                        src={buildImageUrl(item.imageUrl)}
+                                        alt={item.label}
+                                        className="w-12 h-12 object-cover rounded"
+                                      />
+                                    )}
+                                    <div className="flex-1">
+                                      <p className="font-medium text-sm">{item.label}</p>
+                                      <p className="text-xs text-gray-500">Peso: {item.weight}</p>
+                                      {selectedItemIndex === index && (
+                                        <p className="text-xs text-purple-400 mt-1 flex items-center gap-1">
+                                          <ImageIcon size={12} />
+                                          Listo para pegar imagen
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
+
+                                  {/* Botones de acción */}
                                   <button
-                                    onClick={() => setEditingItemIndex(index)}
+                                    onClick={() => {
+                                      setEditingItemIndex(index);
+                                      setSelectedItemIndex(null);
+                                    }}
                                     className="bg-blue-500/20 hover:bg-blue-500/30 p-2 rounded transition-all"
                                     title="Editar"
                                   >

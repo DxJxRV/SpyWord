@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import { Eye, EyeOff, Share2, QrCode, RotateCw, Copy, ChevronDown, ChevronUp, UserX } from "lucide-react";
-import { api } from "../services/api";
+import { api, buildImageUrl } from "../services/api";
 import { toast } from "sonner";
 import Joyride from "react-joyride";
 import { useTutorial } from "../contexts/TutorialContext";
@@ -421,14 +421,14 @@ export default function Room() {
                   <h1 className="text-xl font-bold text-white">***</h1>
                 ) : (
                   <>
-                    {itemImageUrl && (
+                    {itemImageUrl && word !== "???" && (
                       <img
-                        src={itemImageUrl}
+                        src={buildImageUrl(itemImageUrl)}
                         alt={word}
                         className="h-12 w-12 object-cover rounded-lg border-2 border-purple-400"
                       />
                     )}
-                    {(modeType !== 'image' || !itemImageUrl) && (
+                    {(modeType !== 'image' || !itemImageUrl || word === "???") && (
                       <h1 className="text-xl font-bold text-white">
                         {word || "..."}
                       </h1>
@@ -447,14 +447,14 @@ export default function Room() {
                   <h1 className="text-5xl font-bold text-white mb-2">***</h1>
                 ) : (
                   <div className="flex flex-col items-center gap-3">
-                    {itemImageUrl && (
+                    {itemImageUrl && word !== "???" && (
                       <img
-                        src={itemImageUrl}
+                        src={buildImageUrl(itemImageUrl)}
                         alt={word}
                         className="max-h-48 max-w-full object-contain rounded-xl border-2 border-purple-400 shadow-lg"
                       />
                     )}
-                    {(modeType !== 'image' || !itemImageUrl) && (
+                    {(modeType !== 'image' || !itemImageUrl || word === "???") && (
                       <h1 className="text-5xl font-bold text-white">
                         {word || "..."}
                       </h1>

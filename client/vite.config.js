@@ -73,6 +73,11 @@ export default defineConfig({
         target: `http://localhost:${process.env.VITE_SERVER_PORT || 3003}`,
         changeOrigin: true,
         secure: false
+      },
+      '/uploads': {
+        target: `http://localhost:${process.env.VITE_SERVER_PORT || 3003}`,
+        changeOrigin: true,
+        secure: false
       }
     }
   }

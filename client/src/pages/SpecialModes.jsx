@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Gamepad2, Loader2 } from "lucide-react";
-import { api } from "../services/api";
+import { api, buildImageUrl } from "../services/api";
 import { getUserName } from "../utils/nameGenerator";
 import AppHeader from "../components/AppHeader";
 
@@ -107,7 +107,7 @@ export default function SpecialModes() {
                     background: mode.buttonGradient
                       ? `linear-gradient(135deg, ${mode.buttonGradient.from}, ${mode.buttonGradient.to})`
                       : mode.buttonImage
-                      ? `url(${mode.buttonImage}) center/cover`
+                      ? `url(${buildImageUrl(mode.buttonImage)}) center/cover`
                       : mode.buttonColor || "#8B5CF6"
                   }}
                 >
