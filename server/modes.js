@@ -3,16 +3,14 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
-import { PrismaClient } from '@prisma/client';
 import {
   getRandomItemWeighted,
   logItemFeedback,
   getActiveModes,
   getModeById,
-  getModeStats
+  getModeStats,
+  prisma
 } from './services/mode.service.js';
-
-const prisma = new PrismaClient();
 
 // Obtener __dirname en ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -88,6 +86,15 @@ export function setupModesRoutes(app) {
 
         console.log(`📦 Archivo recibido: ${req.file.filename}`);
         console.log(`📂 Guardado en: ${req.file.path}`);
+
+        // Verificar que prisma esté disponible
+        if (!prisma || !prisma.modeImage) {
+          console.error('❌ ERROR CRÍTICO: prisma o prisma.modeImage es undefined');
+          console.error('prisma:', prisma);
+          return res.status(500).json({ error: 'Error de configuración del servidor (Prisma no disponible)' });
+        }
+
+        console.log(`💾 Guardando en BD...`);
 
         // Guardar en BD
         const savedImage = await prisma.modeImage.create({
@@ -212,6 +219,13 @@ export function setupModesRoutes(app) {
           console.warn('⚠️ Item sin label encontrado');
           return res.status(400).json({ error: 'Cada item debe tener un label' });
         }
+      }
+
+      // Verificar que prisma esté disponible
+      if (!prisma || !prisma.gameMode) {
+        console.error('❌ ERROR CRÍTICO: prisma o prisma.gameMode es undefined');
+        console.error('prisma:', prisma);
+        return res.status(500).json({ error: 'Error de configuración del servidor (Prisma no disponible)' });
       }
 
       console.log(`💾 Guardando modo en base de datos...`);

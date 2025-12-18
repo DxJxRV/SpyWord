@@ -2,6 +2,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Exportar prisma para que otros módulos puedan usarlo
+export { prisma };
+
 /**
  * Obtiene un item aleatorio de un modo usando selección ponderada
  * @param {number} modeId - ID del modo de juego
