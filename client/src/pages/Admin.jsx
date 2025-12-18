@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette } from "lucide-react";
+import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette, Star } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import UserManagement from "../components/UserManagement";
 
@@ -351,6 +351,35 @@ export default function Admin() {
     } catch (error) {
       console.error("Error al cambiar estado del modo:", error);
       toast.error("Error al cambiar estado del modo");
+    }
+  }
+
+  async function handleToggleFeatured(mode) {
+    try {
+      const newFeaturedStatus = !mode.isFeaturedOnHome;
+
+      // Si se está marcando como destacado, calcular el siguiente orden disponible
+      let featuredOrder = null;
+      if (newFeaturedStatus) {
+        const featuredModes = modes.filter(m => m.isFeaturedOnHome && m.id !== mode.id);
+        featuredOrder = featuredModes.length + 1;
+
+        if (featuredOrder > 3) {
+          toast.error("Ya hay 3 modos destacados. Quita uno primero.");
+          return;
+        }
+      }
+
+      await api.put(`/admin/modes/${mode.id}/featured`, {
+        isFeaturedOnHome: newFeaturedStatus,
+        featuredOrder: featuredOrder
+      });
+
+      toast.success(newFeaturedStatus ? "Modo marcado como destacado" : "Modo removido de destacados");
+      loadData();
+    } catch (error) {
+      console.error("Error al cambiar estado destacado:", error);
+      toast.error(error.response?.data?.error || "Error al cambiar estado destacado");
     }
   }
 
@@ -805,6 +834,12 @@ export default function Admin() {
                           <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30">
                             {mode.type === "image" ? "Imágenes" : mode.type === "word" ? "Palabras" : "Híbrido"}
                           </span>
+                          {mode.isFeaturedOnHome && (
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex items-center gap-1">
+                              <Star size={12} fill="currentColor" />
+                              Destacado #{mode.featuredOrder}
+                            </span>
+                          )}
                         </div>
                         {mode.description && (
                           <p className="text-gray-400 mb-3">{mode.description}</p>
@@ -841,6 +876,21 @@ export default function Admin() {
                           title="Editar"
                         >
                           <Edit size={18} className="text-blue-400" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleFeatured(mode)}
+                          className={`p-2 rounded-lg transition-all ${
+                            mode.isFeaturedOnHome
+                              ? "bg-yellow-500/30 hover:bg-yellow-500/40"
+                              : "bg-yellow-500/10 hover:bg-yellow-500/20"
+                          }`}
+                          title={mode.isFeaturedOnHome ? "Quitar de destacados" : "Destacar en home"}
+                        >
+                          <Star
+                            size={18}
+                            className="text-yellow-400"
+                            fill={mode.isFeaturedOnHome ? "currentColor" : "none"}
+                          />
                         </button>
                         <button
                           onClick={() => handleToggleMode(mode.id)}
