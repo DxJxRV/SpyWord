@@ -51,6 +51,10 @@ export default function Admin() {
   const [bulkAddMode, setBulkAddMode] = useState(false); // Modo agregar en lote
   const [bulkLabels, setBulkLabels] = useState(""); // Labels separados por comas
 
+  // Estado para configuración global
+  const [specialModesEnabled, setSpecialModesEnabled] = useState(true);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+
   // Cambiar título de la página
   useEffect(() => {
     document.title = "SpyWord - Panel de Admin";
@@ -135,12 +139,14 @@ export default function Admin() {
     setLoading(true);
     try {
       if (activeTab === "modes") {
-        const [modesRes, imagesRes] = await Promise.all([
+        const [modesRes, imagesRes, settingsRes] = await Promise.all([
           api.get("/admin/modes"),
-          api.get("/admin/images")
+          api.get("/admin/images"),
+          api.get("/admin/settings/special-modes")
         ]);
         setModes(modesRes.data);
         setImages(imagesRes.data);
+        setSpecialModesEnabled(settingsRes.data.enabled);
       } else if (activeTab === "words") {
         const [wordsRes, categoriesRes, statsRes] = await Promise.all([
           api.get(`/admin/words${selectedCategory !== "all" ? `?category=${selectedCategory}` : ""}`),
@@ -428,6 +434,23 @@ export default function Admin() {
     } catch (error) {
       console.error("Error al cambiar estado destacado:", error);
       toast.error(error.response?.data?.error || "Error al cambiar estado destacado");
+    }
+  }
+
+  async function handleToggleSpecialModes() {
+    setLoadingSettings(true);
+    try {
+      const newEnabled = !specialModesEnabled;
+      await api.put("/admin/settings/special-modes", {
+        enabled: newEnabled
+      });
+      setSpecialModesEnabled(newEnabled);
+      toast.success(newEnabled ? "Botón de modos especiales activado" : "Botón de modos especiales desactivado");
+    } catch (error) {
+      console.error("Error al cambiar configuración:", error);
+      toast.error("Error al cambiar configuración");
+    } finally {
+      setLoadingSettings(false);
     }
   }
 
@@ -870,6 +893,37 @@ export default function Admin() {
         {/* Contenido de la tab de Modos Especiales */}
         {activeTab === "modes" && (
           <>
+            {/* Configuración global de modos especiales */}
+            <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/30 rounded-xl p-6 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="bg-purple-500/20 p-3 rounded-xl">
+                    <Gamepad2 size={28} className="text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white mb-1">Botón de Modos Especiales</h3>
+                    <p className="text-sm text-gray-400">
+                      {specialModesEnabled
+                        ? "El botón de modos especiales está visible en el menú principal"
+                        : "El botón de modos especiales está oculto en el menú principal"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleToggleSpecialModes}
+                  disabled={loadingSettings}
+                  className={`px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 ${
+                    specialModesEnabled
+                      ? "bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/30 hover:bg-emerald-500/30"
+                      : "bg-red-500/20 text-red-400 border-2 border-red-500/30 hover:bg-red-500/30"
+                  } ${loadingSettings ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  {specialModesEnabled ? <Eye size={20} /> : <EyeOff size={20} />}
+                  {loadingSettings ? "Cambiando..." : specialModesEnabled ? "Visible" : "Oculto"}
+                </button>
+              </div>
+            </div>
+
             {/* Filtros de modos */}
             <div className="flex gap-2 mb-6">
               <button

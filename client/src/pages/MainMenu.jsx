@@ -15,6 +15,7 @@ export default function MainMenu() {
   const [featuredModes, setFeaturedModes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
+  const [specialModesEnabled, setSpecialModesEnabled] = useState(true);
   const isJoining = useRef(false); // Flag to prevent concurrent joins
   const { isPremium } = useAuth();
 
@@ -111,6 +112,21 @@ export default function MainMenu() {
     fetchFeaturedModes();
   }, []);
 
+  useEffect(() => {
+    // Fetch configuración de modos especiales
+    const fetchSpecialModesSettings = async () => {
+      try {
+        const res = await api.get('/settings/special-modes');
+        setSpecialModesEnabled(res.data.enabled);
+      } catch (error) {
+        console.error("Error al cargar configuración de modos especiales:", error);
+        // Por defecto, mantener habilitado si hay error
+        setSpecialModesEnabled(true);
+      }
+    };
+    fetchSpecialModesSettings();
+  }, []);
+
   async function handleCreateRoomWithMode(modeId) {
     setCreatingRoom(true);
     try {
@@ -156,84 +172,86 @@ export default function MainMenu() {
               <span className="text-3xl group-hover:translate-x-1 transition-transform">→</span>
             </button>
 
-            {/* Modos Especiales - Dinámico */}
-            {featuredModes.length === 0 ? (
-              // Botón estático original si no hay modos destacados
-              <button
-                onClick={() => navigate('/special-modes')}
-                className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 px-6 py-4 rounded-2xl text-xl font-bold transition-all active:scale-95 shadow-[0_0_30px_rgba(59,130,246,0.3)] flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="bg-white/20 p-3 rounded-xl">
-                    <Gamepad2 size={32} />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-2xl font-bold">Modos Especiales</p>
-                    <p className="text-sm text-blue-100 opacity-90">Juega con imágenes temáticas</p>
-                  </div>
-                </div>
-                <span className="text-3xl group-hover:translate-x-1 transition-transform">→</span>
-              </button>
-            ) : (
-              // Botón dividido con modos destacados
-              <div className="w-full rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(59,130,246,0.3)] grid gap-[2px] bg-gray-800/50"
-                style={{
-                  gridTemplateColumns: `repeat(${featuredModes.length + 1}, 1fr)`
-                }}
-              >
-                {/* Botones de modos destacados */}
-                {featuredModes.map((mode, index) => (
-                  <button
-                    key={mode.id}
-                    onClick={() => handleCreateRoomWithMode(mode.id)}
-                    disabled={creatingRoom}
-                    className="relative py-4 bg-gradient-to-br from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center overflow-hidden group"
-                    style={{
-                      borderRadius: index === 0 ? '16px 0 0 16px' : 'none'
-                    }}
-                  >
-                    {/* Fondo con imagen o color del modo */}
-                    {mode.buttonImage && (
-                      <div
-                        className="absolute inset-0 bg-cover bg-center opacity-70 group-hover:opacity-90 transition-opacity"
-                        style={{
-                          backgroundImage: `url(${buildImageUrl(mode.buttonImage)})`
-                        }}
-                      />
-                    )}
-                    {mode.buttonGradient && !mode.buttonImage && (
-                      <div
-                        className="absolute inset-0 opacity-70 group-hover:opacity-90 transition-opacity"
-                        style={{
-                          background: `linear-gradient(135deg, ${mode.buttonGradient.from}, ${mode.buttonGradient.to})`
-                        }}
-                      />
-                    )}
-
-                    {/* Overlay oscuro en hover */}
-                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-
-                    {/* Contenido */}
-                    <div className="relative z-10 text-center px-2">
-                      <p className="text-sm font-bold text-white drop-shadow-lg leading-tight">
-                        {mode.name}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-
-                {/* Botón "Más modos" */}
+            {/* Modos Especiales - Dinámico (solo si está habilitado) */}
+            {specialModesEnabled && (
+              featuredModes.length === 0 ? (
+                // Botón estático original si no hay modos destacados
                 <button
                   onClick={() => navigate('/special-modes')}
-                  className="relative py-4 bg-gradient-to-br from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-2 group"
+                  className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 px-6 py-4 rounded-2xl text-xl font-bold transition-all active:scale-95 shadow-[0_0_30px_rgba(59,130,246,0.3)] flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/20 p-3 rounded-xl">
+                      <Gamepad2 size={32} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-2xl font-bold">Modos Especiales</p>
+                      <p className="text-sm text-blue-100 opacity-90">Juega con imágenes temáticas</p>
+                    </div>
+                  </div>
+                  <span className="text-3xl group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+              ) : (
+                // Botón dividido con modos destacados
+                <div className="w-full rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(59,130,246,0.3)] grid gap-[2px] bg-gray-800/50"
                   style={{
-                    borderRadius: '0 16px 16px 0'
+                    gridTemplateColumns: `repeat(${featuredModes.length + 1}, 1fr)`
                   }}
                 >
-                  <Gamepad2 size={24} className="text-white group-hover:scale-110 transition-transform" />
-                  <p className="text-sm font-bold text-white">Más modos</p>
-                </button>
-              </div>
+                  {/* Botones de modos destacados */}
+                  {featuredModes.map((mode, index) => (
+                    <button
+                      key={mode.id}
+                      onClick={() => handleCreateRoomWithMode(mode.id)}
+                      disabled={creatingRoom}
+                      className="relative py-4 bg-gradient-to-br from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center overflow-hidden group"
+                      style={{
+                        borderRadius: index === 0 ? '16px 0 0 16px' : 'none'
+                      }}
+                    >
+                      {/* Fondo con imagen o color del modo */}
+                      {mode.buttonImage && (
+                        <div
+                          className="absolute inset-0 bg-cover bg-center opacity-70 group-hover:opacity-90 transition-opacity"
+                          style={{
+                            backgroundImage: `url(${buildImageUrl(mode.buttonImage)})`
+                          }}
+                        />
+                      )}
+                      {mode.buttonGradient && !mode.buttonImage && (
+                        <div
+                          className="absolute inset-0 opacity-70 group-hover:opacity-90 transition-opacity"
+                          style={{
+                            background: `linear-gradient(135deg, ${mode.buttonGradient.from}, ${mode.buttonGradient.to})`
+                          }}
+                        />
+                      )}
+
+                      {/* Overlay oscuro en hover */}
+                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+
+                      {/* Contenido */}
+                      <div className="relative z-10 text-center px-2">
+                        <p className="text-sm font-bold text-white drop-shadow-lg leading-tight">
+                          {mode.name}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+
+                  {/* Botón "Más modos" */}
+                  <button
+                    onClick={() => navigate('/special-modes')}
+                    className="relative py-4 bg-gradient-to-br from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-2 group"
+                    style={{
+                      borderRadius: '0 16px 16px 0'
+                    }}
+                  >
+                    <Gamepad2 size={24} className="text-white group-hover:scale-110 transition-transform" />
+                    <p className="text-sm font-bold text-white">Más modos</p>
+                  </button>
+                </div>
+              )
             )}
 
             {/* Modo Especial del Día - TEMPORALMENTE OCULTO */}

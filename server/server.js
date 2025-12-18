@@ -24,6 +24,10 @@ import { setupModesRoutes } from './modes.js';
 const IS_PREMIUM_MODE_ACTIVE = false; // TRUE desactiva todos los anuncios globalmente
 // ---------------------------
 
+// --- Control de Modos Especiales ---
+let SPECIAL_MODES_ENABLED = true; // TRUE muestra el botón de modos especiales en el home
+// -----------------------------------
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -1602,6 +1606,39 @@ app.delete('/api/admin/words/:id', async (req, res) => {
     } else {
       res.status(500).json({ error: 'Error al eliminar palabra' });
     }
+  }
+});
+
+// 🎮 GET /api/settings/special-modes - Endpoint público para consultar si los modos especiales están habilitados
+app.get('/api/settings/special-modes', (_req, res) => {
+  res.json({ enabled: SPECIAL_MODES_ENABLED });
+});
+
+// 🔒 GET /api/admin/settings/special-modes - Obtener estado de modos especiales (admin)
+app.get('/api/admin/settings/special-modes', async (_req, res) => {
+  try {
+    res.json({ enabled: SPECIAL_MODES_ENABLED });
+  } catch (error) {
+    console.error('❌ Error al obtener configuración:', error);
+    res.status(500).json({ error: 'Error al obtener configuración' });
+  }
+});
+
+// 🔒 PUT /api/admin/settings/special-modes - Cambiar estado de modos especiales (admin)
+app.put('/api/admin/settings/special-modes', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'El campo "enabled" debe ser un booleano' });
+    }
+
+    SPECIAL_MODES_ENABLED = enabled;
+    console.log(`⚙️ [ADMIN] Modos especiales ${enabled ? 'activados' : 'desactivados'}`);
+
+    res.json({ success: true, enabled: SPECIAL_MODES_ENABLED });
+  } catch (error) {
+    console.error('❌ Error al cambiar configuración:', error);
+    res.status(500).json({ error: 'Error al cambiar configuración' });
   }
 });
 
