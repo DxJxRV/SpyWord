@@ -24,6 +24,13 @@ export default function PassAndPlay() {
   const [alivePlayers, setAlivePlayers] = useState([]);
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState(null);
+
+  // Estados para la Sala de Guerra
+  const [votingEnabled, setVotingEnabled] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [discussionTimer, setDiscussionTimer] = useState(120); // 2 minutos en segundos
+  const [speakerIndex, setSpeakerIndex] = useState(null);
+  const [roundNumber, setRoundNumber] = useState(1);
   const { isPremium } = useAuth();
   const isRoomPremium = false; // Premium Pass - false porque es modo local
   const [showNewRoundInterstitial, setShowNewRoundInterstitial] = useState(false);
@@ -50,28 +57,32 @@ export default function PassAndPlay() {
     }
   }, [totalPlayers]);
 
+  // Cronómetro de discusión
+  useEffect(() => {
+    if (votingMode && !votingEnabled && discussionTimer > 0) {
+      const interval = setInterval(() => {
+        setDiscussionTimer(prev => prev - 1);
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [votingMode, votingEnabled, discussionTimer]);
+
   // Estados del tutorial
   const [runTutorial, setRunTutorial] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
   const [isTutorialMode, setIsTutorialMode] = useState(false);
 
-  // Definir los temas holográficos disponibles
-  const holoThemes = [
-    {
-      name: 'Gold',
-      gradients: ['#fbbf24', '#f59e0b', '#d97706', '#ea580c'],
-      particleColor: '#fbbf24'
-    },
-    {
-      name: 'Holo',
-      gradients: ['#06b6d4', '#8b5cf6', '#ec4899', '#06b6d4'],
-      particleColor: '#8b5cf6'
-    },
-    {
-      name: 'Ruby',
-      gradients: ['#ef4444', '#dc2626', '#ec4899', '#f43f5e'],
-      particleColor: '#ef4444'
-    }
+  // Definir colores neón vibrantes para las tarjetas rascables
+  const neonColors = [
+    { name: 'Cyan', start: '#06b6d4', end: '#0891b2', border: '#22d3ee' },      // cyan
+    { name: 'Purple', start: '#a855f7', end: '#7c3aed', border: '#c084fc' },   // purple
+    { name: 'Pink', start: '#ec4899', end: '#db2777', border: '#f472b6' },     // pink
+    { name: 'Green', start: '#10b981', end: '#059669', border: '#34d399' },    // green
+    { name: 'Orange', start: '#f97316', end: '#ea580c', border: '#fb923c' },  // orange
+    { name: 'Blue', start: '#3b82f6', end: '#2563eb', border: '#60a5fa' },    // blue
+    { name: 'Yellow', start: '#eab308', end: '#ca8a04', border: '#fde047' }, // yellow
+    { name: 'Red', start: '#ef4444', end: '#dc2626', border: '#f87171' },    // red
   ];
 
   // Emojis para avatares de jugadores (personas y objetos)
@@ -96,36 +107,25 @@ export default function PassAndPlay() {
     return "De 3 a 12 jugadores";
   };
 
-  // Función para generar canvas holográfico con patrón de emojis
-  const generateHolographicCanvas = (theme, emoji) => {
+  // Función para generar canvas con color neón
+  const generateHolographicCanvas = (color) => {
     const canvas = document.createElement('canvas');
-    canvas.width = 320;
+    canvas.width = 360;
     canvas.height = 240;
     const ctx = canvas.getContext('2d');
 
-    // Crear gradiente holográfico
+    // Crear gradiente con el color neón asignado
     const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    theme.gradients.forEach((color, idx) => {
-      gradient.addColorStop(idx / (theme.gradients.length - 1), color);
-    });
+    gradient.addColorStop(0, color.start);
+    gradient.addColorStop(1, color.end);
 
     // Aplicar gradiente de fondo
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Agregar patrón de emojis visible (menos opaco = más visible)
-    ctx.globalAlpha = 0.7;
-    ctx.font = '32px Arial';
-    for (let y = 0; y < canvas.height; y += 50) {
-      for (let x = 0; x < canvas.width; x += 50) {
-        ctx.fillText(emoji, x + (y % 100 === 0 ? 25 : 0), y);
-      }
-    }
-
-    // Restaurar opacidad y agregar texto de instrucción
-    ctx.globalAlpha = 1;
+    // Agregar texto de instrucción centrado
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = 'bold 20px Arial';
+    ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('Raspa aquí 👆', canvas.width / 2, canvas.height / 2);
@@ -133,16 +133,16 @@ export default function PassAndPlay() {
     return canvas.toDataURL();
   };
 
-  // Función para generar temas para todos los jugadores con sus emojis personalizados
+  // Función para generar temas para todos los jugadores con colores aleatorios
   const generateCardThemesForPlayers = (numPlayers, avatars) => {
     const themes = [];
     for (let i = 0; i < numPlayers; i++) {
-      const randomTheme = holoThemes[Math.floor(Math.random() * holoThemes.length)];
+      const randomColor = neonColors[Math.floor(Math.random() * neonColors.length)];
       const playerEmoji = avatars[i] || '👤'; // Usar el emoji del jugador
       themes.push({
-        theme: randomTheme,
+        color: randomColor,
         emoji: playerEmoji,
-        canvasImage: generateHolographicCanvas(randomTheme, playerEmoji)
+        canvasImage: generateHolographicCanvas(randomColor)
       });
     }
     return themes;
@@ -178,17 +178,10 @@ export default function PassAndPlay() {
       disableBeacon: true,
       placement: 'top',
     },
-    // Paso 4: Botón ir a votar (se mostrará en fase de discusión)
-    {
-      target: '.pnp-vote-button',
-      content: '🗳️ Después de discutir, presiona "Ir a Votar" para ir a la pantalla de votación.',
-      disableBeacon: true,
-      placement: 'top',
-    },
-    // Paso 5: Pantalla de votación (se mostrará cuando votingMode sea true)
+    // Paso 4: Sala de Guerra (se mostrará cuando votingMode sea true)
     {
       target: '.pnp-voting-container',
-      content: '⚖️ Aquí todos votan por quien creen que es el impostor. Si eliminan al impostor, ¡los jugadores ganan! Si fallan, el juego continúa. Si solo quedan 2 jugadores y uno es el impostor, ¡el impostor gana!',
+      content: '⚔️ ¡Bienvenidos a la Sala de Guerra! Aquí discuten y votan. Primero hablan, luego abren votaciones y seleccionan al impostor. Si eliminan al impostor, ¡los jugadores ganan! Si solo quedan 2 jugadores y uno es el impostor, ¡el impostor gana!',
       disableBeacon: true,
       placement: 'top',
     },
@@ -247,37 +240,25 @@ export default function PassAndPlay() {
       return;
     }
 
-    // PASO 3: Botón "Listo/Siguiente" - Pasar a discusión (las reglas del tutorial lo permiten)
+    // PASO 3: Botón "Listo/Siguiente" - Pasar a la Sala de Guerra
     if (index === 3 && action === ACTIONS.NEXT) {
-      console.log(`📘 Tutorial: Paso 3 → Activando siguiente jugador (modo tutorial saltará a discusión)...`);
+      console.log(`📘 Tutorial: Paso 3 → Activando siguiente jugador (modo tutorial saltará directamente a la Sala de Guerra)...`);
 
       // Llamar handleNextPlayer una sola vez - la lógica del tutorial dentro de la función
-      // se encargará de saltar directamente a la discusión
+      // se encargará de saltar directamente a la Sala de Guerra
       handleNextPlayer();
 
       // Esperar un momento para que el estado se actualice y avanzar al paso 4
       setTimeout(() => {
-        console.log("📘 Tutorial: Avanzando al paso 4 (botón ir a votar)");
+        console.log("📘 Tutorial: Avanzando al paso 4 (Sala de Guerra)");
         setTutorialStepIndex(4);
       }, 600);
       return;
     }
 
-    // PASO 4: Botón "Ir a Votar" - Activar pantalla de votación
+    // PASO 4: Sala de Guerra - Finalizar tutorial
     if (index === 4 && action === ACTIONS.NEXT) {
-      console.log("📘 Tutorial: Paso 4 → Activando votación...");
-      setTimeout(() => {
-        startVoting();
-        setTimeout(() => {
-          setTutorialStepIndex(5);
-        }, 800);
-      }, 300);
-      return;
-    }
-
-    // PASO 5: Pantalla de votación - Finalizar tutorial
-    if (index === 5 && action === ACTIONS.NEXT) {
-      console.log("📘 Tutorial: Paso 5 → Finalizando...");
+      console.log("📘 Tutorial: Paso 4 → Finalizando...");
       setRunTutorial(false);
       setIsTutorialMode(false);
       toast.success("¡Tutorial completado! Ya puedes jugar libremente.");
@@ -369,9 +350,9 @@ export default function PassAndPlay() {
   const shouldShowInterstitial = showNewRoundInterstitial && !isTutorialMode;
 
   const handleNextPlayer = () => {
-    // En modo tutorial, después del primer jugador, saltar directamente a discusión
+    // En modo tutorial, después del primer jugador, saltar directamente a la Sala de Guerra
     if (isTutorialMode && currentPlayerIndex === 0) {
-      console.log("📘 Tutorial: Saltando directamente a discusión desde jugador 1...");
+      console.log("📘 Tutorial: Saltando directamente a la Sala de Guerra desde jugador 1...");
       const playersArray = Array(totalPlayers).fill(null).map((_, idx) => ({
         index: idx,
         isAlive: true,
@@ -379,7 +360,16 @@ export default function PassAndPlay() {
       }));
       setAlivePlayers(playersArray);
       setShowingCard(false);
-      toast.success("¡Tutorial! Pasando a la fase de discusión.");
+
+      // Iniciar Sala de Guerra directamente
+      const randomSpeaker = playersArray[Math.floor(Math.random() * playersArray.length)];
+      setSpeakerIndex(randomSpeaker.index);
+      setVotingMode(true);
+      setVotingEnabled(false);
+      setSelectedPlayer(null);
+      setDiscussionTimer(120);
+
+      toast.success("¡Tutorial! Pasando a la Sala de Guerra.");
       return;
     }
 
@@ -387,15 +377,26 @@ export default function PassAndPlay() {
       setCurrentPlayerIndex(currentPlayerIndex + 1);
       setShowingCard(true);
     } else {
-      // All players saw their words - start discussion
+      // All players saw their words - ir directamente a la Sala de Guerra
       const playersArray = Array(totalPlayers).fill(null).map((_, idx) => ({
         index: idx,
         isAlive: true,
         isImpostor: idx === impostorIndex
       }));
       setAlivePlayers(playersArray);
-      toast.success("¡Todos vieron su palabra! Discutan y voten.");
       setShowingCard(false);
+
+      // Iniciar votación directamente (Sala de Guerra)
+      // Elegir aleatoriamente un jugador vivo como speaker
+      const randomSpeaker = playersArray[Math.floor(Math.random() * playersArray.length)];
+      setSpeakerIndex(randomSpeaker.index);
+
+      setVotingMode(true);
+      setVotingEnabled(false);
+      setSelectedPlayer(null);
+      setDiscussionTimer(120);
+
+      toast.success("¡Todos vieron su palabra! Entren a la Sala de Guerra.");
     }
   };
 
@@ -407,8 +408,15 @@ export default function PassAndPlay() {
       setWinner('PLAYERS');
       setGameOver(true);
       toast.success("¡Eliminaron al impostor! Ganaron los jugadores 🎉");
+
+      // Reset war room al terminar el juego
+      setVotingMode(false);
+      setVotingEnabled(false);
+      setSelectedPlayer(null);
+      setDiscussionTimer(120);
+      setSpeakerIndex(null);
     } else {
-      // Eliminaron a un jugador normal, el juego continúa
+      // Eliminaron a un jugador normal
       const newAlivePlayers = alivePlayers.map(p =>
         p.index === votedPlayerIndex ? { ...p, isAlive: false } : p
       );
@@ -420,18 +428,57 @@ export default function PassAndPlay() {
         setWinner('IMPOSTOR');
         setGameOver(true);
         toast.error("El impostor sobrevivió hasta el final 🎭");
+
+        // Reset war room al terminar el juego
+        setVotingMode(false);
+        setVotingEnabled(false);
+        setSelectedPlayer(null);
+        setDiscussionTimer(120);
+        setSpeakerIndex(null);
       } else {
-        // El juego continúa
+        // El juego continúa - nueva ronda en la Sala de Guerra
         setAlivePlayers(newAlivePlayers);
-        toast.info(`Jugador ${votedPlayerIndex + 1} eliminado. El juego continúa...`);
+        setRoundNumber(prev => prev + 1);
+
+        // Elegir nuevo speaker aleatorio de los jugadores vivos
+        const randomSpeaker = remainingAlive[Math.floor(Math.random() * remainingAlive.length)];
+        setSpeakerIndex(randomSpeaker.index);
+
+        // Resetear estado de votación para nueva ronda (pero mantener votingMode true)
+        setVotingEnabled(false);
+        setSelectedPlayer(null);
+        setDiscussionTimer(120);
+
+        toast.info(`Jugador ${votedPlayerIndex + 1} eliminado. ¡Nueva ronda! ${remainingAlive.length} jugadores quedan.`);
       }
     }
-
-    setVotingMode(false);
   };
 
-  const startVoting = () => {
-    setVotingMode(true);
+  const enableVoting = () => {
+    setVotingEnabled(true);
+    if (navigator.vibrate) navigator.vibrate(50);
+    toast.info("¡Votaciones abiertas! Seleccionen al impostor.");
+  };
+
+  const selectPlayer = (playerIndex) => {
+    if (!votingEnabled) return;
+    setSelectedPlayer(playerIndex);
+    if (navigator.vibrate) navigator.vibrate(20);
+  };
+
+  const confirmVote = () => {
+    if (selectedPlayer !== null) {
+      handleVote(selectedPlayer);
+    }
+  };
+
+  const skipVote = () => {
+    toast.info("Votación saltada. El juego continúa...");
+    setVotingMode(false);
+    setVotingEnabled(false);
+    setSelectedPlayer(null);
+    setDiscussionTimer(120);
+    setSpeakerIndex(null);
   };
 
   const resetGame = () => {
@@ -446,6 +493,50 @@ export default function PassAndPlay() {
     setWinner(null);
     setPlayerAvatars([]);
     setCardThemes([]);
+    // Reset war room states
+    setVotingEnabled(false);
+    setSelectedPlayer(null);
+    setDiscussionTimer(120);
+    setSpeakerIndex(null);
+    setRoundNumber(1);
+  };
+
+  const restartGame = () => {
+    // Volver a jugar con los mismos jugadores
+    // Select random word
+    const randomWord = palabras[Math.floor(Math.random() * palabras.length)];
+    setNormalWord(randomWord);
+    setImpostorWord("???");
+
+    // Generate word list: one impostor gets "???", rest get the word
+    const impostor = Math.floor(Math.random() * totalPlayers);
+    setImpostorIndex(impostor);
+
+    const words = Array(totalPlayers).fill(null).map((_, idx) =>
+      idx === impostor ? "???" : randomWord
+    );
+
+    setSessionWordList(words);
+    setCurrentPlayerIndex(0);
+
+    // Generar nuevos temas holográficos pero mantener los mismos avatares
+    setCardThemes(generateCardThemesForPlayers(totalPlayers, playerAvatars));
+
+    // Reset game states y volver a mostrar tarjetas
+    setGameOver(false);
+    setWinner(null);
+    setVotingMode(false);
+    setAlivePlayers([]);
+    setVotingEnabled(false);
+    setSelectedPlayer(null);
+    setDiscussionTimer(120);
+    setSpeakerIndex(null);
+    setRoundNumber(1);
+
+    // Ir directamente a mostrar la primera tarjeta
+    setShowingCard(true);
+
+    toast.success("¡Nueva partida! Mismos jugadores, nueva palabra.");
   };
 
   // Deshabilitar scroll cuando se muestra la tarjeta de raspado en mobile
@@ -471,7 +562,7 @@ export default function PassAndPlay() {
   const HelpButton = () => (
     <button
       onClick={startTutorial}
-      className="absolute top-20 right-6 bg-blue-500/20 hover:bg-blue-500/30 px-4 py-2 rounded-lg transition-all flex items-center gap-2 border border-blue-500/50 z-50"
+      className="fixed top-20 right-6 bg-blue-500/20 hover:bg-blue-500/30 px-4 py-2 rounded-lg transition-all flex items-center gap-2 border border-blue-500/50 z-[100]"
     >
       <HelpCircle size={20} />
       <span>¿Cómo jugar?</span>
@@ -543,7 +634,7 @@ export default function PassAndPlay() {
 
           <button
             onClick={() => navigate('/')}
-            className="absolute top-20 left-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all flex items-center gap-2 z-50"
+            className="fixed top-20 left-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all flex items-center gap-2 z-[100]"
           >
             <ArrowLeft size={20} />
             <span>Volver</span>
@@ -711,35 +802,46 @@ export default function PassAndPlay() {
           <HelpButton />
 
           <div className="max-w-md w-full space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold mb-2">
-                Jugador {currentPlayerIndex + 1} de {totalPlayers}
-              </h2>
-              <p className="text-gray-400">
-                Raspa la tarjeta para ver tu palabra
-              </p>
+            {/* Banner del jugador actual con emoji */}
+            <div
+              className="rounded-xl p-4 text-center"
+              style={{
+                background: `linear-gradient(to right, ${cardThemes[currentPlayerIndex]?.color?.start}20, ${cardThemes[currentPlayerIndex]?.color?.end}20)`,
+                border: `2px solid ${cardThemes[currentPlayerIndex]?.color?.border || '#22d3ee'}`
+              }}
+            >
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-4xl animate-bounce">{playerAvatars[currentPlayerIndex]}</span>
+                <div>
+                  <p className="text-xl font-bold text-white">Jugador {currentPlayerIndex + 1}/{totalPlayers}</p>
+                </div>
+              </div>
             </div>
 
-            <div className="pnp-scratch-container relative flex justify-center">
-              <div>
+            <div className="pnp-scratch-container w-full">
+              <div
+                className="rounded-xl overflow-hidden w-full"
+                style={{
+                  border: `3px solid ${cardThemes[currentPlayerIndex]?.color?.border || '#22d3ee'}`
+                }}
+              >
                 <ScratchCard
                   key={currentPlayerIndex}
-                  width={320}
+                  width={360}
                   height={240}
-                  image={cardThemes[currentPlayerIndex]?.canvasImage || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='240'%3E%3Crect width='320' height='240' fill='%23475569'/%3E%3C/svg%3E"}
+                  image={cardThemes[currentPlayerIndex]?.canvasImage || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='240'%3E%3Crect width='360' height='240' fill='%23475569'/%3E%3C/svg%3E"}
                   finishPercent={50}
                   onComplete={() => {
                     if (navigator.vibrate) navigator.vibrate(100);
                   }}
                 >
                   <div
-                    className="flex flex-col items-center justify-center px-4"
+                    className="flex flex-col items-center justify-center px-6"
                     style={{
-                      width: '320px',
+                      width: '360px',
                       height: '240px',
                       margin: 0,
-                      padding: '0 16px',
-                      background: '#1a1a2e'
+                      background: 'linear-gradient(to bottom right, #1f2937, #111827)'
                     }}
                   >
                     {isImpostor ? (
@@ -755,8 +857,8 @@ export default function PassAndPlay() {
                         </p>
                       </div>
                     ) : (
-                      <div className="relative">
-                        <p className={`font-black text-center ${
+                      <div className="text-center w-full">
+                        <p className={`font-black ${
                           currentWord.length > 15 ? 'text-3xl' : currentWord.length > 10 ? 'text-4xl' : 'text-5xl'
                         }`} style={{
                           wordBreak: 'break-word',
@@ -832,10 +934,18 @@ export default function PassAndPlay() {
             </div>
 
             <button
-              onClick={resetGame}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95"
+              onClick={restartGame}
+              className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg"
             >
-              Nueva Partida
+              <span>🔄</span>
+              <span>Jugar de Nuevo (Mismo Grupo)</span>
+            </button>
+
+            <button
+              onClick={resetGame}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl text-lg font-semibold transition-all active:scale-95"
+            >
+              Nueva Partida (Cambiar Jugadores)
             </button>
           </div>
         </div>
@@ -843,12 +953,70 @@ export default function PassAndPlay() {
     );
   }
 
-  // Voting Screen
+  // LA SALA DE GUERRA - Pantalla unificada de discusión y votación
   if (votingMode) {
     const alivePlayersList = alivePlayers.filter(p => p.isAlive);
+    const minutes = Math.floor(discussionTimer / 60);
+    const seconds = discussionTimer % 60;
+    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const isTimeRunningOut = discussionTimer <= 10;
 
     return (
       <>
+        <style>{`
+          @keyframes pulse-speaker {
+            0%, 100% {
+              transform: scale(1);
+              box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+            }
+            50% {
+              transform: scale(1.05);
+              box-shadow: 0 0 0 10px rgba(251, 191, 36, 0);
+            }
+          }
+
+          @keyframes bounce-speaker {
+            0%, 100% {
+              transform: translateY(0);
+            }
+            50% {
+              transform: translateY(-5px);
+            }
+          }
+
+          @keyframes flash-red {
+            0%, 100% {
+              background-color: rgba(17, 24, 39, 1);
+            }
+            50% {
+              background-color: rgba(153, 27, 27, 0.3);
+            }
+          }
+
+          .speaker-card {
+            animation: pulse-speaker 2s infinite;
+          }
+
+          .speaker-emoji {
+            animation: bounce-speaker 1s infinite;
+          }
+
+          .time-running-out {
+            animation: flash-red 1s infinite;
+          }
+
+          .player-card-dead {
+            filter: grayscale(100%);
+            opacity: 0.5;
+          }
+
+          .player-card-selected {
+            background: linear-gradient(135deg, #dc2626, #991b1b) !important;
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(220, 38, 38, 0.6);
+          }
+        `}</style>
+
         <AppHeader />
 
         {/* Joyride Tutorial Global */}
@@ -875,125 +1043,148 @@ export default function PassAndPlay() {
           }}
         />
 
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
+        <div className={`flex flex-col min-h-screen bg-gray-950 text-white p-4 pt-32 ${isTimeRunningOut && !votingEnabled ? 'time-running-out' : ''}`}>
           {/* Botón de Ayuda */}
           <HelpButton />
 
-          <div className="pnp-voting-container max-w-md w-full space-y-6">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold mb-2">⚖️ Votación</h2>
-              <p className="text-gray-400">
-                ¿Quién creen que es el impostor?
-              </p>
+          <div className="pnp-voting-container max-w-2xl w-full mx-auto space-y-4">
+            {/* HEADER: Cronómetro y Ronda */}
+            <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-2 border-purple-500/50 rounded-xl p-4 text-center">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-purple-300">
+                  RONDA {roundNumber}
+                </div>
+                <div className={`text-3xl font-black ${isTimeRunningOut && !votingEnabled ? 'text-red-400' : 'text-white'}`}>
+                  ⏱️ {timeString}
+                </div>
+                <div className="text-sm font-semibold text-purple-300">
+                  {alivePlayersList.length} vivos
+                </div>
+              </div>
             </div>
 
-            <div className="bg-gray-800/50 p-6 rounded-2xl space-y-3">
-              <p className="text-sm text-gray-400 mb-4">
-                Jugadores vivos: {alivePlayersList.length}
-              </p>
+            {/* MENSAJE DEL SPEAKER */}
+            {!votingEnabled && speakerIndex !== null && (
+              <div className="bg-amber-500/20 border-2 border-amber-500/50 rounded-xl p-4 text-center">
+                <p className="text-sm text-amber-300 mb-1">📣 Empieza hablando:</p>
+                <p className="text-xl font-bold flex items-center justify-center gap-2">
+                  <span className="text-3xl speaker-emoji">{playerAvatars[speakerIndex]}</span>
+                  <span>Jugador {speakerIndex + 1}</span>
+                </p>
+              </div>
+            )}
 
-              {alivePlayersList.map((player) => {
-                const playerEmoji = playerAvatars[player.index] || '👤';
-                return (
-                  <button
-                    key={player.index}
-                    onClick={() => handleVote(player.index)}
-                    className="w-full bg-purple-600 hover:bg-purple-700 px-6 py-4 rounded-xl text-lg font-semibold transition-all active:scale-95 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{playerEmoji}</span>
-                      <span>Jugador {player.index + 1}</span>
+            {/* GRID DE JUGADORES */}
+            <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+              <div className={`grid gap-3 ${alivePlayersList.length <= 4 ? 'grid-cols-2' : alivePlayersList.length <= 6 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                {alivePlayers.map((player) => {
+                  const playerEmoji = playerAvatars[player.index] || '👤';
+                  const isAlive = player.isAlive;
+                  const isSpeaker = speakerIndex === player.index && !votingEnabled;
+                  const isSelected = selectedPlayer === player.index;
+
+                  return (
+                    <button
+                      key={player.index}
+                      onClick={() => selectPlayer(player.index)}
+                      disabled={!isAlive || !votingEnabled}
+                      className={`
+                        relative aspect-square rounded-xl p-3 transition-all active:scale-95
+                        flex flex-col items-center justify-center gap-2
+                        ${!isAlive ? 'player-card-dead cursor-not-allowed' : ''}
+                        ${isSelected ? 'player-card-selected' : 'bg-gradient-to-br from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800'}
+                        ${isSpeaker ? 'speaker-card border-2 border-amber-500' : 'border border-gray-700'}
+                        ${votingEnabled && isAlive ? 'cursor-pointer' : 'cursor-default'}
+                      `}
+                    >
+                      {/* Emoji del jugador */}
+                      <div className="text-4xl md:text-5xl">
+                        {playerEmoji}
+                      </div>
+
+                      {/* Nombre del jugador */}
+                      <div className="text-xs font-semibold text-gray-300">
+                        J{player.index + 1}
+                      </div>
+
+                      {/* Megáfono para el speaker */}
+                      {isSpeaker && (
+                        <div className="absolute -top-2 -right-2 text-2xl speaker-emoji">
+                          📣
+                        </div>
+                      )}
+
+                      {/* X roja para jugadores muertos */}
+                      {!isAlive && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-6xl text-red-500 font-black">✕</div>
+                        </div>
+                      )}
+
+                      {/* Indicador de selección */}
+                      {isSelected && (
+                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+                          ¿?
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* FOOTER: Acciones */}
+            <div className="space-y-3">
+              {!votingEnabled ? (
+                // Modo Debate
+                <button
+                  onClick={enableVoting}
+                  className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg"
+                >
+                  <span>🗳️</span>
+                  <span>ABRIR VOTACIONES</span>
+                </button>
+              ) : (
+                // Modo Votación
+                <>
+                  {selectedPlayer !== null ? (
+                    <button
+                      onClick={confirmVote}
+                      className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-red-500/30 animate-pulse"
+                    >
+                      <span>⚠️</span>
+                      <span>CONFIRMAR VOTO CONTRA {playerAvatars[selectedPlayer]} J{selectedPlayer + 1}</span>
+                    </button>
+                  ) : (
+                    <div className="w-full bg-gray-800/50 border-2 border-dashed border-gray-600 px-6 py-5 rounded-xl text-center">
+                      <p className="text-gray-400 font-semibold">
+                        👆 Selecciona un jugador para votar
+                      </p>
                     </div>
-                    <span>👉</span>
-                  </button>
-                );
-              })}
-            </div>
+                  )}
 
-            <button
-              onClick={() => setVotingMode(false)}
-              className="w-full bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all text-sm"
-            >
-              ← Cancelar votación
-            </button>
+                  <button
+                    onClick={skipVote}
+                    className="w-full bg-gray-700 hover:bg-gray-600 px-4 py-3 rounded-lg transition-all text-sm font-semibold"
+                  >
+                    Saltar votación
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={resetGame}
+                className="w-full bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all text-xs"
+              >
+                Cancelar partida
+              </button>
+            </div>
           </div>
         </div>
       </>
     );
   }
 
-  // Discussion Phase
-  return (
-    <>
-      <AppHeader />
-
-      {/* Joyride Tutorial Global */}
-      <Joyride
-        steps={tutorialSteps}
-        run={runTutorial && isTutorialMode}
-        stepIndex={tutorialStepIndex}
-        continuous
-        showProgress
-        showSkipButton
-        callback={handleJoyrideCallback}
-        styles={{
-          options: {
-            primaryColor: '#10b981',
-            zIndex: 10000,
-          },
-        }}
-        locale={{
-          back: 'Atrás',
-          close: 'Cerrar',
-          last: 'Finalizar',
-          next: 'Siguiente',
-          skip: 'Saltar',
-        }}
-      />
-
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
-        {/* Botón de Ayuda */}
-        <HelpButton />
-
-        <div className="max-w-md w-full text-center space-y-6">
-          <h2 className="text-3xl font-bold">💬 Discusión</h2>
-          <div className="bg-gray-800/50 p-6 rounded-2xl space-y-4">
-            <p className="text-lg">
-              Todos vieron su palabra. ¡Discutan!
-            </p>
-
-            <div className="bg-blue-500/20 px-4 py-3 rounded-lg border border-blue-500/30">
-              <p className="text-xs text-blue-300 mb-1">ℹ️ Jugadores Vivos</p>
-              <p className="text-sm text-gray-300">
-                {alivePlayers.filter(p => p.isAlive).map(p => `Jugador ${p.index + 1}`).join(', ')}
-              </p>
-            </div>
-
-            <div className="text-left space-y-2 text-sm text-gray-300">
-              <p>📋 <strong>Reglas:</strong></p>
-              <ul className="list-disc list-inside space-y-1 ml-4">
-                <li>Discutan sobre sus palabras sin decirlas directamente</li>
-                <li>El impostor debe descubrir la palabra secreta</li>
-                <li>Los demás deben identificar al impostor</li>
-              </ul>
-            </div>
-          </div>
-
-          <button
-            onClick={startVoting}
-            className="pnp-vote-button w-full bg-purple-600 hover:bg-purple-700 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95"
-          >
-            ⚖️ Ir a Votar
-          </button>
-
-          <button
-            onClick={resetGame}
-            className="w-full bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all text-sm"
-          >
-            Cancelar partida
-          </button>
-        </div>
-      </div>
-    </>
-  );
+  // Esta pantalla ya no debería mostrarse nunca porque vamos directamente a la Sala de Guerra
+  return null;
 }
