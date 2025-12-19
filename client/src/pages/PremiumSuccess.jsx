@@ -13,9 +13,9 @@ export default function PremiumSuccess() {
 
   // Cambiar título de la página
   useEffect(() => {
-    document.title = "SpyWord - ¡Premium Activado!";
+    document.title = "ImpostorWord - ¡Premium Activado!";
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, []);
 

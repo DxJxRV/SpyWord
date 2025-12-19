@@ -57,9 +57,9 @@ export default function Admin() {
 
   // Cambiar título de la página
   useEffect(() => {
-    document.title = "SpyWord - Panel de Admin";
+    document.title = "ImpostorWord - Panel de Admin";
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, []);
 

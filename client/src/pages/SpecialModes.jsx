@@ -13,10 +13,10 @@ export default function SpecialModes() {
   const [creatingRoom, setCreatingRoom] = useState(false);
 
   useEffect(() => {
-    document.title = "SpyWord - Modos Especiales";
+    document.title = "ImpostorWord - Modos Especiales";
     loadModes();
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, []);
 

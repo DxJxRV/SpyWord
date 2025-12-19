@@ -27,9 +27,9 @@ export default function DailyMode() {
 
   // Cambiar título de la página
   useEffect(() => {
-    document.title = "SpyWord - Modo del Día";
+    document.title = "ImpostorWord - Modo del Día";
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, []);
 

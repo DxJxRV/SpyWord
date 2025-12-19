@@ -22,9 +22,9 @@ export default function MainMenu() {
   // Auto-join feature: detect ?join=CODIGO parameter
   // Cambiar título de la página
   useEffect(() => {
-    document.title = "SpyWord - Menú Principal";
+    document.title = "ImpostorWord - Menú Principal";
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, []);
 

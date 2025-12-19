@@ -24,9 +24,9 @@ export default function Home() {
 
   // Cambiar título de la página
   useEffect(() => {
-    document.title = "SpyWord - Juego de Palabras";
+    document.title = "ImpostorWord - Juego de Palabras";
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, []);
 

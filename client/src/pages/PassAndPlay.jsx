@@ -30,9 +30,9 @@ export default function PassAndPlay() {
 
   // Cambiar título de la página
   useEffect(() => {
-    document.title = "SpyWord - Pasa y Juega";
+    document.title = "ImpostorWord - Pasa y Juega";
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, []);
 

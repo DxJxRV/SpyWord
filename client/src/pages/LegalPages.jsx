@@ -11,10 +11,10 @@ export default function LegalPages({ type }) {
   // Cambiar título de la página
   useEffect(() => {
     document.title = type === 'privacy'
-      ? "SpyWord - Política de Privacidad"
-      : "SpyWord - Términos de Servicio";
+      ? "ImpostorWord - Política de Privacidad"
+      : "ImpostorWord - Términos de Servicio";
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, [type]);
 

@@ -53,13 +53,13 @@ export default function Room() {
   // Cambiar título de la página según el modo de juego
   useEffect(() => {
     if (modeName) {
-      document.title = `SpyWord - Modo ${modeName}`;
+      document.title = `ImpostorWord - Modo ${modeName}`;
     } else {
-      document.title = "SpyWord - Juego Online";
+      document.title = "ImpostorWord - Juego Online";
     }
 
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, [modeName]);
   const [impostorId, setImpostorId] = useState(null); // ID del impostor (solo revelado en game over)

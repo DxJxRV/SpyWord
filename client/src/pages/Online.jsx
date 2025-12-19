@@ -23,9 +23,9 @@ export default function Online() {
 
   // Cambiar título de la página
   useEffect(() => {
-    document.title = "SpyWord - Juego Online";
+    document.title = "ImpostorWord - Juego Online";
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, []);
 

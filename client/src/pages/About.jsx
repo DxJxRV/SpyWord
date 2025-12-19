@@ -16,9 +16,9 @@ export default function About() {
 
   // Cambiar título de la página
   useEffect(() => {
-    document.title = "SpyWord - Acerca de";
+    document.title = "ImpostorWord - Acerca de";
     return () => {
-      document.title = "SpyWord";
+      document.title = "ImpostorWord";
     };
   }, []);
 
