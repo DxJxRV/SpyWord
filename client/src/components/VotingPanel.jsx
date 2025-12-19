@@ -174,60 +174,73 @@ export default function VotingPanel({ roomState, roomId, myId, onUpdate }) {
 
     // Show voting interface
     return (
-      <div className="bg-gradient-to-br from-red-600/20 to-orange-600/20 p-6 rounded-xl border-2 border-red-500/50">
-        <div className="flex items-center gap-3 mb-6">
-          <AlertTriangle size={28} className="text-red-400" />
-          <div>
-            <h3 className="text-2xl font-bold text-red-300">Votación en curso</h3>
-            <p className="text-gray-300">¿Quién crees que es el impostor?</p>
-          </div>
-        </div>
-
-        <div className="bg-blue-500/20 px-4 py-2 rounded-lg border border-blue-500/30 mb-6">
-          <p className="text-sm text-blue-300 text-center">
-            <Users size={16} className="inline mr-1" />
-            {votersRemaining} {votersRemaining === 1 ? "jugador falta" : "jugadores faltan"} por votar
-            {" • "}
-            Se necesitan {majorityNeeded} votos para eliminar
+      <div className="bg-gradient-to-br from-red-600/20 to-orange-600/20 p-4 rounded-xl border-2 border-red-500/50">
+        {/* Simplified header */}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-bold text-red-300">Votación</h3>
+          <p className="text-xs text-gray-300">
+            {votersRemaining}/{aliveCount} pendientes • {majorityNeeded} votos necesarios
           </p>
         </div>
 
-        {/* Player selection */}
-        <div className="space-y-3 mb-6">
+        {/* Grid of player cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
           {alivePlayers.map(({ id, name }) => (
             <button
               key={id}
               onClick={() => setSelectedPlayer(id)}
-              className={`w-full p-4 rounded-xl font-semibold transition-all ${
+              className={`relative aspect-square p-2 rounded-xl font-semibold transition-all flex flex-col items-center justify-center gap-1.5 ${
                 selectedPlayer === id
-                  ? "bg-red-500 text-white border-2 border-red-400"
-                  : "bg-gray-800/70 text-gray-200 border-2 border-gray-700 hover:border-red-500/50 hover:bg-gray-700"
+                  ? "bg-red-500/30 text-white border-2 border-red-500 scale-95"
+                  : "bg-gray-800/70 text-gray-200 border-2 border-gray-700 hover:border-red-500/30"
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span>{name}</span>
-                {votesTally[id] && (
-                  <span className="bg-purple-500/30 px-3 py-1 rounded-full text-sm">
-                    {votesTally[id]} {votesTally[id] === 1 ? "voto" : "votos"}
-                  </span>
-                )}
+              {/* Check icon for selected */}
+              {selectedPlayer === id && (
+                <CheckCircle size={18} className="absolute top-1.5 right-1.5 text-red-400" fill="currentColor" />
+              )}
+
+              {/* Avatar circle */}
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold ${
+                selectedPlayer === id ? "bg-red-500 text-white" : "bg-gray-700 text-gray-300"
+              }`}>
+                {name.charAt(0).toUpperCase()}
               </div>
+
+              {/* Name (truncated) */}
+              <span className="text-xs text-center truncate w-full px-1">{name}</span>
+
+              {/* Vote count badge */}
+              {votesTally[id] && (
+                <span className="absolute bottom-1.5 bg-purple-500/70 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+                  {votesTally[id]}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
-        {/* Vote button */}
-        <button
-          onClick={handleVote}
-          disabled={!selectedPlayer || loading}
-          className="w-full bg-red-500 hover:bg-red-600 px-6 py-4 rounded-xl font-bold text-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          <Vote size={24} />
-          <span>{loading ? "Votando..." : "Confirmar Voto"}</span>
-        </button>
+        {/* Confirm button - only visible when player is selected */}
+        {selectedPlayer ? (
+          <button
+            onClick={handleVote}
+            disabled={loading}
+            className="w-full bg-red-500 hover:bg-red-600 px-4 py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            <Vote size={20} />
+            <span>{loading ? "Votando..." : "Confirmar Voto"}</span>
+          </button>
+        ) : (
+          <div className="w-full bg-gray-700/30 px-4 py-3 rounded-xl border-2 border-dashed border-gray-600 flex items-center justify-center">
+            <p className="text-sm text-gray-400">Selecciona un jugador</p>
+          </div>
+        )}
 
-        <p className="text-xs text-gray-400 mt-3 text-center">
-          Tu voto es final. No podrás cambiarlo una vez confirmado.
+        <p className="text-xs text-gray-400 mt-2 text-center">
+          {selectedPlayer
+            ? "Tu voto es final. No podrás cambiarlo."
+            : "Vota por quien crees que es el impostor"
+          }
         </p>
       </div>
     );

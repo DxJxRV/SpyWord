@@ -405,7 +405,7 @@ export default function Room() {
             <h1 className="text-5xl font-bold text-white mb-2">{countdown}</h1>
             <p className="text-xs text-gray-300">Todos se actualizarán al mismo tiempo</p>
           </div>
-        ) : (
+        ) : roomStatus !== 'GAME_OVER' && (
           <div
             data-tutorial="word-card"
             className={`relative bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-2xl border-2 border-purple-500/50 transition-all ${

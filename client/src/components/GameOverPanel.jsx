@@ -1,4 +1,4 @@
-import { Trophy, Target, Users, RotateCw } from "lucide-react";
+import { Trophy, Skull, RotateCw, Heart, Ghost } from "lucide-react";
 import AdPlaceholder from "./AdPlaceholder";
 
 export default function GameOverPanel({ roomState, roomId, myId, onRestart, isPremium = false }) {
@@ -8,111 +8,144 @@ export default function GameOverPanel({ roomState, roomId, myId, onRestart, isPr
   const wasITheImpostor = myId === impostorId;
 
   return (
-    <div
-      className={`p-8 rounded-2xl border-2 ${
-        winner === 'IMPOSTOR'
-          ? 'bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/50'
-          : 'bg-gradient-to-br from-emerald-600/20 to-green-600/20 border-emerald-500/50'
-      }`}
-    >
-      {/* Título de victoria */}
-      <div className="flex flex-col items-center text-center gap-6 mb-8">
-        <Trophy size={80} className={winner === 'IMPOSTOR' ? 'text-red-400' : 'text-emerald-400'} />
+    <div className="space-y-4">
+      {/* Hero Section - Fondo de color completo */}
+      <div
+        className={`-mx-6 px-6 py-8 ${
+          winner === 'IMPOSTOR'
+            ? 'bg-gradient-to-br from-red-600 to-red-700'
+            : 'bg-gradient-to-br from-emerald-600 to-emerald-700'
+        }`}
+      >
+        <div className="flex flex-col items-center text-center gap-4">
+          {/* Icono grande */}
+          {winner === 'IMPOSTOR' ? (
+            <Skull size={72} className="text-white" strokeWidth={2} />
+          ) : (
+            <Trophy size={72} className="text-white" strokeWidth={2} />
+          )}
 
-        <div>
-          <h2 className="text-4xl font-bold mb-4">
-            {winner === 'IMPOSTOR' ? (
-              <span className="text-red-300">¡Victoria del Impostor!</span>
-            ) : (
-              <span className="text-emerald-300">¡Victoria de los Jugadores!</span>
-            )}
-          </h2>
+          {/* Título gigante */}
+          <h1 className="text-4xl md:text-5xl font-bold text-white">
+            {winner === 'IMPOSTOR' ? '¡VICTORIA DEL IMPOSTOR!' : '¡VICTORIA!'}
+          </h1>
 
-          <p className="text-xl text-gray-200 mb-2">
-            {winReason === 'impostor_eliminated' && '¡El impostor fue eliminado!'}
-            {winReason === 'impostor_survived' && '¡El impostor sobrevivió hasta el final!'}
+          {/* Subtítulo con el impostor */}
+          <div className="bg-black/20 backdrop-blur-sm rounded-xl p-4 w-full max-w-sm">
+            <p className="text-sm text-white/80 mb-2">El impostor era:</p>
+
+            {/* Avatar del impostor */}
+            <div className="flex items-center justify-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-gray-900 border-2 border-white flex items-center justify-center text-2xl font-bold text-white">
+                {impostorName.charAt(0).toUpperCase()}
+              </div>
+              <div className="text-left">
+                <p className="text-2xl font-bold text-white">{impostorName}</p>
+                {wasITheImpostor && (
+                  <p className="text-yellow-300 text-sm font-semibold animate-pulse">
+                    🕵️ ¡Eras tú!
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Razón corta */}
+          <p className="text-white/80 text-sm mb-4">
+            {winReason === 'impostor_eliminated' && 'Fue eliminado por votación'}
+            {winReason === 'impostor_survived' && 'Sobrevivió hasta el final'}
           </p>
-        </div>
-      </div>
 
-      {/* Revelar impostor */}
-      <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700 mb-8">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <Target size={28} className="text-red-400" />
-          <h3 className="text-2xl font-bold text-red-300">El Impostor era:</h3>
-        </div>
-
-        <div className={`text-center py-4 px-6 rounded-lg ${
-          wasITheImpostor
-            ? 'bg-red-500/30 border-2 border-red-500'
-            : 'bg-gray-700/50'
-        }`}>
-          <p className="text-3xl font-bold text-white mb-1">{impostorName}</p>
-          {wasITheImpostor && (
-            <p className="text-red-300 text-sm font-semibold animate-pulse">
-              🕵️ ¡Eras tú!
-            </p>
+          {/* Botón de reinicio (solo admin) */}
+          {isAdmin ? (
+            <button
+              onClick={onRestart}
+              className="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-8 py-3 rounded-xl font-bold text-lg transition-all active:scale-95 flex items-center justify-center gap-2 text-white border-2 border-white/30"
+            >
+              <RotateCw size={24} />
+              <span>Jugar de Nuevo</span>
+            </button>
+          ) : (
+            <div className="bg-white/10 backdrop-blur-sm px-6 py-3 rounded-xl text-white/80 text-sm border border-white/20">
+              <p>Esperando a que el administrador reinicie el juego...</p>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Lista de jugadores supervivientes */}
-      <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700 mb-8">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <Users size={24} className="text-blue-400" />
-          <h3 className="text-xl font-bold text-blue-300">Jugadores Finales</h3>
-        </div>
+      {/* Grid de jugadores finales */}
+      <div className="bg-gray-800/50 backdrop-blur-sm p-4 rounded-xl border border-gray-700">
+        <h3 className="text-lg font-bold text-gray-200 mb-3 text-center">Jugadores Finales</h3>
 
-        <div className="space-y-2">
-          {Object.entries(players).map(([playerId, player]) => (
-            <div
-              key={playerId}
-              className={`px-4 py-3 rounded-lg flex items-center justify-between ${
-                playerId === impostorId
-                  ? 'bg-red-500/20 border border-red-500/50'
-                  : player.isAlive
-                  ? 'bg-emerald-500/20 border border-emerald-500/50'
-                  : 'bg-gray-700/50 opacity-60'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-white font-medium">{player.name}</span>
-                {playerId === impostorId && (
-                  <span className="text-red-400 text-xs font-bold">🕵️ IMPOSTOR</span>
-                )}
-                {playerId === myId && (
-                  <span className="text-blue-400 text-xs font-bold">(Tú)</span>
-                )}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+          {Object.entries(players).map(([playerId, player]) => {
+            const isImpostor = playerId === impostorId;
+            const isAlive = player.isAlive !== false;
+            const isMe = playerId === myId;
+
+            return (
+              <div
+                key={playerId}
+                className={`relative p-3 rounded-xl flex flex-col items-center gap-2 transition-all ${
+                  isImpostor
+                    ? 'bg-red-500/20 border-2 border-red-500'
+                    : isAlive
+                    ? 'bg-emerald-500/10 border-2 border-emerald-500/30'
+                    : 'bg-gray-700/30 border-2 border-gray-600 opacity-60'
+                }`}
+              >
+                {/* Badge de estado */}
+                <div className="absolute top-1.5 right-1.5">
+                  {isImpostor ? (
+                    <span className="text-red-400 text-lg">🕵️</span>
+                  ) : isAlive ? (
+                    <Heart size={14} className="text-emerald-400" fill="currentColor" />
+                  ) : (
+                    <Ghost size={14} className="text-gray-400" />
+                  )}
+                </div>
+
+                {/* Avatar */}
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
+                    isImpostor
+                      ? 'bg-red-500 text-white'
+                      : isAlive
+                      ? 'bg-emerald-500/30 text-emerald-200'
+                      : 'bg-gray-600 text-gray-300'
+                  }`}
+                >
+                  {player.name.charAt(0).toUpperCase()}
+                </div>
+
+                {/* Nombre */}
+                <span className="text-xs text-center truncate w-full text-white font-medium">
+                  {player.name}
+                  {isMe && <span className="text-blue-400"> (Tú)</span>}
+                </span>
+
+                {/* Status badge */}
+                <span
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    isImpostor
+                      ? 'bg-red-500/50 text-red-100'
+                      : isAlive
+                      ? 'bg-emerald-500/30 text-emerald-200'
+                      : 'bg-gray-600/50 text-gray-300'
+                  }`}
+                >
+                  {isImpostor ? 'Impostor' : isAlive ? 'Vivo' : 'Eliminado'}
+                </span>
               </div>
-              <span className={`text-sm font-semibold ${
-                player.isAlive ? 'text-emerald-400' : 'text-gray-400'
-              }`}>
-                {player.isAlive ? '✓ Vivo' : '✗ Eliminado'}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       {/* Banner Publicitario */}
-      <div className="flex justify-center mb-6">
+      <div className="flex justify-center">
         <AdPlaceholder isPremium={isPremium} format="horizontal" />
       </div>
-
-      {/* Botón de reinicio (solo admin) */}
-      {isAdmin ? (
-        <button
-          onClick={onRestart}
-          className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl font-bold text-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-        >
-          <RotateCw size={24} />
-          <span>Jugar de Nuevo</span>
-        </button>
-      ) : (
-        <div className="text-center text-gray-400 text-sm">
-          <p>Esperando a que el administrador reinicie el juego...</p>
-        </div>
-      )}
     </div>
   );
 }

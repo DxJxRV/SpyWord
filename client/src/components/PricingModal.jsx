@@ -121,6 +121,10 @@ export default function PricingModal({ isOpen, onClose }) {
                   <div className="w-1.5 h-1.5 bg-blue-400 rounded-full flex-shrink-0" />
                   <span>Partidas ilimitadas</span>
                 </div>
+                <div className="flex items-center gap-2 text-gray-300">
+                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full flex-shrink-0" />
+                  <span>Si eres host, todos juegan sin anuncios</span>
+                </div>
               </div>
 
               {/* Botón de compra */}
@@ -173,6 +177,10 @@ export default function PricingModal({ isOpen, onClose }) {
                 <div className="flex items-center gap-2 text-gray-300">
                   <div className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0" />
                   <span>Partidas ilimitadas</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-300">
+                  <div className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0" />
+                  <span>Si eres host, todos juegan sin anuncios</span>
                 </div>
                 <div className="flex items-center gap-2 text-gray-300">
                   <div className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0" />
