@@ -6,6 +6,7 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Función para refrescar el estado del usuario
   const refreshUser = async () => {
@@ -41,6 +42,8 @@ export function AuthProvider({ children }) {
     refreshUser,
     isPremium: user?.isPremium || false,
     isAdmin: user?.isAdmin || false,
+    showLoginModal,
+    setShowLoginModal,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

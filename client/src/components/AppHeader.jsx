@@ -17,10 +17,9 @@ export default function AppHeader() {
   const menuRef = useRef(null);
 
   // Usar contexto de autenticación
-  const { user, setUser, isAuthLoading, refreshUser } = useAuth();
+  const { user, setUser, isAuthLoading, refreshUser, isPremium, showLoginModal, setShowLoginModal } = useAuth();
 
   // Estado del modal de login
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginMode, setLoginMode] = useState("options"); // "options", "login", "register"
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -212,17 +211,24 @@ export default function AppHeader() {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 overflow-hidden"
+              className="relative w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center hover:scale-110 transition-transform active:scale-95"
               aria-label="Menú de perfil"
             >
               {user && user.profilePicture ? (
                 <img
                   src={user.profilePicture}
                   alt="Foto de perfil"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-full"
                 />
               ) : (
                 <User size={20} className="text-white" />
+              )}
+
+              {/* Coronita Premium sobrepuesta */}
+              {isPremium && (
+                <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full p-0.5 border-2 border-gray-900 shadow-lg">
+                  <Crown size={12} className="text-white" fill="currentColor" />
+                </div>
               )}
             </button>
 

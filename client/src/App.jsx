@@ -15,6 +15,7 @@ import Premium from "./pages/Premium";
 import PremiumSuccess from "./pages/PremiumSuccess";
 import FullscreenButton from "./components/FullscreenButton";
 import Footer from "./components/Footer";
+import PremiumTab from "./components/PremiumTab";
 import { TutorialProvider } from "./contexts/TutorialContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { getUserName, setUserName as saveUserName } from "./utils/nameGenerator";
@@ -167,6 +168,9 @@ export default function App() {
 
           {/* 🔹 Botón de pantalla completa (arriba a la derecha) */}
           <FullscreenButton />
+
+          {/* 🔹 Pestaña Premium para usuarios no premium */}
+          <PremiumTab />
 
           {/* 🔹 Navbar condicional de sala */}
           <RoomNavbar />
