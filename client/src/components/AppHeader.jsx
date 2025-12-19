@@ -244,12 +244,9 @@ export default function AppHeader() {
                   ) : user ? (
                     // Usuario autenticado
                     <>
-                      <p className="text-xs text-gray-400 mb-2">Cuenta de Google</p>
-                      <p className="text-sm font-semibold text-white truncate mb-2">{user.email}</p>
-
-                      {/* Campo de nombre editable para usuarios autenticados */}
-                      <div className="mt-2">
-                        <p className="text-xs text-gray-400 mb-1">Nombre en el juego</p>
+                      {/* Campo de nombre editable para usuarios autenticados - PRIMERO */}
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-400 mb-1">Mi nombre en el juego</p>
                         {isEditing ? (
                           <div className="flex items-center gap-2">
                             <input
@@ -281,7 +278,7 @@ export default function AppHeader() {
                             onClick={handleEditName}
                             className="group flex items-center gap-2 hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-all w-full"
                           >
-                            <span className="text-sm font-semibold text-white flex-1 text-left">
+                            <span className="text-base font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent flex-1 text-left animate-pulse bg-[length:200%_auto]">
                               {name}
                             </span>
                             <Pencil size={14} className="text-gray-400 group-hover:text-white transition-colors" />
@@ -289,7 +286,14 @@ export default function AppHeader() {
                         )}
                       </div>
 
-                      <div className="mt-2">
+                      {/* Cuenta de Google - SEGUNDO */}
+                      <div className="mb-3 pb-3 border-b border-gray-700">
+                        <p className="text-xs text-gray-400 mb-1">Cuenta de Google</p>
+                        <p className="text-sm text-white truncate">{user.email}</p>
+                      </div>
+
+                      {/* Status Premium - TERCERO */}
+                      <div>
                         {user.isPremium ? (
                           <>
                             <p className="text-xs text-amber-400 font-semibold">✨ Usuario Premium</p>
