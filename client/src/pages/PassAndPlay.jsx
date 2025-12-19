@@ -32,6 +32,9 @@ export default function PassAndPlay() {
   const [cardThemes, setCardThemes] = useState([]);
   const scratchCanvasRef = useRef(null);
 
+  // Estados para los avatares de jugadores
+  const [playerAvatars, setPlayerAvatars] = useState([]);
+
   // Cambiar título de la página
   useEffect(() => {
     document.title = "ImpostorWord - Pasa y Juega";
@@ -39,6 +42,13 @@ export default function PassAndPlay() {
       document.title = "ImpostorWord";
     };
   }, []);
+
+  // Generar avatares cuando cambia el número de jugadores
+  useEffect(() => {
+    if (totalPlayers >= 3 && totalPlayers <= 12) {
+      setPlayerAvatars(generatePlayerAvatars(totalPlayers));
+    }
+  }, [totalPlayers]);
 
   // Estados del tutorial
   const [runTutorial, setRunTutorial] = useState(false);
@@ -66,6 +76,28 @@ export default function PassAndPlay() {
 
   // Emojis disponibles para el patrón
   const availableEmojis = ['🎲', '🤐', '🕵️', '🎭', '👽', '💎'];
+
+  // Emojis para avatares de jugadores (personas y objetos)
+  const playerEmojiPool = [
+    '👨', '👩', '🧑', '👴', '👵', '🧔', '👱', '👨‍🦰', '👩‍🦰', '🧑‍🦱', '👨‍🦱', '👩‍🦱',
+    '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮'
+  ];
+
+  // Función para generar avatares únicos para cada jugador
+  const generatePlayerAvatars = (numPlayers) => {
+    const shuffled = [...playerEmojiPool].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, numPlayers);
+  };
+
+  // Función para obtener mensaje dinámico según cantidad de jugadores
+  const getPlayerCountMessage = (count) => {
+    if (count < 3) return "⚠️ Mínimo 3 jugadores";
+    if (count === 3) return "El trío dinámico";
+    if (count >= 4 && count <= 6) return "Grupo estándar - Ideal para empezar";
+    if (count >= 7 && count <= 9) return "¡Fiesta grande!";
+    if (count >= 10 && count <= 12) return "¡Caos total! Va a haber gritos";
+    return "De 3 a 12 jugadores";
+  };
 
   // Función para generar canvas holográfico con patrón de emojis
   const generateHolographicCanvas = (theme, emoji) => {
@@ -291,6 +323,9 @@ export default function PassAndPlay() {
     // Generar temas holográficos para todos los jugadores
     setCardThemes(generateCardThemesForPlayers(4));
 
+    // Generar avatares únicos para cada jugador
+    setPlayerAvatars(generatePlayerAvatars(4));
+
     // NO mostrar intersticial en modo tutorial
     setSetupMode(false);
     setShowingCard(true);
@@ -320,6 +355,8 @@ export default function PassAndPlay() {
 
     // Generar temas holográficos para todos los jugadores
     setCardThemes(generateCardThemesForPlayers(totalPlayers));
+
+    // Los avatares ya están generados por el useEffect que escucha cambios en totalPlayers
 
     // Mostrar viñeta intersticial antes de mostrar la primera palabra
     setShowNewRoundInterstitial(true);
@@ -410,6 +447,8 @@ export default function PassAndPlay() {
     setAlivePlayers([]);
     setGameOver(false);
     setWinner(null);
+    setPlayerAvatars([]);
+    setCardThemes([]);
   };
 
   // Deshabilitar scroll cuando se muestra la tarjeta de raspado en mobile
@@ -477,6 +516,38 @@ export default function PassAndPlay() {
   if (setupMode) {
     return (
       <>
+        <style>{`
+          @keyframes bounce-in {
+            0% {
+              opacity: 0;
+              transform: scale(0) translateY(-20px);
+            }
+            50% {
+              transform: scale(1.2);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1) translateY(0);
+            }
+          }
+
+          @keyframes breathe {
+            0%, 100% {
+              transform: scale(1);
+            }
+            50% {
+              transform: scale(1.02);
+            }
+          }
+
+          .animate-bounce-in {
+            animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+          }
+
+          .animate-breathe {
+            animation: breathe 3s ease-in-out infinite;
+          }
+        `}</style>
         <AppHeader />
 
         {/* Joyride Tutorial Global - Funciona en todas las pantallas */}
@@ -507,7 +578,7 @@ export default function PassAndPlay() {
 
           <button
             onClick={() => navigate('/')}
-            className="absolute top-20 left-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all flex items-center gap-2"
+            className="absolute top-20 left-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all flex items-center gap-2 z-50"
           >
             <ArrowLeft size={20} />
             <span>Volver</span>
@@ -516,86 +587,96 @@ export default function PassAndPlay() {
           {/* Botón de Ayuda */}
           <HelpButton />
 
-          <h1 className="text-3xl font-bold mb-6">🎮 Pasa y Juega</h1>
+          <h1 className="text-3xl font-bold mb-4 mt-12">🎮 Pasa y Juega</h1>
           <p className="text-gray-400 mb-8 text-center max-w-md">
             Juega en un solo dispositivo. Cada jugador verá su palabra por turnos.
           </p>
 
-          <div className="bg-gray-800/50 p-8 rounded-2xl max-w-md w-full space-y-6">
+          <div className="bg-gray-800/50 p-8 rounded-2xl max-w-lg w-full space-y-6">
             <div className="pnp-player-counter">
-              <label className="flex items-center gap-2 text-lg font-semibold mb-3">
-                <Users size={24} />
-                <span>Número de jugadores</span>
+              <label className="flex items-center justify-center gap-2 text-lg font-semibold mb-4">
+                <Users size={24} className="text-purple-400" />
+                <span>Reúne a tu tripulación</span>
               </label>
 
-              <div className="flex items-center gap-3">
+              {/* Selector horizontal grande */}
+              <div className="flex items-center gap-4 mb-4">
                 {/* Botón decrementar */}
                 <button
                   onClick={() => {
                     const current = totalPlayers === '' ? 4 : totalPlayers;
-                    setTotalPlayers(Math.max(3, current - 1));
+                    const newValue = Math.max(3, current - 1);
+                    setTotalPlayers(newValue);
+                    if (navigator.vibrate) navigator.vibrate(10);
                   }}
                   disabled={totalPlayers <= 3 && totalPlayers !== ''}
-                  className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all active:scale-95"
+                  className="flex-shrink-0 bg-red-500/20 hover:bg-red-500/30 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-red-400 disabled:text-gray-600 p-4 rounded-xl transition-all active:scale-95 border-2 border-red-500/50 disabled:border-gray-700"
                 >
-                  <ChevronDown size={24} />
+                  <ChevronDown size={28} strokeWidth={3} />
                 </button>
 
-                {/* Input de número */}
-                <input
-                  type="number"
-                  min="3"
-                  max="12"
-                  value={totalPlayers}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '') {
-                      setTotalPlayers('');
-                    } else {
-                      const num = parseInt(val);
-                      if (!isNaN(num)) {
-                        setTotalPlayers(Math.min(12, Math.max(0, num)));
-                      }
-                    }
-                  }}
-                  className={`flex-1 bg-gray-700 text-white px-4 py-3 rounded-xl text-center text-2xl font-bold border-2 focus:outline-none transition-colors ${
-                    totalPlayers < 3 || totalPlayers === ''
-                      ? 'border-red-500 focus:border-red-400'
-                      : 'border-gray-600 focus:border-emerald-500'
-                  }`}
-                />
+                {/* Número grande en el centro */}
+                <div className="flex-1 bg-gradient-to-br from-purple-600/30 to-pink-600/30 border-2 border-purple-500/50 rounded-xl p-6 text-center">
+                  <div className="text-6xl font-black bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    {totalPlayers || 0}
+                  </div>
+                  <p className="text-xs text-purple-300 mt-1 font-semibold">jugadores</p>
+                </div>
 
                 {/* Botón incrementar */}
                 <button
                   onClick={() => {
                     const current = totalPlayers === '' ? 3 : totalPlayers;
-                    setTotalPlayers(Math.min(12, current + 1));
+                    const newValue = Math.min(12, current + 1);
+                    setTotalPlayers(newValue);
+                    if (navigator.vibrate) navigator.vibrate(10);
                   }}
                   disabled={totalPlayers >= 12}
-                  className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all active:scale-95"
+                  className="flex-shrink-0 bg-emerald-500/20 hover:bg-emerald-500/30 disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-400 disabled:text-gray-600 p-4 rounded-xl transition-all active:scale-95 border-2 border-emerald-500/50 disabled:border-gray-700"
                 >
-                  <ChevronUp size={24} />
+                  <ChevronUp size={28} strokeWidth={3} />
                 </button>
               </div>
 
-              {/* Mensaje de error o ayuda */}
-              {(totalPlayers < 3 || totalPlayers === '') ? (
-                <p className="text-sm text-red-400 mt-2 text-center font-semibold">
-                  ⚠️ Mínimo 3 jugadores
-                </p>
-              ) : (
-                <p className="text-sm text-gray-400 mt-2 text-center">
-                  De 3 a 12 jugadores
-                </p>
-              )}
+              {/* Mensaje dinámico */}
+              <p className={`text-sm text-center font-semibold mb-4 transition-all ${
+                totalPlayers < 3 || totalPlayers === ''
+                  ? 'text-red-400'
+                  : totalPlayers >= 10
+                  ? 'text-orange-400'
+                  : 'text-purple-300'
+              }`}>
+                {getPlayerCountMessage(totalPlayers || 0)}
+              </p>
+
+              {/* Grid de avatares de la tripulación */}
+              <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+                <p className="text-xs text-gray-400 mb-3 text-center">Tu tripulación:</p>
+                <div className="grid grid-cols-6 gap-2 justify-items-center">
+                  {playerAvatars.map((emoji, idx) => {
+                    return (
+                      <div
+                        key={idx}
+                        className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-lg animate-bounce-in border-2 border-gray-700"
+                        style={{
+                          animationDelay: `${idx * 50}ms`,
+                          animationFillMode: 'backwards'
+                        }}
+                      >
+                        {emoji}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <button
               onClick={startGame}
-              className="pnp-start-button w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="pnp-start-button w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/30 animate-breathe"
             >
-              <Play size={24} />
-              <span>Iniciar Partida</span>
+              <Play size={28} />
+              <span>EMPEZAR</span>
             </button>
           </div>
 
@@ -780,7 +861,7 @@ export default function PassAndPlay() {
                 <p className="text-lg font-semibold mb-2">Resumen:</p>
                 <p className="text-sm text-gray-300">
                   <strong>Palabra secreta:</strong> {normalWord}<br/>
-                  <strong>El impostor era:</strong> Jugador {impostorIndex + 1}
+                  <strong>El impostor era:</strong> <span className="text-2xl">{playerAvatars[impostorIndex] || '👤'}</span> Jugador {impostorIndex + 1}
                 </p>
               </div>
             </div>
@@ -846,16 +927,22 @@ export default function PassAndPlay() {
                 Jugadores vivos: {alivePlayersList.length}
               </p>
 
-              {alivePlayersList.map((player) => (
-                <button
-                  key={player.index}
-                  onClick={() => handleVote(player.index)}
-                  className="w-full bg-purple-600 hover:bg-purple-700 px-6 py-4 rounded-xl text-lg font-semibold transition-all active:scale-95 flex items-center justify-between"
-                >
-                  <span>Jugador {player.index + 1}</span>
-                  <span>👉</span>
-                </button>
-              ))}
+              {alivePlayersList.map((player) => {
+                const playerEmoji = playerAvatars[player.index] || '👤';
+                return (
+                  <button
+                    key={player.index}
+                    onClick={() => handleVote(player.index)}
+                    className="w-full bg-purple-600 hover:bg-purple-700 px-6 py-4 rounded-xl text-lg font-semibold transition-all active:scale-95 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{playerEmoji}</span>
+                      <span>Jugador {player.index + 1}</span>
+                    </div>
+                    <span>👉</span>
+                  </button>
+                );
+              })}
             </div>
 
             <button
