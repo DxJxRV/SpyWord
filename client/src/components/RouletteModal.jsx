@@ -582,8 +582,8 @@ export default function RouletteModal() {
               <div className="text-center relative space-y-3" ref={tooltipRef}>
                 {/* Micro-copy para premium */}
                 {selectedRouletteType === 'premium' && (
-                  <p className="text-gray-500 text-xs">
-                    🎟️ Las fichas premium se obtienen al apoyar el proyecto<br />
+                  <p className="text-xs bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 bg-clip-text text-transparent font-semibold">
+                    🎟️ Obtén una ficha al comprar 1 semana sin anuncios<br />
                     Algunos premios son extremadamente raros
                   </p>
                 )}

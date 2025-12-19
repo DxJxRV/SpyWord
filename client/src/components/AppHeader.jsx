@@ -287,13 +287,42 @@ export default function AppHeader() {
                         )}
                       </div>
 
-                      <p className="text-xs text-gray-500 mt-2">
+                      <div className="mt-2">
                         {user.isPremium ? (
-                          <span className="text-amber-400">✨ Usuario Premium</span>
+                          <>
+                            <p className="text-xs text-amber-400 font-semibold">✨ Usuario Premium</p>
+                            {user.premiumExpiresAt && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {(() => {
+                                  const now = new Date();
+                                  const expiresAt = new Date(user.premiumExpiresAt);
+                                  const diff = expiresAt - now;
+
+                                  if (diff <= 0) {
+                                    return 'Expirado';
+                                  }
+
+                                  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+                                  if (days > 365) {
+                                    return 'Premium de por vida';
+                                  } else if (days > 0) {
+                                    return `Vence en ${days} día${days !== 1 ? 's' : ''}`;
+                                  } else if (hours > 0) {
+                                    return `Vence en ${hours} hora${hours !== 1 ? 's' : ''}`;
+                                  } else {
+                                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                    return `Vence en ${minutes} min${minutes !== 1 ? 's' : ''}`;
+                                  }
+                                })()}
+                              </p>
+                            )}
+                          </>
                         ) : (
-                          "Usuario Free"
+                          <p className="text-xs text-gray-500">Usuario Free</p>
                         )}
-                      </p>
+                      </div>
                     </>
                   ) : (
                     // Usuario no autenticado - Mostrar nombre local editable

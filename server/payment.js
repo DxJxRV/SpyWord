@@ -184,18 +184,31 @@ function setupPaymentRoutes(app, checkAuth, requireAuth) {
           premiumExpiresAt.setFullYear(premiumExpiresAt.getFullYear() + 100);
         }
 
+        // Preparar datos de actualización
+        const updateData = {
+          isPremium: true,
+          premiumExpiresAt: premiumExpiresAt
+        };
+
+        // Si es suscripción semanal, agregar una ficha de ruleta premium
+        if (planType === 'weekly') {
+          updateData.premiumRouletteTokens = {
+            increment: 1
+          };
+        }
+
         // Actualizar el usuario en la base de datos
         const updatedUser = await prisma.user.update({
           where: { id: userId },
-          data: {
-            isPremium: true,
-            premiumExpiresAt: premiumExpiresAt
-          }
+          data: updateData
         });
 
         console.log(`✅ Usuario ${userId} actualizado a Premium - Plan: ${planType}`);
         console.log(`   Email: ${updatedUser.email}`);
         console.log(`   Expira: ${premiumExpiresAt?.toISOString() || 'Nunca'}`);
+        if (planType === 'weekly') {
+          console.log(`   🎟️  Ficha premium agregada - Total: ${updatedUser.premiumRouletteTokens}`);
+        }
 
       } catch (error) {
         console.error('❌ Error al actualizar usuario a Premium:', error);

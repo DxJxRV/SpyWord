@@ -432,6 +432,7 @@ function setupAuthRoutes(app) {
         userId: userFromDB.id,
         email: userFromDB.email,
         isPremium: userFromDB.isPremium,
+        premiumExpiresAt: userFromDB.premiumExpiresAt,
         isAdmin: userFromDB.isAdmin,
         profilePicture: userFromDB.profilePicture || null,
       });
