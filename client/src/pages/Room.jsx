@@ -682,7 +682,7 @@ export default function Room() {
       />
 
       {/* Botón flotante para reiniciar tutorial */}
-      <TutorialButton isRoom={true} />
+      {/* <TutorialButton isRoom={true} /> */}
 
       {/* Viñeta Intersticial */}
       {showRestartInterstitial && (

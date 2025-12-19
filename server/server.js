@@ -158,13 +158,27 @@ app.post('/api/rooms/create', checkAuth, async (req, res) => {
     const roomId = generateRoomId();
     const adminId = uuidv4();
 
+    // Obtener profilePicture si el usuario está autenticado
+    let profilePicture = null;
+    if (req.user && req.user.userId) {
+      try {
+        const userFromDB = await prisma.user.findUnique({
+          where: { id: req.user.userId },
+          select: { profilePicture: true }
+        });
+        profilePicture = userFromDB?.profilePicture || null;
+      } catch (error) {
+        console.error('Error al obtener profilePicture del admin:', error);
+      }
+    }
+
     let roomData = {
       adminId,
       adminUserId: req.user ? req.user.userId : null,
       adminName: adminName || "Admin",
       round: 1,
       players: {
-        [adminId]: { lastSeen: Date.now(), name: adminName || "Admin", isAlive: true, hasVoted: false }
+        [adminId]: { lastSeen: Date.now(), name: adminName || "Admin", isAlive: true, hasVoted: false, profilePicture: profilePicture }
       },
       impostorId: null,
       starterPlayerId: null,
@@ -255,7 +269,7 @@ app.post('/api/rooms/create', checkAuth, async (req, res) => {
 });
 
 // 👥 POST /api/rooms/:roomId/join
-app.post('/api/rooms/:roomId/join', (req, res) => {
+app.post('/api/rooms/:roomId/join', checkAuth, async (req, res) => {
   const { roomId } = req.params;
   const { playerName } = req.body;
 
@@ -270,23 +284,39 @@ app.post('/api/rooms/:roomId/join', (req, res) => {
   const room = rooms[roomId];
   let playerId;
 
+  // Obtener profilePicture si el usuario está autenticado
+  let profilePicture = null;
+  if (req.user && req.user.userId) {
+    try {
+      const userFromDB = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        select: { profilePicture: true }
+      });
+      profilePicture = userFromDB?.profilePicture || null;
+    } catch (error) {
+      console.error('Error al obtener profilePicture:', error);
+    }
+  }
+
   // Verificar si el jugador ya tiene una sesión activa en esta sala
   const existingPlayerId = req.cookies.sid;
   if (existingPlayerId && room.players[existingPlayerId]) {
     // El jugador ya existe en esta sala, reutilizar el ID
     playerId = existingPlayerId;
     room.players[playerId].lastSeen = Date.now();
+    room.players[playerId].profilePicture = profilePicture; // Actualizar foto si cambió
     console.log(`🔄 Jugador reconectado a ${roomId}: ${playerId} (${playerName})`);
   } else {
     // Crear nuevo jugador
     playerId = uuidv4();
 
-    // Registrar jugador con nombre y timestamp
+    // Registrar jugador con nombre, timestamp y foto de perfil
     room.players[playerId] = {
       lastSeen: Date.now(),
       name: playerName.trim(),
       isAlive: true,
-      hasVoted: false
+      hasVoted: false,
+      profilePicture: profilePicture
     };
 
     const activePlayers = getActivePlayers(room);
@@ -855,7 +885,8 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
       playersData[pId] = {
         name: room.players[pId].name,
         isAlive: room.players[pId].isAlive !== false, // Default true si no existe
-        hasVoted: room.players[pId].hasVoted || false
+        hasVoted: room.players[pId].hasVoted || false,
+        profilePicture: room.players[pId].profilePicture || null
       };
     }
 

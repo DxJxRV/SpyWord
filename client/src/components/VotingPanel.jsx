@@ -185,39 +185,52 @@ export default function VotingPanel({ roomState, roomId, myId, onUpdate }) {
 
         {/* Grid of player cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
-          {alivePlayers.map(({ id, name }) => (
-            <button
-              key={id}
-              onClick={() => setSelectedPlayer(id)}
-              className={`relative aspect-square p-2 rounded-xl font-semibold transition-all flex flex-col items-center justify-center gap-1.5 ${
-                selectedPlayer === id
-                  ? "bg-red-500/30 text-white border-2 border-red-500 scale-95"
-                  : "bg-gray-800/70 text-gray-200 border-2 border-gray-700 hover:border-red-500/30"
-              }`}
-            >
-              {/* Check icon for selected */}
-              {selectedPlayer === id && (
-                <CheckCircle size={18} className="absolute top-1.5 right-1.5 text-red-400" fill="currentColor" />
-              )}
+          {alivePlayers.map(({ id, name }) => {
+            const playerData = players[id];
+            const profilePicture = playerData?.profilePicture;
 
-              {/* Avatar circle */}
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold ${
-                selectedPlayer === id ? "bg-red-500 text-white" : "bg-gray-700 text-gray-300"
-              }`}>
-                {name.charAt(0).toUpperCase()}
-              </div>
+            return (
+              <button
+                key={id}
+                onClick={() => setSelectedPlayer(id)}
+                className={`relative aspect-square p-2 rounded-xl font-semibold transition-all flex flex-col items-center justify-center gap-1.5 ${
+                  selectedPlayer === id
+                    ? "bg-red-500/30 text-white border-2 border-red-500 scale-95"
+                    : "bg-gray-800/70 text-gray-200 border-2 border-gray-700 hover:border-red-500/30"
+                }`}
+              >
+                {/* Check icon for selected */}
+                {selectedPlayer === id && (
+                  <CheckCircle size={18} className="absolute top-1.5 right-1.5 text-red-400" fill="currentColor" />
+                )}
 
-              {/* Name (truncated) */}
-              <span className="text-xs text-center truncate w-full px-1">{name}</span>
+                {/* Avatar circle or profile picture */}
+                {profilePicture ? (
+                  <img
+                    src={profilePicture}
+                    alt={name}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold ${
+                    selectedPlayer === id ? "bg-red-500 text-white" : "bg-gray-700 text-gray-300"
+                  }`}>
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                )}
 
-              {/* Vote count badge */}
-              {votesTally[id] && (
-                <span className="absolute bottom-1.5 bg-purple-500/70 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
-                  {votesTally[id]}
-                </span>
-              )}
-            </button>
-          ))}
+                {/* Name (truncated) */}
+                <span className="text-xs text-center truncate w-full px-1">{name}</span>
+
+                {/* Vote count badge */}
+                {votesTally[id] && (
+                  <span className="absolute bottom-1.5 bg-purple-500/70 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+                    {votesTally[id]}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Confirm button - only visible when player is selected */}

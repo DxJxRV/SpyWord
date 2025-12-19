@@ -36,9 +36,17 @@ export default function GameOverPanel({ roomState, roomId, myId, onRestart, isPr
 
             {/* Avatar del impostor */}
             <div className="flex items-center justify-center gap-3">
-              <div className="w-16 h-16 rounded-full bg-gray-900 border-2 border-white flex items-center justify-center text-2xl font-bold text-white">
-                {impostorName.charAt(0).toUpperCase()}
-              </div>
+              {players[impostorId]?.profilePicture ? (
+                <img
+                  src={players[impostorId].profilePicture}
+                  alt={impostorName}
+                  className="w-16 h-16 rounded-full object-cover border-2 border-white"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-gray-900 border-2 border-white flex items-center justify-center text-2xl font-bold text-white">
+                  {impostorName.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div className="text-left">
                 <p className="text-2xl font-bold text-white">{impostorName}</p>
                 {wasITheImpostor && (
@@ -106,17 +114,25 @@ export default function GameOverPanel({ roomState, roomId, myId, onRestart, isPr
                 </div>
 
                 {/* Avatar */}
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
-                    isImpostor
-                      ? 'bg-red-500 text-white'
-                      : isAlive
-                      ? 'bg-emerald-500/30 text-emerald-200'
-                      : 'bg-gray-600 text-gray-300'
-                  }`}
-                >
-                  {player.name.charAt(0).toUpperCase()}
-                </div>
+                {player.profilePicture ? (
+                  <img
+                    src={player.profilePicture}
+                    alt={player.name}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
+                      isImpostor
+                        ? 'bg-red-500 text-white'
+                        : isAlive
+                        ? 'bg-emerald-500/30 text-emerald-200'
+                        : 'bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    {player.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
 
                 {/* Nombre */}
                 <span className="text-xs text-center truncate w-full text-white font-medium">
