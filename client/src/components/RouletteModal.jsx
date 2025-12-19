@@ -14,10 +14,10 @@ const DAILY_PRIZES = [
 ];
 
 const PREMIUM_PRIZES = [
-  { id: '1week', label: '1 semana sin anuncios', color: '#2563EB', textColor: '#FFFFFF', probability: 35, colorName: 'Azul', winMessage: '🎉 Una semana completa sin anuncios\n¡A disfrutar!' },
+  { id: '1week', label: '+7 días Premium', color: '#2563EB', textColor: '#FFFFFF', probability: 35, colorName: 'Azul', winMessage: '🎉 Una semana completa sin anuncios\n¡A disfrutar!' },
   { id: '3days', label: '+3 días Premium', color: '#9333EA', textColor: '#FFFFFF', probability: 30, colorName: 'Morado', winMessage: '✨ Sumamos 3 días a tu Premium\nSe acumulan automáticamente' },
   { id: '7days', label: '+7 días Premium', color: '#EC4899', textColor: '#FFFFFF', probability: 24, colorName: 'Rosa', winMessage: '🔥 Una semana extra de Premium\n¡Disfrútala!' },
-  { id: '1month', label: '1 mes Premium', color: '#F59E0B', textColor: '#FFFFFF', probability: 10, colorName: 'Naranja', winMessage: '👑 Premium por todo un mes\nGracias por apoyar el proyecto 💛' },
+  { id: '1month', label: '+1 mes Premium', color: '#F59E0B', textColor: '#FFFFFF', probability: 10, colorName: 'Naranja', winMessage: '👑 Premium por todo un mes\nGracias por apoyar el proyecto 💛' },
   { id: 'lifetime', label: 'Premium de por vida', color: 'url(#lifetimeGradient)', textColor: '#FFD700', probability: 1, colorName: 'Legendario', solidColor: '#1C1C1C', winMessage: '👑 Increíble…\nPremium de por vida desbloqueado\nGracias por ser parte de esto 💛' }
 ];
 
@@ -211,6 +211,13 @@ export default function RouletteModal() {
           toast.success(prize.winMessage || `¡Ganaste ${prize.label}!`, {
             duration: 5000
           });
+        }
+
+        // Recargar página después de mostrar resultado (solo si ganó algo)
+        if (prize.id !== 'nothing') {
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000); // Esperar 3 segundos para que vea el resultado
         }
       }, 4000);
 

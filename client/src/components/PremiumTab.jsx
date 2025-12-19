@@ -8,17 +8,19 @@ export default function PremiumTab() {
   const { isPremium, setShowRouletteModal } = useAuth();
   const [currentTab, setCurrentTab] = useState(0); // 0 = NO ADS, 1 = RULETA
 
-  // Alternar entre pestañas cada 5 segundos
+  // Alternar entre pestañas cada 5 segundos (solo si NO es premium)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTab((prev) => (prev === 0 ? 1 : 0));
-    }, 5000);
+    if (!isPremium) {
+      const interval = setInterval(() => {
+        setCurrentTab((prev) => (prev === 0 ? 1 : 0));
+      }, 5000);
 
-    return () => clearInterval(interval);
-  }, []);
-
-  // No mostrar si el usuario ya es premium
-  if (isPremium) return null;
+      return () => clearInterval(interval);
+    } else {
+      // Si es premium, fijar la tab de ruleta (tab 1)
+      setCurrentTab(1);
+    }
+  }, [isPremium]);
 
   const handleClick = () => {
     if (currentTab === 0) {
@@ -33,7 +35,7 @@ export default function PremiumTab() {
   return (
     <button
       onClick={handleClick}
-      className="fixed top-1/2 right-0 -translate-y-1/2 z-50 group"
+      className="fixed bottom-24 right-0 z-50 group"
       style={{
         transformOrigin: "right center"
       }}
