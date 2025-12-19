@@ -4,20 +4,21 @@ import { api } from "../services/api";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { createPortal } from "react-dom";
+import confetti from "canvas-confetti";
 
 const DAILY_PRIZES = [
-  { id: 'nothing', label: '❌ Casi 😅', color: 'from-gray-500 to-gray-600', textColor: 'text-gray-300' },
-  { id: '10min', label: '⏱️ 10 min sin ads', color: 'from-blue-500 to-blue-600', textColor: 'text-blue-300' },
-  { id: '30min', label: '⭐ 30 min premium', color: 'from-purple-500 to-purple-600', textColor: 'text-purple-300' },
-  { id: '1day', label: '🕓 1 día premium', color: 'from-amber-500 to-amber-600', textColor: 'text-amber-300' }
+  { id: 'nothing', label: 'Casi… 😅', color: '#6B7280', textColor: '#FFFFFF', probability: 60, colorName: 'Gris', winMessage: 'Hoy no tocó, pero puedes volver mañana' },
+  { id: '10min', label: '10 min sin anuncios', color: '#3B82F6', textColor: '#FFFFFF', probability: 25, colorName: 'Azul', winMessage: '🎉 Disfruta 10 minutos sin anuncios\nEmpiezan ahora' },
+  { id: '30min', label: '30 min Premium', color: '#A855F7', textColor: '#FFFFFF', probability: 10, colorName: 'Morado', winMessage: '✨ 30 minutos Premium activados\nSin anuncios, sin límites' },
+  { id: '1day', label: '1 día Premium', color: 'url(#dailyGradient)', textColor: '#FFFFFF', probability: 5, colorName: 'Dorado', solidColor: '#F6C453', winMessage: '👑 ¡Premium por 24 horas!\nDisfrútalo al máximo' }
 ];
 
 const PREMIUM_PRIZES = [
-  { id: '1week', label: '⏱️ 1 semana sin ads', color: 'from-blue-600 to-blue-700', textColor: 'text-blue-300' },
-  { id: '3days', label: '⭐ +3 días premium', color: 'from-purple-600 to-purple-700', textColor: 'text-purple-300' },
-  { id: '7days', label: '⭐ +7 días premium', color: 'from-pink-600 to-pink-700', textColor: 'text-pink-300' },
-  { id: '1month', label: '💎 1 mes premium', color: 'from-amber-600 to-amber-700', textColor: 'text-amber-300' },
-  { id: 'lifetime', label: '👑 Premium de por vida', color: 'from-yellow-500 to-yellow-600', textColor: 'text-yellow-300' }
+  { id: '1week', label: '1 semana sin anuncios', color: '#2563EB', textColor: '#FFFFFF', probability: 35, colorName: 'Azul', winMessage: '🎉 Una semana completa sin anuncios\n¡A disfrutar!' },
+  { id: '3days', label: '+3 días Premium', color: '#9333EA', textColor: '#FFFFFF', probability: 30, colorName: 'Morado', winMessage: '✨ Sumamos 3 días a tu Premium\nSe acumulan automáticamente' },
+  { id: '7days', label: '+7 días Premium', color: '#EC4899', textColor: '#FFFFFF', probability: 24, colorName: 'Rosa', winMessage: '🔥 Una semana extra de Premium\n¡Disfrútala!' },
+  { id: '1month', label: '1 mes Premium', color: '#F59E0B', textColor: '#FFFFFF', probability: 10, colorName: 'Naranja', winMessage: '👑 Premium por todo un mes\nGracias por apoyar el proyecto 💛' },
+  { id: 'lifetime', label: 'Premium de por vida', color: 'url(#lifetimeGradient)', textColor: '#FFD700', probability: 1, colorName: 'Legendario', solidColor: '#1C1C1C', winMessage: '👑 Increíble…\nPremium de por vida desbloqueado\nGracias por ser parte de esto 💛' }
 ];
 
 export default function RouletteModal() {
@@ -31,6 +32,57 @@ export default function RouletteModal() {
   const [selectedRouletteType, setSelectedRouletteType] = useState('daily'); // 'daily' or 'premium'
   const tooltipRef = useRef(null);
   const [currentTime, setCurrentTime] = useState(new Date()); // Para actualizar el countdown
+  const [mustStartSpinning, setMustStartSpinning] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const wheelRef = useRef(null);
+
+  // Convertir prizes a formato de Wheel
+  const currentPrizes = selectedRouletteType === 'daily' ? DAILY_PRIZES : PREMIUM_PRIZES;
+
+  // Función para lanzar confetti
+  const launchConfetti = (prizeId) => {
+    if (prizeId === 'nothing') return; // No confetti si no gana nada
+
+    // Confetti especial para lifetime
+    if (prizeId === 'lifetime') {
+      const duration = 5000;
+      const end = Date.now() + duration;
+
+      const frame = () => {
+        confetti({
+          particleCount: 7,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 },
+          colors: ['#FFD700', '#FFA500', '#FF6347']
+        });
+        confetti({
+          particleCount: 7,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 },
+          colors: ['#FFD700', '#FFA500', '#FF6347']
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      };
+      frame();
+    } else {
+      // Confetti normal para otros premios
+      const colors = selectedRouletteType === 'daily'
+        ? ['#3B82F6', '#A855F7', '#F59E0B']
+        : ['#EAB308', '#EC4899', '#9333EA'];
+
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: colors
+      });
+    }
+  };
 
   // Cargar estado de la ruleta cuando se abre el modal
   useEffect(() => {
@@ -51,6 +103,25 @@ export default function RouletteModal() {
       setLoading(false);
     }
   }
+
+  // Calcular ángulos basados en probabilidades
+  const calculateAngles = (prizes) => {
+    let currentAngle = 0;
+    return prizes.map(prize => {
+      const angle = (prize.probability / 100) * 360;
+      const startAngle = currentAngle;
+      const endAngle = currentAngle + angle;
+      const middleAngle = startAngle + (angle / 2);
+      currentAngle = endAngle;
+      return {
+        ...prize,
+        startAngle,
+        endAngle,
+        middleAngle,
+        angle
+      };
+    });
+  };
 
   async function handleSpin() {
     // Verificar si está loggeado
@@ -79,39 +150,75 @@ export default function RouletteModal() {
     setShowResult(false);
 
     try {
-      // Simular animación de spin (3 segundos)
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Hacer request al backend
+      // Hacer request al backend primero para obtener el premio
       const response = await api.post('/roulette/spin', {
         type: selectedRouletteType
       });
       const { prize } = response.data;
 
-      setSelectedPrize(prize);
-      setShowResult(true);
+      // Calcular ángulos con probabilidades
+      const prizesWithAngles = calculateAngles(currentPrizes);
 
-      // Mostrar toast según el premio
-      if (prize.id === 'nothing') {
-        toast.info("¡Casi! 😅 Vuelve mañana con Premium", {
-          duration: 5000
-        });
-      } else if (prize.id === 'lifetime') {
-        toast.success("¡GANASTE PREMIUM DE POR VIDA! 👑🎉", {
-          duration: 8000
-        });
-      } else {
-        toast.success(`¡Ganaste ${prize.label}! 🎉`, {
-          duration: 5000
-        });
+      // Encontrar el premio ganado
+      const wonPrize = prizesWithAngles.find(p => p.id === prize.id);
+
+      if (!wonPrize) {
+        console.error('Premio no encontrado en la ruleta actual:', prize.id);
+        toast.error('Error: Premio inválido');
+        setSpinning(false);
+        return;
       }
 
-      // Recargar estado
-      await loadStatus();
+      // Guardar el premio seleccionado
+      setSelectedPrize(prize);
+
+      // Calcular rotación: 5 vueltas completas + el ángulo del premio (ajustado para que la flecha apunte al centro del segmento)
+      const targetAngle = wonPrize.middleAngle;
+      const totalRotation = 360 * 5 + (360 - targetAngle);
+
+      // Resetear la rotación primero
+      setRotation(0);
+      setMustStartSpinning(false);
+
+      // Dar tiempo al navegador para renderizar el estado inicial
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Ahora aplicar la rotación con la transición
+          setMustStartSpinning(true);
+          setRotation(totalRotation);
+        });
+      });
+
+      // Esperar a que termine la animación (4 segundos)
+      setTimeout(() => {
+        setMustStartSpinning(false);
+        setSpinning(false);
+        setShowResult(true);
+
+        // Lanzar confetti
+        launchConfetti(prize.id);
+
+        // Mostrar toast según el premio usando winMessage
+        if (prize.id === 'nothing') {
+          toast.info(prize.winMessage || "Hoy no tocó, pero puedes volver mañana", {
+            duration: 5000
+          });
+        } else if (prize.id === 'lifetime') {
+          toast.success(prize.winMessage || "👑 Premium de por vida desbloqueado", {
+            duration: 8000
+          });
+        } else {
+          toast.success(prize.winMessage || `¡Ganaste ${prize.label}!`, {
+            duration: 5000
+          });
+        }
+      }, 4000);
+
+      // Recargar estado en background
+      loadStatus();
     } catch (error) {
       console.error("Error al girar ruleta:", error);
       toast.error(error.response?.data?.error || "Error al girar ruleta");
-    } finally {
       setSpinning(false);
     }
   }
@@ -201,6 +308,9 @@ export default function RouletteModal() {
                   setSelectedRouletteType('daily');
                   setShowResult(false);
                   setSelectedPrize(null);
+                  setMustStartSpinning(false);
+                  setSpinning(false);
+                  setRotation(0);
                 }}
                 className={`relative flex-1 py-3 px-3 rounded-xl font-semibold transition-all ${
                   selectedRouletteType === 'daily'
@@ -232,6 +342,9 @@ export default function RouletteModal() {
                   setSelectedRouletteType('premium');
                   setShowResult(false);
                   setSelectedPrize(null);
+                  setMustStartSpinning(false);
+                  setSpinning(false);
+                  setRotation(0);
                 }}
                 className={`relative flex-1 py-3 px-3 rounded-xl font-semibold transition-all ${
                   selectedRouletteType === 'premium'
@@ -277,65 +390,114 @@ export default function RouletteModal() {
             </div>
           ) : (
             <>
-              {/* Ruleta visual */}
+              {/* Ruleta visual con SVG */}
               <div className="relative">
-                {/* Contenedor de la ruleta */}
-                <div className="relative aspect-square max-w-sm mx-auto">
+                <div className="relative max-w-md mx-auto aspect-square">
                   {/* Indicador/flecha superior */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-10">
-                    <div className={`w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[30px] ${
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 z-20">
+                    <div className={`w-0 h-0 border-l-[24px] border-l-transparent border-r-[24px] border-r-transparent border-t-[36px] ${
                       selectedRouletteType === 'daily' ? 'border-t-blue-500' : 'border-t-amber-500'
-                    }`}></div>
+                    } drop-shadow-lg`}></div>
                   </div>
 
-                  {/* Círculo de la ruleta */}
+                  {/* Contenedor SVG de la ruleta */}
                   <div
-                    className={`relative w-full h-full rounded-full border-8 ${
-                      selectedRouletteType === 'daily' ? 'border-blue-500 shadow-blue-500/30' : 'border-amber-500 shadow-amber-500/30'
-                    } shadow-2xl transition-transform duration-3000 ease-out ${
-                      spinning ? 'animate-spin' : ''
-                    }`}
+                    ref={wheelRef}
+                    className="relative w-full h-full"
                     style={{
-                      animation: spinning ? 'spin 3s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none'
+                      transform: `rotate(${rotation}deg)`,
+                      transition: mustStartSpinning ? 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none'
                     }}
                   >
-                    {/* Segmentos de la ruleta */}
-                    {(selectedRouletteType === 'daily' ? DAILY_PRIZES : PREMIUM_PRIZES).map((prize, index) => {
-                      const prizes = selectedRouletteType === 'daily' ? DAILY_PRIZES : PREMIUM_PRIZES;
-                      const rotation = (360 / prizes.length) * index;
-                      return (
-                        <div
-                          key={prize.id}
-                          className={`absolute inset-0 flex items-start justify-center pt-8`}
-                          style={{
-                            transform: `rotate(${rotation}deg)`
-                          }}
-                        >
-                          <div
-                            className={`bg-gradient-to-b ${prize.color} px-3 py-1.5 rounded-lg shadow-lg`}
-                            style={{
-                              transform: `rotate(0deg)`
-                            }}
-                          >
-                            <p className="text-white text-xs font-bold text-center whitespace-nowrap">
-                              {prize.label}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-2xl">
+                      {/* Definir gradientes */}
+                      <defs>
+                        {/* Gradiente para 1 día (daily) - Dorado elegante */}
+                        <linearGradient id="dailyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" style={{ stopColor: '#F6C453', stopOpacity: 1 }} />
+                          <stop offset="100%" style={{ stopColor: '#E6A93A', stopOpacity: 1 }} />
+                        </linearGradient>
 
-                    {/* Centro de la ruleta */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className={`bg-gray-900 rounded-full w-20 h-20 flex items-center justify-center border-4 ${
-                        selectedRouletteType === 'daily' ? 'border-blue-500' : 'border-amber-500'
-                      } shadow-xl`}>
-                        {selectedRouletteType === 'daily' ? (
-                          <CircleDashed size={40} className="text-blue-400" />
-                        ) : (
-                          <Crown size={40} className="text-amber-400" fill="currentColor" />
-                        )}
-                      </div>
+                        {/* Gradiente para lifetime (premium) - Negro elegante con borde dorado */}
+                        <linearGradient id="lifetimeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" style={{ stopColor: '#1C1C1C', stopOpacity: 1 }} />
+                          <stop offset="100%" style={{ stopColor: '#2A2A2A', stopOpacity: 1 }} />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Borde exterior */}
+                      <circle
+                        cx="100"
+                        cy="100"
+                        r="98"
+                        fill="none"
+                        stroke={selectedRouletteType === 'daily' ? '#3B82F6' : '#F59E0B'}
+                        strokeWidth="4"
+                      />
+
+                      {/* Segmentos de la ruleta */}
+                      {calculateAngles(currentPrizes).map((prize) => {
+                        const startAngleRad = (prize.startAngle - 90) * (Math.PI / 180);
+                        const endAngleRad = (prize.endAngle - 90) * (Math.PI / 180);
+                        const middleAngleRad = (prize.middleAngle - 90) * (Math.PI / 180);
+
+                        const x1 = 100 + 94 * Math.cos(startAngleRad);
+                        const y1 = 100 + 94 * Math.sin(startAngleRad);
+                        const x2 = 100 + 94 * Math.cos(endAngleRad);
+                        const y2 = 100 + 94 * Math.sin(endAngleRad);
+
+                        const largeArcFlag = prize.angle > 180 ? 1 : 0;
+
+                        const textX = 100 + 55 * Math.cos(middleAngleRad);
+                        const textY = 100 + 55 * Math.sin(middleAngleRad);
+                        // Rotar 90 grados para que el texto sea perpendicular al radio
+                        const textRotation = prize.middleAngle + 90;
+
+                        return (
+                          <g key={prize.id}>
+                            {/* Segmento */}
+                            <path
+                              d={`M 100 100 L ${x1} ${y1} A 94 94 0 ${largeArcFlag} 1 ${x2} ${y2} Z`}
+                              fill={prize.color}
+                              stroke={prize.id === 'lifetime' ? '#FFD700' : prize.id === '1day' ? '#F6C453' : '#1F2937'}
+                              strokeWidth={prize.id === 'lifetime' || prize.id === '1day' ? '2' : '1'}
+                            />
+
+                            {/* Texto del premio */}
+                            <text
+                              x={textX}
+                              y={textY}
+                              fill={prize.textColor}
+                              fontSize={prize.label.length > 12 ? '7' : '9'}
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              transform={`rotate(${textRotation}, ${textX}, ${textY})`}
+                            >
+                              {prize.label}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Círculo central */}
+                      <circle
+                        cx="100"
+                        cy="100"
+                        r="25"
+                        fill="#111827"
+                        stroke={selectedRouletteType === 'daily' ? '#3B82F6' : '#F59E0B'}
+                        strokeWidth="3"
+                      />
+                    </svg>
+
+                    {/* Icono central */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      {selectedRouletteType === 'daily' ? (
+                        <CircleDashed size={32} className="text-blue-400" />
+                      ) : (
+                        <Crown size={32} className="text-amber-400" fill="currentColor" />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -410,7 +572,15 @@ export default function RouletteModal() {
 
 
               {/* Información sobre premios con tooltip */}
-              <div className="text-center relative" ref={tooltipRef}>
+              <div className="text-center relative space-y-3" ref={tooltipRef}>
+                {/* Micro-copy para premium */}
+                {selectedRouletteType === 'premium' && (
+                  <p className="text-gray-500 text-xs">
+                    🎟️ Las fichas premium se obtienen al apoyar el proyecto<br />
+                    Algunos premios son extremadamente raros
+                  </p>
+                )}
+
                 <p className="text-gray-400 text-sm">
                   <Sparkles size={14} className="inline text-amber-400 mb-0.5" />{" "}
                   <button
@@ -435,29 +605,25 @@ export default function RouletteModal() {
                     {/* Contenido del tooltip */}
                     <div className="space-y-2">
                       {(selectedRouletteType === 'daily' ? DAILY_PRIZES : PREMIUM_PRIZES).map((prize) => (
-                        <div key={prize.id} className="flex items-center justify-between">
-                          <span className="text-gray-300 text-sm">{prize.label}</span>
-                          {prize.id === 'nothing' ? (
-                            <span className="text-gray-500 text-xs">La suerte para la próxima</span>
-                          ) : prize.id === 'lifetime' ? (
-                            <span className="text-yellow-400 text-xs font-medium">¡Premium para siempre!</span>
-                          ) : (
-                            <span className="text-amber-400 text-xs font-medium">
-                              {prize.id === '10min' && '+10 min premium'}
-                              {prize.id === '30min' && '+30 min premium'}
-                              {prize.id === '1day' && '+1 día premium'}
-                              {prize.id === '1week' && '+1 semana sin ads'}
-                              {prize.id === '3days' && '+3 días premium'}
-                              {prize.id === '7days' && '+7 días premium'}
-                              {prize.id === '1month' && '+1 mes premium'}
-                            </span>
-                          )}
+                        <div key={prize.id} className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-4 h-4 rounded-full border border-gray-600 flex-shrink-0"
+                              style={{
+                                background: prize.solidColor || prize.color
+                              }}
+                            />
+                            <span className="text-gray-300 text-sm">{prize.label}</span>
+                          </div>
+                          <span className="text-gray-400 text-xs font-medium">
+                            {prize.colorName}
+                          </span>
                         </div>
                       ))}
                       <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-700">
                         {selectedRouletteType === 'daily'
-                          ? '💡 Puedes girar la ruleta diaria una vez al día. El tiempo premium se acumula.'
-                          : '💡 Usa tus fichas premium para premios especiales. ¡Puedes ganar premium de por vida!'}
+                          ? 'Puedes girar la ruleta diaria una vez al día. El tiempo premium se acumula.'
+                          : 'Usa tus fichas premium para premios especiales. ¡Puedes ganar premium de por vida!'}
                       </p>
                     </div>
                   </div>
@@ -471,41 +637,29 @@ export default function RouletteModal() {
       {/* Mini Modal de Resultado - Aparece encima de todo por 3 segundos */}
       {showResult && selectedPrize && (
         <div className="fixed inset-0 flex items-center justify-center z-[60] pointer-events-none">
-          <div className={`bg-gradient-to-br ${
+          <div className={`rounded-2xl p-6 shadow-2xl border-4 max-w-md mx-4 pointer-events-auto animate-fade-in ${
             selectedPrize.id === 'lifetime'
-              ? 'from-yellow-500 to-amber-500'
+              ? 'bg-gradient-to-br from-gray-900 to-black border-yellow-500'
               : selectedPrize.id === 'nothing'
-              ? 'from-gray-700 to-gray-800'
+              ? 'bg-gradient-to-br from-gray-700 to-gray-800 border-gray-600'
               : selectedRouletteType === 'daily'
-              ? 'from-blue-500 to-blue-600'
-              : 'from-amber-500 to-yellow-500'
-          } rounded-2xl p-6 shadow-2xl border-4 ${
-            selectedPrize.id === 'lifetime'
-              ? 'border-yellow-300'
-              : selectedPrize.id === 'nothing'
-              ? 'border-gray-600'
-              : selectedRouletteType === 'daily'
-              ? 'border-blue-400'
-              : 'border-amber-400'
-          } max-w-md mx-4 pointer-events-auto animate-fade-in`}>
+              ? 'bg-gradient-to-br from-blue-500 to-blue-600 border-blue-400'
+              : 'bg-gradient-to-br from-amber-500 to-yellow-500 border-amber-400'
+          }`}>
             <div className="text-center">
-              <h3 className="text-2xl font-bold text-white mb-3">
-                {selectedPrize.id === 'nothing' ? '¡Casi lo logras!' : selectedPrize.id === 'lifetime' ? '¡INCREÍBLE!' : '¡Felicidades!'}
+              <h3 className={`text-2xl font-bold mb-3 ${
+                selectedPrize.id === 'lifetime' ? 'text-yellow-400' : 'text-white'
+              }`}>
+                {selectedPrize.id === 'nothing' ? '¡Casi lo logras!' : selectedPrize.id === 'lifetime' ? '👑 Increíble…' : '¡Felicidades!'}
               </h3>
-              <p className="text-4xl mb-3">{selectedPrize.label}</p>
-              {selectedPrize.id === 'nothing' ? (
-                <p className="text-gray-200 text-sm">
-                  Vuelve mañana con <Crown size={14} className="inline text-yellow-300" /> Premium para más oportunidades
-                </p>
-              ) : selectedPrize.id === 'lifetime' ? (
-                <p className="text-yellow-100 text-base font-medium">
-                  ¡Ahora tienes acceso premium para siempre! 🎉
-                </p>
-              ) : (
-                <p className="text-white text-base">
-                  ¡Has ganado {selectedPrize.minutes} minutos de tiempo premium!
-                </p>
-              )}
+              <p className={`text-3xl mb-3 font-medium ${
+                selectedPrize.id === 'lifetime' ? 'text-yellow-300' : 'text-white'
+              }`}>{selectedPrize.label}</p>
+              <p className={`text-sm whitespace-pre-line ${
+                selectedPrize.id === 'lifetime' ? 'text-yellow-100' : selectedPrize.id === 'nothing' ? 'text-gray-200' : 'text-white'
+              }`}>
+                {selectedPrize.winMessage}
+              </p>
             </div>
           </div>
         </div>
