@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Crown, Trash2, Calendar, RefreshCw, Users, Mail, Search, Filter, Shield, ChevronLeft, ChevronRight } from "lucide-react";
+import { Crown, Trash2, Calendar, RefreshCw, Users, Mail, Search, Filter, Shield, ChevronLeft, ChevronRight, CircleDashed, Coins } from "lucide-react";
 import { api } from "../services/api";
 
 const USERS_PER_PAGE = 10;
@@ -12,6 +12,11 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [daysToAdd, setDaysToAdd] = useState(30);
+
+  // Estados para modal de tokens
+  const [showTokensModal, setShowTokensModal] = useState(false);
+  const [tokenType, setTokenType] = useState("daily"); // 'daily' | 'premium'
+  const [tokenAmount, setTokenAmount] = useState(1);
 
   // Nuevos estados para filtros y paginación
   const [searchTerm, setSearchTerm] = useState("");
@@ -88,6 +93,41 @@ export default function UserManagement() {
     } catch (error) {
       console.error("Error al cambiar permisos de admin:", error);
       toast.error("Error al cambiar permisos de admin");
+    }
+  }
+
+  async function updateTokens(userId, type, amount) {
+    try {
+      const response = await api.put(`/admin/users/${userId}/tokens`, {
+        type,
+        amount
+      });
+      toast.success(`Tokens ${type === 'daily' ? 'diarios' : 'premium'} actualizados: ${amount > 0 ? '+' : ''}${amount}`);
+      loadUsers();
+      return response.data;
+    } catch (error) {
+      console.error("Error al actualizar tokens:", error);
+      toast.error(error.response?.data?.error || "Error al actualizar tokens");
+      throw error;
+    }
+  }
+
+  function openTokensModal(user) {
+    setSelectedUser(user);
+    setTokenType("daily");
+    setTokenAmount(1);
+    setShowTokensModal(true);
+  }
+
+  async function handleTokensSubmit() {
+    if (!selectedUser) return;
+
+    try {
+      await updateTokens(selectedUser.id, tokenType, tokenAmount);
+      setShowTokensModal(false);
+      setSelectedUser(null);
+    } catch (error) {
+      // Error already handled in updateTokens
     }
   }
 
@@ -312,6 +352,7 @@ export default function UserManagement() {
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Tipo</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Estado</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Admin</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Fichas</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Expira</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase">Acciones</th>
               </tr>
@@ -370,6 +411,24 @@ export default function UserManagement() {
                     )}
                   </td>
                   <td className="px-4 py-3">
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-1">
+                          <CircleDashed size={12} className="text-blue-400" />
+                          <span className="text-xs font-medium text-blue-400">{user.dailyRouletteTokens || 0}</span>
+                        </div>
+                        <span className="text-[10px] text-gray-500">Diaria</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-1">
+                          <Crown size={12} className="text-amber-400" fill="currentColor" />
+                          <span className="text-xs font-medium text-amber-400">{user.premiumRouletteTokens || 0}</span>
+                        </div>
+                        <span className="text-[10px] text-gray-500">Premium</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
                     {user.premiumExpiresAt ? (
                       <div>
                         <p className={`text-sm ${isExpired(user.premiumExpiresAt) ? 'text-red-400' : 'text-gray-300'}`}>
@@ -385,6 +444,15 @@ export default function UserManagement() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => openTokensModal(user)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                        title="Gestionar Fichas"
+                      >
+                        <Coins size={14} className="inline mr-1" />
+                        Fichas
+                      </button>
+
                       <button
                         onClick={() => toggleAdmin(user.id, user.isAdmin)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -569,6 +637,163 @@ export default function UserManagement() {
                 onClick={() => {
                   setShowPremiumModal(false);
                   setSelectedUser(null);
+                }}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para gestionar fichas de ruleta */}
+      {showTokensModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Coins size={24} className="text-red-400" />
+              Gestionar Fichas de Ruleta
+            </h3>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-400 mb-1">Usuario:</p>
+              <p className="text-white font-medium">{selectedUser.email}</p>
+            </div>
+
+            {/* Estado actual de fichas */}
+            <div className="mb-4 bg-gray-900/50 rounded-lg p-3 border border-gray-700">
+              <p className="text-sm text-gray-400 mb-2">Fichas actuales:</p>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <CircleDashed size={16} className="text-blue-400" />
+                  <span className="text-blue-400 font-medium">Diaria: {selectedUser.dailyRouletteTokens || 0}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Crown size={16} className="text-amber-400" fill="currentColor" />
+                  <span className="text-amber-400 font-medium">Premium: {selectedUser.premiumRouletteTokens || 0}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Selector de tipo de ficha */}
+            <div className="mb-4">
+              <label className="block text-sm text-gray-400 mb-2">
+                Tipo de ficha:
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTokenType("daily")}
+                  className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                    tokenType === "daily"
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  }`}
+                >
+                  <CircleDashed size={16} />
+                  Diaria
+                </button>
+                <button
+                  onClick={() => setTokenType("premium")}
+                  className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                    tokenType === "premium"
+                      ? "bg-amber-500 text-white"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  }`}
+                >
+                  <Crown size={16} fill="currentColor" />
+                  Premium
+                </button>
+              </div>
+            </div>
+
+            {/* Input de cantidad */}
+            <div className="mb-4">
+              <label className="block text-sm text-gray-400 mb-2">
+                Cantidad a {tokenAmount >= 0 ? "agregar" : "quitar"}:
+              </label>
+              <input
+                type="number"
+                value={tokenAmount}
+                onChange={(e) => setTokenAmount(parseInt(e.target.value) || 0)}
+                className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none"
+                placeholder="0"
+              />
+
+              {/* Botones rápidos */}
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                <button
+                  onClick={() => setTokenAmount(-1)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm text-red-400"
+                >
+                  -1
+                </button>
+                <button
+                  onClick={() => setTokenAmount(1)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm text-green-400"
+                >
+                  +1
+                </button>
+                <button
+                  onClick={() => setTokenAmount(5)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm text-green-400"
+                >
+                  +5
+                </button>
+                <button
+                  onClick={() => setTokenAmount(-5)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm text-red-400"
+                >
+                  -5
+                </button>
+                <button
+                  onClick={() => setTokenAmount(10)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm text-green-400"
+                >
+                  +10
+                </button>
+                <button
+                  onClick={() => setTokenAmount(0)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Vista previa del resultado */}
+            {tokenAmount !== 0 && (
+              <div className="mb-4 p-3 bg-gray-900/50 rounded-lg border border-gray-700">
+                <p className="text-sm text-gray-400 mb-1">Vista previa:</p>
+                <p className="text-white">
+                  {tokenType === "daily" ? "Fichas Diarias" : "Fichas Premium"}:
+                  <span className={`ml-2 font-bold ${tokenAmount > 0 ? "text-green-400" : "text-red-400"}`}>
+                    {(tokenType === "daily" ? selectedUser.dailyRouletteTokens : selectedUser.premiumRouletteTokens) || 0}
+                    {" → "}
+                    {Math.max(0, ((tokenType === "daily" ? selectedUser.dailyRouletteTokens : selectedUser.premiumRouletteTokens) || 0) + tokenAmount)}
+                  </span>
+                </p>
+              </div>
+            )}
+
+            {/* Botones de acción */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleTokensSubmit}
+                disabled={tokenAmount === 0}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  tokenAmount === 0
+                    ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                    : "bg-red-500 hover:bg-red-600 text-white"
+                }`}
+              >
+                Aplicar
+              </button>
+              <button
+                onClick={() => {
+                  setShowTokensModal(false);
+                  setSelectedUser(null);
+                  setTokenAmount(1);
                 }}
                 className="flex-1 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg font-medium transition-colors"
               >

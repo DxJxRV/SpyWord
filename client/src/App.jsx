@@ -16,6 +16,7 @@ import PremiumSuccess from "./pages/PremiumSuccess";
 import FullscreenButton from "./components/FullscreenButton";
 import Footer from "./components/Footer";
 import PremiumTab from "./components/PremiumTab";
+import RouletteModal from "./components/RouletteModal";
 import { TutorialProvider } from "./contexts/TutorialContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { getUserName, setUserName as saveUserName } from "./utils/nameGenerator";
@@ -171,6 +172,9 @@ export default function App() {
 
           {/* 🔹 Pestaña Premium para usuarios no premium */}
           <PremiumTab />
+
+          {/* 🔹 Modal de Ruleta */}
+          <RouletteModal />
 
           {/* 🔹 Navbar condicional de sala */}
           <RoomNavbar />

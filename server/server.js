@@ -19,6 +19,7 @@ import {
 import { passport, checkAuth, setupAuthRoutes, requireAuth } from './auth.js';
 import { setupPaymentRoutes } from './payment.js';
 import { setupModesRoutes } from './modes.js';
+import { setupRouletteRoutes } from './roulette.js';
 
 // --- Control de Anuncios ---
 const IS_PREMIUM_MODE_ACTIVE = false; // TRUE desactiva todos los anuncios globalmente
@@ -88,6 +89,9 @@ setupPaymentRoutes(app, checkAuth, requireAuth);
 
 // Configurar rutas de modos especiales
 setupModesRoutes(app);
+
+// Configurar rutas de ruleta
+setupRouletteRoutes(app, checkAuth, requireAuth);
 
 // Servir archivos estáticos de /uploads
 app.use('/uploads', express.static('uploads'));
@@ -1056,6 +1060,9 @@ app.get('/api/admin/users', async (req, res) => {
         isPremium: true,
         premiumExpiresAt: true,
         isAdmin: true,
+        dailyRouletteTokens: true,
+        premiumRouletteTokens: true,
+        lastDailyTokenReset: true,
         createdAt: true,
         updatedAt: true
       }
@@ -1247,6 +1254,109 @@ app.delete('/api/admin/users/:id', async (req, res) => {
     } else {
       res.status(500).json({ error: 'Error al eliminar usuario' });
     }
+  }
+});
+
+// 🎰 GET /api/admin/users/:id/tokens - Obtener tokens de ruleta de un usuario
+app.get('/api/admin/users/:id/tokens', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        dailyRouletteTokens: true,
+        premiumRouletteTokens: true,
+        lastDailyTokenReset: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json({
+      success: true,
+      tokens: {
+        daily: user.dailyRouletteTokens,
+        premium: user.premiumRouletteTokens,
+        lastDailyReset: user.lastDailyTokenReset
+      },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener tokens del usuario:', error);
+    res.status(500).json({ error: 'Error al obtener tokens del usuario' });
+  }
+});
+
+// 🎰 PUT /api/admin/users/:id/tokens - Actualizar tokens de ruleta de un usuario
+app.put('/api/admin/users/:id/tokens', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, amount } = req.body; // type: 'daily' | 'premium', amount: número a sumar (puede ser negativo)
+
+    if (!type || !['daily', 'premium'].includes(type)) {
+      return res.status(400).json({ error: 'Tipo de token inválido. Use "daily" o "premium"' });
+    }
+
+    if (typeof amount !== 'number') {
+      return res.status(400).json({ error: 'La cantidad debe ser un número' });
+    }
+
+    // Obtener usuario actual
+    const user = await prisma.user.findUnique({
+      where: { id }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Calcular nuevos valores
+    const field = type === 'daily' ? 'dailyRouletteTokens' : 'premiumRouletteTokens';
+    const currentValue = user[field];
+    const newValue = Math.max(0, currentValue + amount); // No permitir valores negativos
+
+    // Actualizar tokens
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        [field]: newValue
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        dailyRouletteTokens: true,
+        premiumRouletteTokens: true
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Tokens ${type} actualizados correctamente`,
+      tokens: {
+        daily: updatedUser.dailyRouletteTokens,
+        premium: updatedUser.premiumRouletteTokens
+      },
+      change: {
+        type,
+        previous: currentValue,
+        amount,
+        new: newValue
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error al actualizar tokens del usuario:', error);
+    res.status(500).json({ error: 'Error al actualizar tokens del usuario' });
   }
 });
 

@@ -101,12 +101,33 @@ model User {
   isPremium       Boolean   @default(false) @map("is_premium") // CRUCIAL para anuncios y Premium Pass
   premiumExpiresAt DateTime? @map("premium_expires_at") // Fecha de expiración del premium
   isAdmin         Boolean   @default(false) @map("is_admin") // Permisos de administrador
+  dailyRouletteTokens Int   @default(1) @map("daily_roulette_tokens") // Fichas para ruleta diaria (se resetea diario)
+  premiumRouletteTokens Int @default(0) @map("premium_roulette_tokens") // Fichas para ruleta premium
+  lastDailyTokenReset DateTime? @map("last_daily_token_reset") // Última vez que se resetearon tokens diarios
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  rouletteSpins   RouletteSpins[]
 
   @@map("users")
   @@index([googleId])
   @@index([isPremium])
   @@index([email])
   @@index([isAdmin])
+}
+
+// Modelo para trackear spins de la ruleta
+model RouletteSpins {
+  id            Int      @id @default(autoincrement())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rouletteType  String   @db.VarChar(20) @map("roulette_type") // 'daily' | 'premium'
+  prize         String   @db.VarChar(50) // 'nothing' | '10min' | '30min' | '1day' | '1week' | '3days' | '7days' | '1month' | 'lifetime'
+  prizeMinutes  Int?     @map("prize_minutes") // Minutos de premium ganados (null si es nothing o lifetime)
+  spunAt        DateTime @default(now()) @map("spun_at")
+
+  @@map("roulette_spins")
+  @@index([userId, spunAt])
+  @@index([spunAt])
+  @@index([rouletteType])
 }
