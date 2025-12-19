@@ -331,13 +331,10 @@ export default function AppHeader() {
                       </div>
                     </>
                   ) : (
-                    // Usuario no autenticado - Mostrar nombre local editable (DESTACADO)
+                    // Usuario no autenticado - Mostrar nombre local editable
                     <>
-                      <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-2 border-purple-500/50 rounded-lg p-3 mb-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Pencil size={14} className="text-purple-400" />
-                          <p className="text-xs font-semibold text-purple-300">Mi nombre en el juego</p>
-                        </div>
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-400 mb-1">Mi nombre en el juego</p>
                         {isEditing ? (
                           <div className="flex items-center gap-2">
                             <input
@@ -345,7 +342,7 @@ export default function AppHeader() {
                               value={tempName}
                               onChange={(e) => setTempName(e.target.value)}
                               onKeyDown={handleKeyDown}
-                              className="bg-gray-700 text-white px-2 py-1 rounded-lg border border-purple-500 focus:border-purple-400 focus:outline-none text-sm flex-1"
+                              className="bg-gray-700 text-white px-2 py-1 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm flex-1"
                               maxLength={25}
                               autoFocus
                             />
@@ -367,15 +364,14 @@ export default function AppHeader() {
                         ) : (
                           <button
                             onClick={handleEditName}
-                            className="group flex items-center gap-2 hover:bg-purple-500/20 px-2 py-1.5 rounded-lg transition-all w-full border border-purple-500/30 hover:border-purple-400/50"
+                            className="group flex items-center gap-2 hover:bg-gray-700/50 px-2 py-1 rounded-lg transition-all w-full"
                           >
-                            <span className="text-base font-bold text-white flex-1 text-left">
+                            <span className="text-base font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent flex-1 text-left animate-pulse bg-[length:200%_auto]">
                               {name}
                             </span>
-                            <Pencil size={16} className="text-purple-400 group-hover:text-purple-300 transition-colors" />
+                            <Pencil size={14} className="text-gray-400 group-hover:text-white transition-colors" />
                           </button>
                         )}
-                        <p className="text-xs text-purple-300/70 mt-2 text-center">Haz clic para cambiar tu nombre</p>
                       </div>
                       <p className="text-xs text-gray-500">No autenticado</p>
                     </>

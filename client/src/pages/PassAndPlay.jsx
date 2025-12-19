@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Users, Play, HelpCircle, ChevronUp, ChevronDown } from "lucide-react";
-import { toast } from "sonner";
 import ScratchCard from "react-scratchcard-v2";
 import Joyride, { ACTIONS, EVENTS, STATUS } from "react-joyride";
 import AppHeader from "../components/AppHeader";
@@ -37,7 +36,7 @@ export default function PassAndPlay() {
 
   // Estados para el diseño holográfico de las tarjetas
   const [cardThemes, setCardThemes] = useState([]);
-  const scratchCanvasRef = useRef(null);
+  const scratchCardContainerRef = useRef(null);
 
   // Estados para los avatares de jugadores
   const [playerAvatars, setPlayerAvatars] = useState([]);
@@ -214,9 +213,6 @@ export default function PassAndPlay() {
     if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
       // Tutorial terminado o saltado
       setRunTutorial(false);
-      if (status === STATUS.FINISHED) {
-        toast.success("¡Tutorial completado! Ya puedes jugar libremente.");
-      }
       setIsTutorialMode(false);
       setTutorialStepIndex(0);
       // Resetear al modo setup
@@ -261,7 +257,6 @@ export default function PassAndPlay() {
       console.log("📘 Tutorial: Paso 4 → Finalizando...");
       setRunTutorial(false);
       setIsTutorialMode(false);
-      toast.success("¡Tutorial completado! Ya puedes jugar libremente.");
       setTimeout(() => {
         resetGame();
       }, 500);
@@ -312,7 +307,6 @@ export default function PassAndPlay() {
 
   const startGame = () => {
     if (totalPlayers === '' || totalPlayers < 3 || isNaN(totalPlayers)) {
-      toast.error("Se necesitan al menos 3 jugadores");
       return;
     }
 
@@ -368,8 +362,6 @@ export default function PassAndPlay() {
       setVotingEnabled(false);
       setSelectedPlayer(null);
       setDiscussionTimer(120);
-
-      toast.success("¡Tutorial! Pasando a la Sala de Guerra.");
       return;
     }
 
@@ -395,8 +387,6 @@ export default function PassAndPlay() {
       setVotingEnabled(false);
       setSelectedPlayer(null);
       setDiscussionTimer(120);
-
-      toast.success("¡Todos vieron su palabra! Entren a la Sala de Guerra.");
     }
   };
 
@@ -407,7 +397,6 @@ export default function PassAndPlay() {
       // ¡Ganaron los jugadores!
       setWinner('PLAYERS');
       setGameOver(true);
-      toast.success("¡Eliminaron al impostor! Ganaron los jugadores 🎉");
 
       // Reset war room al terminar el juego
       setVotingMode(false);
@@ -427,7 +416,6 @@ export default function PassAndPlay() {
         // Solo quedan 2: el impostor gana
         setWinner('IMPOSTOR');
         setGameOver(true);
-        toast.error("El impostor sobrevivió hasta el final 🎭");
 
         // Reset war room al terminar el juego
         setVotingMode(false);
@@ -448,8 +436,6 @@ export default function PassAndPlay() {
         setVotingEnabled(false);
         setSelectedPlayer(null);
         setDiscussionTimer(120);
-
-        toast.info(`Jugador ${votedPlayerIndex + 1} eliminado. ¡Nueva ronda! ${remainingAlive.length} jugadores quedan.`);
       }
     }
   };
@@ -457,7 +443,6 @@ export default function PassAndPlay() {
   const enableVoting = () => {
     setVotingEnabled(true);
     if (navigator.vibrate) navigator.vibrate(50);
-    toast.info("¡Votaciones abiertas! Seleccionen al impostor.");
   };
 
   const selectPlayer = (playerIndex) => {
@@ -473,7 +458,6 @@ export default function PassAndPlay() {
   };
 
   const skipVote = () => {
-    toast.info("Votación saltada. El juego continúa...");
     setVotingMode(false);
     setVotingEnabled(false);
     setSelectedPlayer(null);
@@ -535,37 +519,40 @@ export default function PassAndPlay() {
 
     // Ir directamente a mostrar la primera tarjeta
     setShowingCard(true);
-
-    toast.success("¡Nueva partida! Mismos jugadores, nueva palabra.");
   };
 
-  // Deshabilitar scroll cuando se muestra la tarjeta de raspado en mobile
+  // Deshabilitar scroll y centrar la card cuando se muestra
   useEffect(() => {
     if (showingCard) {
-      // Guardar el overflow actual
-      const originalOverflow = document.body.style.overflow;
-      const originalTouchAction = document.body.style.touchAction;
-
       // Deshabilitar scroll
       document.body.style.overflow = 'hidden';
       document.body.style.touchAction = 'none';
 
-      // Restaurar al desmontar o cuando showingCard cambie
+      // Centrar la card en la pantalla
+      setTimeout(() => {
+        if (scratchCardContainerRef.current) {
+          scratchCardContainerRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          });
+        }
+      }, 100);
+
       return () => {
-        document.body.style.overflow = originalOverflow;
-        document.body.style.touchAction = originalTouchAction;
+        document.body.style.overflow = '';
+        document.body.style.touchAction = '';
       };
     }
-  }, [showingCard]);
+  }, [showingCard, currentPlayerIndex]);
 
   // Renderizar el botón de ayuda (disponible en todas las pantallas)
   const HelpButton = () => (
     <button
       onClick={startTutorial}
-      className="fixed top-20 right-6 bg-blue-500/20 hover:bg-blue-500/30 px-4 py-2 rounded-lg transition-all flex items-center gap-2 border border-blue-500/50 z-[100]"
+      className="fixed top-20 right-6 bg-blue-500/10 hover:bg-blue-500/20 p-3 rounded-lg transition-all flex items-center justify-center border border-blue-500/30 z-[100]"
+      title="¿Cómo jugar?"
     >
       <HelpCircle size={20} />
-      <span>¿Cómo jugar?</span>
     </button>
   );
 
@@ -634,10 +621,10 @@ export default function PassAndPlay() {
 
           <button
             onClick={() => navigate('/')}
-            className="fixed top-20 left-6 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all flex items-center gap-2 z-[100]"
+            className="fixed top-20 left-6 bg-white/5 hover:bg-white/10 p-3 rounded-lg transition-all flex items-center justify-center z-[100]"
+            title="Volver"
           >
             <ArrowLeft size={20} />
-            <span>Volver</span>
           </button>
 
           {/* Botón de Ayuda */}
@@ -818,7 +805,10 @@ export default function PassAndPlay() {
               </div>
             </div>
 
-            <div className="pnp-scratch-container w-full">
+            <div
+              ref={scratchCardContainerRef}
+              className="pnp-scratch-container w-full"
+            >
               <div
                 className="rounded-xl overflow-hidden w-full"
                 style={{
@@ -1274,7 +1264,7 @@ export default function PassAndPlay() {
             </div>
 
             {/* FOOTER: Acciones */}
-            <div className="space-y-3">
+            <div className={`space-y-3 ${!votingEnabled ? 'sticky bottom-0 bg-gray-950 pt-4 pb-4 -mb-4' : ''}`}>
               {!votingEnabled ? (
                 // Modo Debate
                 <button

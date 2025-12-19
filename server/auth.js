@@ -75,6 +75,8 @@ passport.use(
               name,
               profilePicture,
               isPremium: false, // Por defecto, usuarios no son premium
+              dailyRouletteTokens: 1,
+              lastDailyTokenReset: new Date()
             },
           });
           console.log(`✅ Nuevo usuario creado: ${email} (ID: ${user.id})`);
@@ -264,7 +266,9 @@ function setupAuthRoutes(app) {
           email,
           password: hashedPassword,
           name: name || null,
-          isPremium: false
+          isPremium: false,
+          dailyRouletteTokens: 1,
+          lastDailyTokenReset: new Date()
         }
       });
 
