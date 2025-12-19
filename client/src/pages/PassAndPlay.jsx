@@ -74,9 +74,6 @@ export default function PassAndPlay() {
     }
   ];
 
-  // Emojis disponibles para el patrón
-  const availableEmojis = ['🎲', '🤐', '🕵️', '🎭', '👽', '💎'];
-
   // Emojis para avatares de jugadores (personas y objetos)
   const playerEmojiPool = [
     '👨', '👩', '🧑', '👴', '👵', '🧔', '👱', '👨‍🦰', '👩‍🦰', '🧑‍🦱', '👨‍🦱', '👩‍🦱',
@@ -116,8 +113,8 @@ export default function PassAndPlay() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Agregar patrón de emojis con baja opacidad
-    ctx.globalAlpha = 0.15;
+    // Agregar patrón de emojis visible (menos opaco = más visible)
+    ctx.globalAlpha = 0.7;
     ctx.font = '32px Arial';
     for (let y = 0; y < canvas.height; y += 50) {
       for (let x = 0; x < canvas.width; x += 50) {
@@ -136,16 +133,16 @@ export default function PassAndPlay() {
     return canvas.toDataURL();
   };
 
-  // Función para generar temas aleatorios para todos los jugadores
-  const generateCardThemesForPlayers = (numPlayers) => {
+  // Función para generar temas para todos los jugadores con sus emojis personalizados
+  const generateCardThemesForPlayers = (numPlayers, avatars) => {
     const themes = [];
     for (let i = 0; i < numPlayers; i++) {
       const randomTheme = holoThemes[Math.floor(Math.random() * holoThemes.length)];
-      const randomEmoji = availableEmojis[Math.floor(Math.random() * availableEmojis.length)];
+      const playerEmoji = avatars[i] || '👤'; // Usar el emoji del jugador
       themes.push({
         theme: randomTheme,
-        emoji: randomEmoji,
-        canvasImage: generateHolographicCanvas(randomTheme, randomEmoji)
+        emoji: playerEmoji,
+        canvasImage: generateHolographicCanvas(randomTheme, playerEmoji)
       });
     }
     return themes;
@@ -320,11 +317,12 @@ export default function PassAndPlay() {
     setSessionWordList(words);
     setCurrentPlayerIndex(0);
 
-    // Generar temas holográficos para todos los jugadores
-    setCardThemes(generateCardThemesForPlayers(4));
-
     // Generar avatares únicos para cada jugador
-    setPlayerAvatars(generatePlayerAvatars(4));
+    const tutorialAvatars = generatePlayerAvatars(4);
+    setPlayerAvatars(tutorialAvatars);
+
+    // Generar temas holográficos para todos los jugadores con sus avatares
+    setCardThemes(generateCardThemesForPlayers(4, tutorialAvatars));
 
     // NO mostrar intersticial en modo tutorial
     setSetupMode(false);
@@ -353,10 +351,9 @@ export default function PassAndPlay() {
     setSessionWordList(words);
     setCurrentPlayerIndex(0);
 
-    // Generar temas holográficos para todos los jugadores
-    setCardThemes(generateCardThemesForPlayers(totalPlayers));
-
+    // Generar temas holográficos para todos los jugadores con sus avatares
     // Los avatares ya están generados por el useEffect que escucha cambios en totalPlayers
+    setCardThemes(generateCardThemesForPlayers(totalPlayers, playerAvatars));
 
     // Mostrar viñeta intersticial antes de mostrar la primera palabra
     setShowNewRoundInterstitial(true);
@@ -469,38 +466,6 @@ export default function PassAndPlay() {
       };
     }
   }, [showingCard]);
-
-  // Agregar haptic feedback mientras se rasca
-  useEffect(() => {
-    if (!showingCard) return;
-
-    let lastVibration = 0;
-    const vibrationInterval = 100; // Vibrar cada 100ms mientras rasca
-
-    const handleScratch = (e) => {
-      // Verificar que el usuario está tocando/arrastrando
-      if ((e.type === 'touchmove' || (e.type === 'mousemove' && e.buttons === 1))) {
-        const now = Date.now();
-        if (now - lastVibration > vibrationInterval) {
-          if (navigator.vibrate) {
-            navigator.vibrate(10); // Vibración corta y suave
-          }
-          lastVibration = now;
-        }
-      }
-    };
-
-    const scratchContainer = document.querySelector('.pnp-scratch-container');
-    if (scratchContainer) {
-      scratchContainer.addEventListener('touchmove', handleScratch, { passive: true });
-      scratchContainer.addEventListener('mousemove', handleScratch, { passive: true });
-
-      return () => {
-        scratchContainer.removeEventListener('touchmove', handleScratch);
-        scratchContainer.removeEventListener('mousemove', handleScratch);
-      };
-    }
-  }, [showingCard, currentPlayerIndex]);
 
   // Renderizar el botón de ayuda (disponible en todas las pantallas)
   const HelpButton = () => (
@@ -755,8 +720,8 @@ export default function PassAndPlay() {
               </p>
             </div>
 
-            <div className="pnp-scratch-container relative flex justify-center" style={{ touchAction: 'none' }}>
-              <div style={{ touchAction: 'none' }}>
+            <div className="pnp-scratch-container relative flex justify-center">
+              <div>
                 <ScratchCard
                   key={currentPlayerIndex}
                   width={320}
