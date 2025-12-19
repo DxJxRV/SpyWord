@@ -900,53 +900,193 @@ export default function PassAndPlay() {
     );
   }
 
-  // Game Over Screen
+  // Game Over Screen - PANTALLA DE GLORIA
   if (gameOver) {
+    const impostorEmoji = playerAvatars[impostorIndex] || '👤';
+    const picantePhrases = [
+      "¿Fue suerte o habilidad?",
+      `El Jugador ${impostorIndex + 1} suda mucho al mentir...`,
+      "Otro round, otra oportunidad",
+      "La venganza es un plato que se sirve frío",
+      "¿Quién será el próximo impostor?",
+      "Eso estuvo cerca...",
+    ];
+    const randomPhrase = picantePhrases[Math.floor(Math.random() * picantePhrases.length)];
+
     return (
       <>
+        <style>{`
+          @keyframes stamp-appear {
+            0% {
+              transform: scale(0) rotate(-15deg);
+              opacity: 0;
+            }
+            50% {
+              transform: scale(1.2) rotate(-12deg);
+            }
+            100% {
+              transform: scale(1) rotate(-15deg);
+              opacity: 1;
+            }
+          }
+
+          @keyframes float-in {
+            0% {
+              transform: translateY(50px);
+              opacity: 0;
+            }
+            100% {
+              transform: translateY(0);
+              opacity: 1;
+            }
+          }
+
+          @keyframes confetti-fall {
+            0% {
+              transform: translateY(-100vh) rotate(0deg);
+              opacity: 1;
+            }
+            100% {
+              transform: translateY(100vh) rotate(720deg);
+              opacity: 0;
+            }
+          }
+
+          .stamp {
+            animation: stamp-appear 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.5s forwards;
+            opacity: 0;
+          }
+
+          .float-in {
+            animation: float-in 0.6s ease-out;
+          }
+
+          .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            animation: confetti-fall 3s linear infinite;
+          }
+        `}</style>
+
         <AppHeader />
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
+
+        {/* Fondo Full Screen con degradado */}
+        <div
+          className="relative flex flex-col items-center justify-center min-h-screen text-white p-6 pt-20 overflow-hidden"
+          style={{
+            background: winner === 'IMPOSTOR'
+              ? 'radial-gradient(circle at center, #7f1d1d 0%, #450a0a 50%, #000000 100%)'
+              : 'radial-gradient(circle at center, #065f46 0%, #064e3b 50%, #000000 100%)'
+          }}
+        >
+          {/* Confeti animado (solo si ganaron jugadores) */}
+          {winner === 'PLAYERS' && (
+            <>
+              {[...Array(20)].map((_, i) => (
+                <div
+                  key={i}
+                  className="confetti"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    backgroundColor: ['#fbbf24', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'][Math.floor(Math.random() * 5)],
+                    animationDelay: `${Math.random() * 3}s`,
+                    animationDuration: `${2 + Math.random() * 2}s`
+                  }}
+                />
+              ))}
+            </>
+          )}
+
           {/* Botón de Ayuda */}
           <HelpButton />
 
-          <div className="max-w-md w-full text-center space-y-6">
-            <div className={`p-8 rounded-2xl ${
-              winner === 'IMPOSTOR'
-                ? 'bg-gradient-to-br from-red-600/20 to-red-800/20 border-2 border-red-500'
-                : 'bg-gradient-to-br from-emerald-600/20 to-emerald-800/20 border-2 border-emerald-500'
-            }`}>
-              <h2 className="text-4xl font-bold mb-4">
-                {winner === 'IMPOSTOR' ? '🎭 ¡Victoria del Impostor!' : '🎉 ¡Victoria de los Jugadores!'}
+          <div className="max-w-md w-full text-center space-y-8 relative z-10">
+            {/* Encabezado */}
+            <div className="float-in">
+              <h1 className="text-6xl font-black mb-2">
+                {winner === 'IMPOSTOR' ? '🎭' : '🎉'}
+              </h1>
+              <h2 className="text-5xl font-black tracking-tight">
+                {winner === 'IMPOSTOR' ? '¡VICTORIA!' : '¡VICTORIA!'}
               </h2>
-              <p className="text-xl mb-6">
-                {winner === 'IMPOSTOR'
-                  ? 'El impostor sobrevivió hasta el final'
-                  : '¡Eliminaron al impostor correctamente!'}
+              <p className="text-xl text-gray-300 mt-2">
+                {winner === 'IMPOSTOR' ? 'El impostor sobrevivió' : 'Impostor eliminado'}
               </p>
-
-              <div className="bg-gray-800/50 p-4 rounded-lg mb-4">
-                <p className="text-lg font-semibold mb-2">Resumen:</p>
-                <p className="text-sm text-gray-300">
-                  <strong>Palabra secreta:</strong> {normalWord}<br/>
-                  <strong>El impostor era:</strong> <span className="text-2xl">{playerAvatars[impostorIndex] || '👤'}</span> Jugador {impostorIndex + 1}
-                </p>
-              </div>
             </div>
 
-            <button
-              onClick={restartGame}
-              className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg"
-            >
-              <span>🔄</span>
-              <span>Jugar de Nuevo (Mismo Grupo)</span>
-            </button>
+            {/* Hero Section - Avatar del Impostor */}
+            <div className="relative float-in" style={{ animationDelay: '0.2s' }}>
+              {/* Avatar Gigante */}
+              <div className="relative inline-block">
+                <div className="text-9xl mb-4 filter drop-shadow-2xl">
+                  {impostorEmoji}
+                </div>
 
-            <button
-              onClick={resetGame}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl text-lg font-semibold transition-all active:scale-95"
+                {/* Sello de CAPTURADO o Corona */}
+                {winner === 'PLAYERS' ? (
+                  <div
+                    className="stamp absolute top-0 right-0 bg-red-600 text-white px-6 py-3 rounded-lg font-black text-2xl border-4 border-red-800 shadow-2xl"
+                    style={{
+                      transform: 'rotate(-15deg)',
+                    }}
+                  >
+                    ¡CAPTURADO!
+                  </div>
+                ) : (
+                  <div className="stamp absolute -top-4 left-1/2 -translate-x-1/2 text-6xl filter drop-shadow-lg">
+                    👑
+                  </div>
+                )}
+              </div>
+
+              <p className="text-3xl font-bold mt-4">
+                Jugador {impostorIndex + 1}
+              </p>
+              <p className="text-sm text-gray-400">
+                {winner === 'IMPOSTOR' ? 'Maestro del engaño' : 'Fue descubierto'}
+              </p>
+            </div>
+
+            {/* Badge de Palabra Secreta */}
+            <div
+              className="float-in inline-block px-6 py-4 rounded-2xl backdrop-blur-md border-2 shadow-xl"
+              style={{
+                animationDelay: '0.4s',
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderColor: winner === 'IMPOSTOR' ? '#f87171' : '#6ee7b7'
+              }}
             >
-              Nueva Partida (Cambiar Jugadores)
-            </button>
+              <p className="text-sm text-gray-300 mb-1">🔓 La palabra era:</p>
+              <p className="text-3xl font-black uppercase tracking-wider">
+                {normalWord}
+              </p>
+            </div>
+
+            {/* Frase Picante */}
+            <p className="float-in text-lg italic text-gray-400" style={{ animationDelay: '0.6s' }}>
+              "{randomPhrase}"
+            </p>
+
+            {/* Botones */}
+            <div className="space-y-4 float-in" style={{ animationDelay: '0.8s' }}>
+              {/* Botón Primario - REVANCHA */}
+              <button
+                onClick={restartGame}
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 px-8 py-6 rounded-2xl text-2xl font-black transition-all active:scale-95 flex items-center justify-center gap-4 shadow-2xl shadow-purple-500/50"
+              >
+                <span className="text-3xl">🔄</span>
+                <span>REVANCHA RÁPIDA</span>
+              </button>
+
+              {/* Botón Secundario - Cambiar Config */}
+              <button
+                onClick={resetGame}
+                className="w-full text-gray-400 hover:text-white transition-all text-sm py-2"
+              >
+                ⚙️ Cambiar configuración
+              </button>
+            </div>
           </div>
         </div>
       </>
