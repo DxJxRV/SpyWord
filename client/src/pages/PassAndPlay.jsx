@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Users, Play, HelpCircle, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +28,10 @@ export default function PassAndPlay() {
   const isRoomPremium = false; // Premium Pass - false porque es modo local
   const [showNewRoundInterstitial, setShowNewRoundInterstitial] = useState(false);
 
+  // Estados para el diseño holográfico de las tarjetas
+  const [cardThemes, setCardThemes] = useState([]);
+  const scratchCanvasRef = useRef(null);
+
   // Cambiar título de la página
   useEffect(() => {
     document.title = "ImpostorWord - Pasa y Juega";
@@ -40,6 +44,80 @@ export default function PassAndPlay() {
   const [runTutorial, setRunTutorial] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
   const [isTutorialMode, setIsTutorialMode] = useState(false);
+
+  // Definir los temas holográficos disponibles
+  const holoThemes = [
+    {
+      name: 'Gold',
+      gradients: ['#fbbf24', '#f59e0b', '#d97706', '#ea580c'],
+      particleColor: '#fbbf24'
+    },
+    {
+      name: 'Holo',
+      gradients: ['#06b6d4', '#8b5cf6', '#ec4899', '#06b6d4'],
+      particleColor: '#8b5cf6'
+    },
+    {
+      name: 'Ruby',
+      gradients: ['#ef4444', '#dc2626', '#ec4899', '#f43f5e'],
+      particleColor: '#ef4444'
+    }
+  ];
+
+  // Emojis disponibles para el patrón
+  const availableEmojis = ['🎲', '🤐', '🕵️', '🎭', '👽', '💎'];
+
+  // Función para generar canvas holográfico con patrón de emojis
+  const generateHolographicCanvas = (theme, emoji) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+
+    // Crear gradiente holográfico
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    theme.gradients.forEach((color, idx) => {
+      gradient.addColorStop(idx / (theme.gradients.length - 1), color);
+    });
+
+    // Aplicar gradiente de fondo
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Agregar patrón de emojis con baja opacidad
+    ctx.globalAlpha = 0.15;
+    ctx.font = '32px Arial';
+    for (let y = 0; y < canvas.height; y += 50) {
+      for (let x = 0; x < canvas.width; x += 50) {
+        ctx.fillText(emoji, x + (y % 100 === 0 ? 25 : 0), y);
+      }
+    }
+
+    // Restaurar opacidad y agregar texto de instrucción
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Raspa aquí 👆', canvas.width / 2, canvas.height / 2);
+
+    return canvas.toDataURL();
+  };
+
+  // Función para generar temas aleatorios para todos los jugadores
+  const generateCardThemesForPlayers = (numPlayers) => {
+    const themes = [];
+    for (let i = 0; i < numPlayers; i++) {
+      const randomTheme = holoThemes[Math.floor(Math.random() * holoThemes.length)];
+      const randomEmoji = availableEmojis[Math.floor(Math.random() * availableEmojis.length)];
+      themes.push({
+        theme: randomTheme,
+        emoji: randomEmoji,
+        canvasImage: generateHolographicCanvas(randomTheme, randomEmoji)
+      });
+    }
+    return themes;
+  };
 
   // Definir TODOS los pasos del tutorial en un solo array
   const tutorialSteps = [
@@ -60,7 +138,7 @@ export default function PassAndPlay() {
     // Paso 2: Contenedor de raspado (se mostrará cuando showingCard sea true)
     {
       target: '.pnp-scratch-container',
-      content: '✨ Este es el contenedor de raspado. Cada jugador debe raspar con el dedo (o mouse) para revelar su palabra. Si eres el impostor te saldrá "???"',
+      content: '✨ Este es el contenedor de raspado. Cada jugador debe raspar con el dedo (o mouse) para revelar su palabra. Si eres el impostor te saldrá "IMPOSTOR"',
       disableBeacon: true,
       placement: 'bottom',
     },
@@ -210,6 +288,9 @@ export default function PassAndPlay() {
     setSessionWordList(words);
     setCurrentPlayerIndex(0);
 
+    // Generar temas holográficos para todos los jugadores
+    setCardThemes(generateCardThemesForPlayers(4));
+
     // NO mostrar intersticial en modo tutorial
     setSetupMode(false);
     setShowingCard(true);
@@ -236,6 +317,9 @@ export default function PassAndPlay() {
 
     setSessionWordList(words);
     setCurrentPlayerIndex(0);
+
+    // Generar temas holográficos para todos los jugadores
+    setCardThemes(generateCardThemesForPlayers(totalPlayers));
 
     // Mostrar viñeta intersticial antes de mostrar la primera palabra
     setShowNewRoundInterstitial(true);
@@ -346,6 +430,38 @@ export default function PassAndPlay() {
       };
     }
   }, [showingCard]);
+
+  // Agregar haptic feedback mientras se rasca
+  useEffect(() => {
+    if (!showingCard) return;
+
+    let lastVibration = 0;
+    const vibrationInterval = 100; // Vibrar cada 100ms mientras rasca
+
+    const handleScratch = (e) => {
+      // Verificar que el usuario está tocando/arrastrando
+      if ((e.type === 'touchmove' || (e.type === 'mousemove' && e.buttons === 1))) {
+        const now = Date.now();
+        if (now - lastVibration > vibrationInterval) {
+          if (navigator.vibrate) {
+            navigator.vibrate(10); // Vibración corta y suave
+          }
+          lastVibration = now;
+        }
+      }
+    };
+
+    const scratchContainer = document.querySelector('.pnp-scratch-container');
+    if (scratchContainer) {
+      scratchContainer.addEventListener('touchmove', handleScratch, { passive: true });
+      scratchContainer.addEventListener('mousemove', handleScratch, { passive: true });
+
+      return () => {
+        scratchContainer.removeEventListener('touchmove', handleScratch);
+        scratchContainer.removeEventListener('mousemove', handleScratch);
+      };
+    }
+  }, [showingCard, currentPlayerIndex]);
 
   // Renderizar el botón de ayuda (disponible en todas las pantallas)
   const HelpButton = () => (
@@ -508,6 +624,16 @@ export default function PassAndPlay() {
 
     return (
       <>
+        <style>{`
+          @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+          }
+        `}</style>
         <AppHeader />
 
         {/* Joyride Tutorial Global */}
@@ -554,10 +680,10 @@ export default function PassAndPlay() {
                   key={currentPlayerIndex}
                   width={320}
                   height={240}
-                  image="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='240'%3E%3Crect width='320' height='240' fill='%23475569'/%3E%3Ctext x='160' y='120' font-family='Arial' font-size='20' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'%3ERaspa aquí 👆%3C/text%3E%3C/svg%3E"
+                  image={cardThemes[currentPlayerIndex]?.canvasImage || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='240'%3E%3Crect width='320' height='240' fill='%23475569'/%3E%3C/svg%3E"}
                   finishPercent={50}
                   onComplete={() => {
-                    if (navigator.vibrate) navigator.vibrate(40);
+                    if (navigator.vibrate) navigator.vibrate(100);
                   }}
                 >
                   <div
@@ -567,21 +693,37 @@ export default function PassAndPlay() {
                       height: '240px',
                       margin: 0,
                       padding: '0 16px',
-                      background: isImpostor
-                        ? 'linear-gradient(to bottom right, rgb(220 38 38), rgb(153 27 27))'
-                        : 'linear-gradient(to bottom right, rgb(5 150 105), rgb(4 120 87))'
+                      background: '#1a1a2e'
                     }}
                   >
-                    <p className={`font-black text-white text-center ${
-                      currentWord.length > 15 ? 'text-3xl' : currentWord.length > 10 ? 'text-4xl' : 'text-5xl'
-                    }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                      {currentWord}
-                    </p>
-                    {isImpostor && (
-                      <p className="text-lg font-semibold bg-red-900/50 px-3 py-2 rounded-lg mt-3 text-center">
-                        🎭 Eres el IMPOSTOR<br/>
-                        <span className="text-xs">Descubre la palabra secreta</span>
-                      </p>
+                    {isImpostor ? (
+                      <div className="text-center">
+                        <p className="text-6xl font-black text-red-500 animate-pulse" style={{
+                          textShadow: '0 0 10px rgba(239, 68, 68, 0.5)',
+                          animation: 'glitch 0.3s infinite'
+                        }}>
+                          IMPOSTOR
+                        </p>
+                        <p className="text-sm font-semibold text-red-400 mt-3">
+                          🎭 Descubre la palabra secreta
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <p className={`font-black text-center ${
+                          currentWord.length > 15 ? 'text-3xl' : currentWord.length > 10 ? 'text-4xl' : 'text-5xl'
+                        }`} style={{
+                          wordBreak: 'break-word',
+                          overflowWrap: 'break-word',
+                          background: 'linear-gradient(135deg, #ffffff 0%, #a78bfa 100%)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          backgroundClip: 'text',
+                          filter: 'drop-shadow(0 0 20px rgba(167, 139, 250, 0.5))'
+                        }}>
+                          {currentWord}
+                        </p>
+                      </div>
                     )}
                   </div>
                 </ScratchCard>
