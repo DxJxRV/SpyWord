@@ -617,7 +617,7 @@ export default function PassAndPlay() {
           }}
         />
 
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20 pb-28">
 
           <button
             onClick={() => navigate('/')}
@@ -635,7 +635,7 @@ export default function PassAndPlay() {
             Juega en un solo dispositivo. Cada jugador verá su palabra por turnos.
           </p>
 
-          <div className="bg-gray-800/50 p-8 rounded-2xl max-w-lg w-full space-y-6">
+          <div className="bg-gray-800/50 p-8 rounded-2xl max-w-lg w-full space-y-6 mb-6">
             <div className="pnp-player-counter">
               <label className="flex items-center justify-center gap-2 text-lg font-semibold mb-4">
                 <Users size={24} className="text-purple-400" />
@@ -713,14 +713,19 @@ export default function PassAndPlay() {
                 </div>
               </div>
             </div>
+          </div>
 
-            <button
-              onClick={startGame}
-              className="pnp-start-button w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/30 animate-breathe"
-            >
-              <Play size={28} />
-              <span>EMPEZAR</span>
-            </button>
+          {/* Botón EMPEZAR fijo en el bottom */}
+          <div className="fixed bottom-0 left-0 right-0 pt-6 pb-4 px-4 bg-gradient-to-t from-gray-950 via-gray-950/95 to-transparent z-40">
+            <div className="max-w-lg mx-auto">
+              <button
+                onClick={startGame}
+                className="pnp-start-button w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/50 animate-breathe"
+              >
+                <Play size={28} />
+                <span>EMPEZAR</span>
+              </button>
+            </div>
           </div>
 
           {/* Banner Publicitario */}
@@ -1173,11 +1178,11 @@ export default function PassAndPlay() {
           }}
         />
 
-        <div className={`flex flex-col min-h-screen bg-gray-950 text-white p-4 pt-32 ${isTimeRunningOut && !votingEnabled ? 'time-running-out' : ''}`}>
+        <div className={`min-h-screen bg-gray-950 text-white p-4 pt-32 pb-28 ${isTimeRunningOut && !votingEnabled ? 'time-running-out' : ''}`}>
           {/* Botón de Ayuda */}
           <HelpButton />
 
-          <div className="pnp-voting-container max-w-2xl w-full mx-auto space-y-4">
+          <div className="pnp-voting-container max-w-2xl w-full mx-auto space-y-4 relative">
             {/* HEADER: Cronómetro y Ronda */}
             <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-2 border-purple-500/50 rounded-xl p-4 text-center">
               <div className="flex items-center justify-between">
@@ -1264,16 +1269,20 @@ export default function PassAndPlay() {
             </div>
 
             {/* FOOTER: Acciones */}
-            <div className={`space-y-3 ${!votingEnabled ? 'sticky bottom-0 bg-gray-950 pt-4 pb-4 -mb-4' : ''}`}>
+            <div className="space-y-3 pb-safe">
               {!votingEnabled ? (
-                // Modo Debate
-                <button
-                  onClick={enableVoting}
-                  className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg"
-                >
-                  <span>🗳️</span>
-                  <span>ABRIR VOTACIONES</span>
-                </button>
+                // Modo Debate - Botón fijo en el bottom
+                <div className="fixed bottom-0 left-0 right-0 pt-6 pb-4 px-4 bg-gradient-to-t from-gray-950 via-gray-950/95 to-transparent z-40">
+                  <div className="max-w-2xl mx-auto">
+                    <button
+                      onClick={enableVoting}
+                      className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-purple-500/50"
+                    >
+                      <span>🗳️</span>
+                      <span>ABRIR VOTACIONES</span>
+                    </button>
+                  </div>
+                </div>
               ) : (
                 // Modo Votación
                 <>
