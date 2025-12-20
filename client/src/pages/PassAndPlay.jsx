@@ -521,6 +521,11 @@ export default function PassAndPlay() {
     setShowingCard(true);
   };
 
+  // Scroll al top cuando cambia de pantalla
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [setupMode, showingCard, votingMode, gameOver]);
+
   // Deshabilitar scroll y centrar la card cuando se muestra
   useEffect(() => {
     if (showingCard) {

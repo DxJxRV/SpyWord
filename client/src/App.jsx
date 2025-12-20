@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Toaster, toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Pencil, Check, X } from "lucide-react";
 import MainMenu from "./pages/MainMenu";
 import Online from "./pages/Online";
@@ -20,6 +20,16 @@ import RouletteModal from "./components/RouletteModal";
 import { TutorialProvider } from "./contexts/TutorialContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { getUserName, setUserName as saveUserName } from "./utils/nameGenerator";
+
+function ScrollToTop() {
+  const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  return null;
+}
 
 function RoomNavbar() {
   const navigate = useNavigate();
@@ -156,6 +166,7 @@ function ConditionalFooter() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AuthProvider>
         <TutorialProvider>
           <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden flex flex-col">
