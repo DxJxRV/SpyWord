@@ -137,7 +137,7 @@ export default function MainMenu() {
       });
 
       const { roomId } = response.data;
-      toast.success("Sala creada correctamente");
+      // toast.success("Sala creada correctamente");
       if (navigator.vibrate) navigator.vibrate(50);
       navigate(`/room/${roomId}`);
     } catch (error) {

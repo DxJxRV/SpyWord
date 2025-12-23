@@ -73,7 +73,7 @@ export default function Home() {
       const playerName = getUserName();
       const response = await api.post('/rooms/create', { adminName: playerName });
       const roomId = response.data.roomId;
-      toast.success(`¡Partida creada! Código: ${roomId}`);
+      // toast.success(`¡Partida creada! Código: ${roomId}`);
       if (navigator.vibrate) navigator.vibrate(50);
       // Ir directo a la sala
       navigate(`/room/${roomId}`);
