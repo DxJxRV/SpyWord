@@ -13,6 +13,7 @@ import LegalPages from "./pages/LegalPages";
 import About from "./pages/About";
 import Premium from "./pages/Premium";
 import PremiumSuccess from "./pages/PremiumSuccess";
+import Blog from "./pages/Blog";
 import FullscreenButton from "./components/FullscreenButton";
 import Footer from "./components/Footer";
 import PremiumTab from "./components/PremiumTab";
@@ -205,6 +206,8 @@ export default function App() {
               <Route path="/privacy" element={<LegalPages type="privacy" />} />
               <Route path="/terms" element={<LegalPages type="terms" />} />
               <Route path="/about" element={<About />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/blog/:slug" element={<Blog />} />
             </Routes>
           </div>
 

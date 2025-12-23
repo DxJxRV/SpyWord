@@ -304,6 +304,34 @@ export default function MainMenu() {
               Versión 2.0 • Hecho con ❤️ para jugar con amigos
             </p>
           </div>
+
+          {/* Mini Tutorial - Discreto */}
+          <div className="mt-16 pt-8 border-t border-gray-800 space-y-4">
+            <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">Cómo jugar</p>
+            
+            <div className="space-y-3 text-xs text-gray-500">
+              <div>
+                <span className="text-emerald-500 font-bold">Juego Online:</span>
+                <p className="inline"> Crea una sala o únete con código. Comparte tu código QR o enlace para invitar amigos. Ideal para jugar con gente en cualquier parte del mundo. <a href="/blog/14-conectar-amigos" className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer underline">más</a></p>
+              </div>
+              
+              <div>
+                <span className="text-blue-500 font-bold">Modos Especiales:</span>
+                <p className="inline"> Juega con temas diferentes como películas, ciencia o historia. Cada modo tiene sus propias palabras y dificultades. <a href="/blog/12-modos-de-juego" className="text-blue-400 hover:text-blue-300 transition-colors cursor-pointer underline">más</a></p>
+              </div>
+              
+              <div>
+                <span className="text-purple-500 font-bold">Pasa y Juega:</span>
+                <p className="inline"> Un solo teléfono pasa entre jugadores. Perfecto para jugar en una reunión sin que nadie necesite su propio dispositivo. <a href="/blog/13-pasa-y-juega" className="text-purple-400 hover:text-purple-300 transition-colors cursor-pointer underline">más</a></p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-gray-800">
+              <p className="text-xs text-gray-600">
+                💡 <span className="text-gray-500">¿No sabes cómo jugar? Revisa nuestro <a href="/blog/11-como-jugar" className="text-purple-400 hover:text-purple-300">blog de guías</a></span>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </>

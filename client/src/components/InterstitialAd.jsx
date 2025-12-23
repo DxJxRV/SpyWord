@@ -12,16 +12,19 @@ export default function InterstitialAd({
   isRoomPremium = false,
   onClose
 }) {
+  // HARDCODE: Simular usuario premium (cambiar a false para ver anuncios)
+  const isUserPremium = true;
+
   useEffect(() => {
     // Si el usuario es premium O si el anfitrión es premium (Premium Pass), cerrar inmediatamente
-    if (isPremium || isRoomPremium) {
+    if (isUserPremium || isPremium || isRoomPremium) {
       onClose?.();
       return;
     }
-  }, [isPremium, isRoomPremium, onClose]);
+  }, [isUserPremium, isPremium, isRoomPremium, onClose]);
 
   // Si el usuario es premium O si el anfitrión es premium, no renderizar nada
-  if (isPremium || isRoomPremium) return null;
+  if (isUserPremium || isPremium || isRoomPremium) return null;
 
   const handleClose = () => {
     onClose?.();

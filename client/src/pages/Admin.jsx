@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette, Star, Lock } from "lucide-react";
+import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette, Star, Lock, BarChart3 } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import UserManagement from "../components/UserManagement";
 import { useAuth } from "../contexts/AuthContext";
@@ -12,12 +12,21 @@ export default function Admin() {
   const [hasAccess, setHasAccess] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
 
-  const [activeTab, setActiveTab] = useState("words"); // "words", "users", "modes"
+  const [activeTab, setActiveTab] = useState("dashboard"); // "dashboard", "words", "users", "modes"
   const [words, setWords] = useState([]);
   const [categories, setCategories] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("all");
+
+  // Estado para dashboard - cada sección independiente
+  const [dashboardSections, setDashboardSections] = useState({
+    server: { data: null, loading: false, error: null },
+    rooms: { data: null, loading: false, error: null },
+    users: { data: null, loading: false, error: null },
+    words: { data: null, loading: false, error: null },
+    modes: { data: null, loading: false, error: null }
+  });
 
   // Estado para agregar palabras
   const [showAddModal, setShowAddModal] = useState(false);
@@ -89,9 +98,80 @@ export default function Admin() {
   // Cargar datos iniciales
   useEffect(() => {
     if (hasAccess) {
-      loadData();
+      if (activeTab === "dashboard") {
+        // Inicializar estados con loading
+        setDashboardSections({
+          server: { data: null, loading: true, error: null },
+          rooms: { data: null, loading: true, error: null },
+          users: { data: null, loading: true, error: null },
+          words: { data: null, loading: true, error: null },
+          modes: { data: null, loading: true, error: null }
+        });
+        setLoading(false); // No usar el loading general para dashboard
+        loadDashboardData();
+      } else {
+        loadData();
+      }
     }
   }, [selectedCategory, activeTab, hasAccess]);
+
+  async function loadDashboardData() {
+    try {
+      const res = await api.get("/admin/dashboard");
+      const data = res.data;
+      
+      // Actualizar cada sección independientemente
+      setDashboardSections(prev => ({
+        ...prev,
+        server: { data: data.server, loading: false, error: null },
+        rooms: { data: data.rooms, loading: false, error: null },
+        users: { data: data.users, loading: false, error: null },
+        words: { data: data.words, loading: false, error: null },
+        modes: { data: data.modes, loading: false, error: null }
+      }));
+    } catch (error) {
+      console.error("Error al cargar dashboard:", error);
+      // Actualizar todas las secciones con error
+      setDashboardSections(prev => {
+        const newState = { ...prev };
+        Object.keys(newState).forEach(key => {
+          newState[key] = { ...newState[key], error: "Error al cargar datos", loading: false };
+        });
+        return newState;
+      });
+    }
+  }
+  
+  // Componente para cada tarjeta de métrica
+  const MetricCard = ({ title, value, icon: Icon, gradient }) => (
+    <div className={`bg-gradient-to-br ${gradient} p-6 rounded-xl border border-opacity-30`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-gray-400 text-sm">{title}</p>
+          <p className="text-3xl font-bold text-white">{value}</p>
+        </div>
+        <Icon className="text-white/70" size={32} />
+      </div>
+    </div>
+  );
+  
+  // Componente para secciones del dashboard
+  const DashboardSection = ({ title, loading, error, children }) => (
+    <div>
+      <h3 className="text-xl font-bold text-white mb-4">{title}</h3>
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw size={24} className="text-purple-400 animate-spin" />
+        </div>
+      ) : error ? (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400 text-sm">
+          {error}
+        </div>
+      ) : (
+        children
+      )}
+    </div>
+  );
 
   // Global paste listener para quick paste en item cards
   useEffect(() => {
@@ -637,6 +717,17 @@ export default function Admin() {
         {/* Tabs */}
         <div className="flex gap-2 mb-8 border-b border-gray-800">
           <button
+            onClick={() => setActiveTab("dashboard")}
+            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
+              activeTab === "dashboard"
+                ? "text-purple-400 border-b-2 border-purple-400"
+                : "text-gray-400 hover:text-gray-300"
+            }`}
+          >
+            <BarChart3 size={20} />
+            Dashboard
+          </button>
+          <button
             onClick={() => setActiveTab("words")}
             className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
               activeTab === "words"
@@ -670,6 +761,162 @@ export default function Admin() {
             Usuarios
           </button>
         </div>
+
+        {/* Dashboard Content */}
+        {activeTab === "dashboard" && (
+          <div className="space-y-8">
+            {/* Dashboard Header with Refresh Button */}
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-bold text-white">Dashboard</h2>
+              <button
+                onClick={loadDashboardData}
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg font-semibold transition-all"
+              >
+                <RefreshCw size={18} />
+                Recargar
+              </button>
+            </div>
+
+            {/* Server Metrics */}
+            <DashboardSection
+              title="Servidor"
+              loading={dashboardSections.server.loading}
+              error={dashboardSections.server.error}
+            >
+              {dashboardSections.server.data && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <MetricCard
+                    title="Tiempo de ejecución"
+                    value={`${Math.floor(dashboardSections.server.data.uptime / 3600)}h ${Math.floor((dashboardSections.server.data.uptime % 3600) / 60)}m`}
+                    icon={TrendingUp}
+                    gradient="from-blue-600/20 to-cyan-600/20"
+                  />
+                  <MetricCard
+                    title="Memoria Usada"
+                    value={`${dashboardSections.server.data.memoryUsageMB.toFixed(1)} MB`}
+                    icon={BarChart3}
+                    gradient="from-cyan-600/20 to-teal-600/20"
+                  />
+                </div>
+              )}
+            </DashboardSection>
+
+            {/* Rooms & Players */}
+            <DashboardSection
+              title="Partidas Activas"
+              loading={dashboardSections.rooms.loading}
+              error={dashboardSections.rooms.error}
+            >
+              {dashboardSections.rooms.data && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <MetricCard
+                    title="Salas Activas"
+                    value={dashboardSections.rooms.data.total}
+                    icon={Gamepad2}
+                    gradient="from-purple-600/20 to-pink-600/20"
+                  />
+                  <MetricCard
+                    title="Jugadores en Partida"
+                    value={dashboardSections.rooms.data.players}
+                    icon={Users}
+                    gradient="from-pink-600/20 to-rose-600/20"
+                  />
+                </div>
+              )}
+            </DashboardSection>
+
+            {/* Users Statistics */}
+            <DashboardSection
+              title="Usuarios"
+              loading={dashboardSections.users.loading}
+              error={dashboardSections.users.error}
+            >
+              {dashboardSections.users.data && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <MetricCard
+                    title="Usuarios Totales"
+                    value={dashboardSections.users.data.total}
+                    icon={Users}
+                    gradient="from-emerald-600/20 to-green-600/20"
+                  />
+                  <MetricCard
+                    title="Premium"
+                    value={dashboardSections.users.data.premium}
+                    icon={Star}
+                    gradient="from-amber-600/20 to-orange-600/20"
+                  />
+                  <MetricCard
+                    title="Administradores"
+                    value={dashboardSections.users.data.admins}
+                    icon={Lock}
+                    gradient="from-violet-600/20 to-purple-600/20"
+                  />
+                </div>
+              )}
+            </DashboardSection>
+
+            {/* Words Statistics */}
+            <DashboardSection
+              title="Palabras"
+              loading={dashboardSections.words.loading}
+              error={dashboardSections.words.error}
+            >
+              {dashboardSections.words.data && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <MetricCard
+                    title="Palabras Totales"
+                    value={dashboardSections.words.data.total}
+                    icon={BookOpen}
+                    gradient="from-blue-600/20 to-indigo-600/20"
+                  />
+                  <MetricCard
+                    title="Activas"
+                    value={dashboardSections.words.data.active}
+                    icon={TrendingUp}
+                    gradient="from-indigo-600/20 to-purple-600/20"
+                  />
+                  <MetricCard
+                    title="Categorías"
+                    value={dashboardSections.words.data.categories}
+                    icon={Filter}
+                    gradient="from-purple-600/20 to-pink-600/20"
+                  />
+                </div>
+              )}
+            </DashboardSection>
+
+            {/* Game Modes */}
+            <DashboardSection
+              title="Modos de Juego"
+              loading={dashboardSections.modes.loading}
+              error={dashboardSections.modes.error}
+            >
+              {dashboardSections.modes.data && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <MetricCard
+                    title="Modos Totales"
+                    value={dashboardSections.modes.data.total}
+                    icon={Gamepad2}
+                    gradient="from-rose-600/20 to-red-600/20"
+                  />
+                  <MetricCard
+                    title="Modos Activos"
+                    value={dashboardSections.modes.data.active}
+                    icon={Star}
+                    gradient="from-red-600/20 to-orange-600/20"
+                  />
+                </div>
+              )}
+            </DashboardSection>
+
+            {/* Last Updated */}
+            {dashboardSections.server.data && (
+              <div className="text-center text-gray-400 text-sm pt-4 border-t border-gray-700">
+                Última actualización: {new Date(dashboardSections.server.data.timestamp).toLocaleString("es-ES")}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Contenido de la tab de Palabras */}
         {activeTab === "words" && (

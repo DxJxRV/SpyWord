@@ -1391,6 +1391,80 @@ app.put('/api/admin/users/:id/tokens', async (req, res) => {
   }
 });
 
+// 📊 GET /api/admin/dashboard - Obtener datos del dashboard
+app.get('/api/admin/dashboard', async (req, res) => {
+  try {
+    // Obtener datos del servidor
+    const uptime = process.uptime();
+    const memoryUsage = process.memoryUsage();
+    
+    // Obtener salas activas
+    const activeRooms = Object.values(rooms).filter(room => room.isActive !== false);
+    const totalPlayersInRooms = activeRooms.reduce((sum, room) => sum + (room.players?.length || 0), 0);
+    
+    // Obtener usuarios
+    const totalUsers = await prisma.user.count();
+    const premiumUsers = await prisma.user.count({ where: { isPremium: true } });
+    const adminUsers = await prisma.user.count({ where: { isAdmin: true } });
+    
+    // Obtener palabras
+    const totalWords = await prisma.word.count();
+    const activeWords = await prisma.word.count({ where: { is_active: true } });
+    const totalCategories = await prisma.word.findMany({
+      distinct: ['category'],
+      select: { category: true }
+    });
+    
+    // Obtener modos
+    const totalModes = await prisma.gameMode.count();
+    const activeModes = await prisma.gameMode.count({ where: { isActive: true } });
+    
+    // Obtener ruleta (últimos spins)
+    const recentSpins = await prisma.rouletteSpins.findMany({
+      take: 10,
+      orderBy: { spunAt: 'desc' },
+      select: {
+        id: true,
+        rouletteType: true,
+        prize: true,
+        spunAt: true
+      }
+    });
+
+    res.json({
+      server: {
+        uptime: Math.floor(uptime),
+        memoryUsageMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+        timestamp: new Date().toISOString()
+      },
+      rooms: {
+        total: activeRooms.length,
+        players: totalPlayersInRooms
+      },
+      users: {
+        total: totalUsers,
+        premium: premiumUsers,
+        admins: adminUsers
+      },
+      words: {
+        total: totalWords,
+        active: activeWords,
+        categories: totalCategories.length
+      },
+      modes: {
+        total: totalModes,
+        active: activeModes
+      },
+      roulette: {
+        recentSpins
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener datos del dashboard:', error);
+    res.status(500).json({ error: 'Error al obtener datos del dashboard' });
+  }
+});
+
 // 📊 GET /api/admin/stats - Obtener estadísticas
 app.get('/api/admin/stats', async (req, res) => {
   try {

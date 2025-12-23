@@ -23,7 +23,7 @@ export default function AdPlaceholder({ isPremium = false, format = 'rectangle',
   }, [isPremium]);
 
   // Si es premium, no renderizar nada
-  if (isPremium) return null;
+  if (isPremium || true) return null;
 
   // Determinar dimensiones según formato
   const dimensions = {
