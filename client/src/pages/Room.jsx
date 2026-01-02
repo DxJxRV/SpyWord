@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Eye, EyeOff, Share2, QrCode, Copy, ChevronDown, ChevronUp, Play, UserPlus, Crown, MoreVertical, UserMinus, UserCheck, X, PhoneOff, Users } from "lucide-react";
+import { Eye, EyeOff, Share2, QrCode, Copy, ChevronDown, ChevronUp, Play, UserPlus, Crown, MoreVertical, UserMinus, UserCheck, X, PhoneOff, Users, Lock, LockOpen } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import { toast } from "sonner";
 import Joyride from "react-joyride";
@@ -248,16 +248,9 @@ export default function Room() {
         // Actualizar estado de matchmaking
         if (res.data.isPublic !== undefined) {
           setRoomIsPublic(res.data.isPublic);
-          if (res.data.isPublic && matchmakingMode !== 'public') {
-            setMatchmakingMode('public');
-          }
         }
         if (res.data.requestedPlayers !== undefined) {
           setRoomRequestedPlayers(res.data.requestedPlayers);
-          if (res.data.requestedPlayers > 0 && matchmakingMode !== 'request') {
-            setMatchmakingMode('request');
-            setRequestCount(res.data.requestedPlayers);
-          }
         }
 
         if (res.data.nextRoundAt && !nextRoundTimestamp.current) {
@@ -419,6 +412,31 @@ export default function Room() {
   useEffect(() => {
     setWaitingSlots(roomRequestedPlayers);
   }, [roomRequestedPlayers]);
+
+  // Toggle público/privado
+  const handleTogglePublic = async () => {
+    if (!isAdmin) return;
+
+    const newIsPublic = !roomIsPublic;
+
+    try {
+      await api.post(`/rooms/${roomId}/set-public`, {
+        isPublic: newIsPublic,
+        requestedPlayers: newIsPublic ? 0 : roomRequestedPlayers
+      });
+
+      setRoomIsPublic(newIsPublic);
+      if (newIsPublic) {
+        setRoomRequestedPlayers(0);
+      }
+
+      toast.success(newIsPublic ? "Sala ahora es pública" : "Sala ahora es privada");
+      if (navigator.vibrate) navigator.vibrate(30);
+    } catch (err) {
+      console.error("Error al cambiar visibilidad:", err);
+      toast.error("Error al cambiar la configuración");
+    }
+  };
 
   // ===== FUNCIONES DE VOZ =====
 
@@ -897,18 +915,39 @@ export default function Room() {
             {/* Grid de usuarios colapsable */}
             <div className={`flex-[0.7] bg-gray-800/50 rounded-lg border border-gray-700/50 ${showPlayersGrid ? 'overflow-visible' : 'overflow-hidden'}`}>
               {/* Header del grid con toggle */}
-              <button
-                onClick={() => setShowPlayersGrid(!showPlayersGrid)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-700/30 transition-all"
-              >
+              <div className="w-full px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-white">👥 Jugadores</span>
-                  <span className="bg-purple-500/30 text-purple-300 text-xs px-2 py-0.5 rounded-full font-bold">{totalPlayers}</span>
+                  <button
+                    onClick={() => setShowPlayersGrid(!showPlayersGrid)}
+                    className="flex items-center gap-2 hover:bg-gray-700/30 px-2 py-1 rounded transition-all"
+                  >
+                    <span className="text-sm font-semibold text-white">👥 Jugadores</span>
+                    <span className="bg-purple-500/30 text-purple-300 text-xs px-2 py-0.5 rounded-full font-bold">{totalPlayers}</span>
+                  </button>
+
+                  {/* Candado público/privado (solo admin) */}
+                  {isAdmin && (
+                    <button
+                      onClick={handleTogglePublic}
+                      className={`p-1.5 rounded-lg transition-all active:scale-95 ${
+                        roomIsPublic
+                          ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                          : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-400'
+                      }`}
+                      title={roomIsPublic ? "Sala pública - Click para hacer privada" : "Sala privada - Click para hacer pública"}
+                    >
+                      {roomIsPublic ? <LockOpen size={14} /> : <Lock size={14} />}
+                    </button>
+                  )}
                 </div>
-                <span className="text-gray-400">
+
+                <button
+                  onClick={() => setShowPlayersGrid(!showPlayersGrid)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   {showPlayersGrid ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </span>
-              </button>
+                </button>
+              </div>
 
               {/* Grid de avatares de jugadores */}
               <div className="p-4 pt-0">
@@ -1090,7 +1129,12 @@ export default function Room() {
 
                 {/* Leyenda de botones */}
                 <div className="px-4 pb-2">
-                  <div className="flex items-center gap-3 text-[9px] text-gray-500">
+                  <div className="flex items-center gap-3 text-[9px] text-gray-500 flex-wrap">
+                    {isAdmin && (
+                      <span className="text-green-400">
+                        {roomIsPublic ? '🔓 Pública' : '🔒 Privada'}
+                      </span>
+                    )}
                     <span>👥 Amigos: Invita con QR/Link</span>
                     {isAdmin && <span className="text-purple-400">🔍 Solicitar: Busca jugadores</span>}
                   </div>

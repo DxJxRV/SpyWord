@@ -25,6 +25,7 @@ export default function Online() {
   // Estados para matchmaking
   const [isSearching, setIsSearching] = useState(false);
   const [matchmakingStatus, setMatchmakingStatus] = useState(null);
+  const [availableRooms, setAvailableRooms] = useState([]); // Salas públicas/solicitando
 
   // Cambiar título de la página
   useEffect(() => {
@@ -32,6 +33,23 @@ export default function Online() {
     return () => {
       document.title = "ImpostorWord";
     };
+  }, []);
+
+  // Cargar salas disponibles cada 3 segundos
+  useEffect(() => {
+    const fetchAvailableRooms = async () => {
+      try {
+        const response = await api.get('/matchmaking/public-rooms');
+        setAvailableRooms(response.data.rooms || []);
+      } catch (error) {
+        console.error('Error al cargar salas:', error);
+      }
+    };
+
+    fetchAvailableRooms();
+    const interval = setInterval(fetchAvailableRooms, 3000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleCreateRoom = () => {
@@ -192,7 +210,67 @@ export default function Online() {
         <h1 className="text-3xl font-bold mb-6">Juego Online 🌐</h1>
 
         {!mode && (
-          <div className="flex flex-col gap-4 max-w-md w-full">
+          <div className="flex flex-col gap-4 max-w-2xl w-full">
+            {/* Cards de salas buscando jugadores */}
+            {availableRooms.length > 0 && (
+              <div className="w-full">
+                <h2 className="text-sm font-semibold text-purple-300 mb-3">🔍 Partidas buscando jugadores</h2>
+                <div className="flex flex-col gap-2">
+                  {availableRooms.slice(0, 3).map(room => (
+                    <button
+                      key={room.roomId}
+                      onClick={async () => {
+                        try {
+                          const playerName = getUserName();
+                          await api.post(`/rooms/${room.roomId}/join`, { playerName });
+                          toast.success("¡Te uniste a la sala!");
+                          navigate(`/room/${room.roomId}`);
+                          if (navigator.vibrate) navigator.vibrate(40);
+                        } catch (error) {
+                          console.error("Error al unirse:", error);
+                          toast.error("No se pudo unir a la sala");
+                        }
+                      }}
+                      className="bg-gray-800/50 border border-gray-700 hover:border-purple-500 rounded-lg p-3 transition-all active:scale-98 flex items-center justify-between group"
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Avatar del host */}
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-bold shadow-lg">
+                          {room.hostName.charAt(0).toUpperCase()}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex flex-col items-start">
+                          <span className="text-sm font-bold text-white group-hover:text-purple-300">
+                            {room.hostName}'s Room
+                          </span>
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <span>👥 {room.currentPlayers}/{room.maxPlayers}</span>
+                            {room.requestedPlayers > 0 && (
+                              <span className="text-purple-400">• 🔍 {room.requestedPlayers} solicitado{room.requestedPlayers > 1 ? 's' : ''}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Badge */}
+                      <div className="flex items-center gap-2">
+                        {room.isPublic ? (
+                          <span className="bg-green-500/20 text-green-300 text-xs px-2 py-1 rounded-full font-bold">
+                            Pública
+                          </span>
+                        ) : (
+                          <span className="bg-purple-500/20 text-purple-300 text-xs px-2 py-1 rounded-full font-bold">
+                            Solicitando
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Botón Encontrar Partida - PRINCIPAL */}
             <button
               onClick={handleFindMatch}
@@ -208,34 +286,32 @@ export default function Online() {
               </div>
             </button>
 
-            {/* Botón Crear Partida */}
-            <button
-              onClick={handleCreateRoom}
-              disabled={loading}
-              className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-5 rounded-xl hover:from-emerald-600 hover:to-emerald-700 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-4 shadow-lg"
-            >
-              <div className="bg-white/20 p-3 rounded-lg">
-                <Play size={28} />
-              </div>
-              <div className="flex flex-col items-start text-left">
-                <span className="text-xl font-bold">{loading ? "Creando..." : "Crear partida"}</span>
-                <span className="text-sm text-emerald-100 opacity-90">Inicia un nuevo juego como anfitrión</span>
-              </div>
-            </button>
+            {/* Row: Crear y Unirse */}
+            <div className="flex gap-3 w-full">
+              {/* Botón Crear Partida - 70% */}
+              <button
+                onClick={handleCreateRoom}
+                disabled={loading}
+                className="flex-[0.7] bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-4 rounded-xl hover:from-emerald-600 hover:to-emerald-700 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3 shadow-lg"
+              >
+                <div className="bg-white/20 p-2 rounded-lg">
+                  <Play size={24} />
+                </div>
+                <div className="flex flex-col items-start text-left">
+                  <span className="text-lg font-bold">{loading ? "Creando..." : "Crear partida"}</span>
+                  <span className="text-xs text-emerald-100 opacity-90">Sé el anfitrión</span>
+                </div>
+              </button>
 
-            {/* Botón Unirse a Partida */}
-            <button
-              onClick={() => setMode("join")}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-5 rounded-xl hover:from-blue-600 hover:to-blue-700 active:scale-95 transition-all flex items-center gap-4 shadow-lg"
-            >
-              <div className="bg-white/20 p-3 rounded-lg">
-                <Link2 size={28} />
-              </div>
-              <div className="flex flex-col items-start text-left">
-                <span className="text-xl font-bold">Unirse a partida</span>
-                <span className="text-sm text-blue-100 opacity-90">Entra con código o escanea QR</span>
-              </div>
-            </button>
+              {/* Botón Unirse a Partida - 30% */}
+              <button
+                onClick={() => setMode("join")}
+                className="flex-[0.3] bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 shadow-lg"
+              >
+                <Link2 size={24} />
+                <span className="text-sm font-bold">Unirse</span>
+              </button>
+            </div>
 
             {/* Banner Publicitario */}
             <div className="flex justify-center mt-4">

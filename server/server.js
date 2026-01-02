@@ -216,7 +216,7 @@ app.post('/api/rooms/create', checkAuth, async (req, res) => {
       votersRemaining: 0,
       eliminatedPlayerId: null,
       // Matchmaking
-      isPublic: false,
+      isPublic: true, // Por defecto PÚBLICA
       requestedPlayers: 0, // Cantidad de jugadores solicitados
       maxPlayers: 10,
       autoCreated: false,
@@ -271,6 +271,17 @@ app.post('/api/rooms/create', checkAuth, async (req, res) => {
     }
 
     rooms[roomId] = roomData;
+
+    // Agregar a salas públicas si isPublic es true
+    if (roomData.isPublic) {
+      publicRooms[roomId] = {
+        hostName: roomData.adminName,
+        currentPlayers: Object.keys(roomData.players).length,
+        maxPlayers: roomData.maxPlayers,
+        createdAt: Date.now()
+      };
+      console.log(`🌐 Sala ${roomId} creada como PÚBLICA`);
+    }
 
     if (req.user) {
       console.log(`👑 Admin autenticado: ${req.user.email} (userId: ${req.user.userId}) - Premium: ${req.user.isPremium}`);
@@ -1101,27 +1112,96 @@ app.post('/api/rooms/:roomId/set-public', (req, res) => {
 });
 
 // 🌐 GET /api/matchmaking/public-rooms
-// Listar salas públicas disponibles
+// Listar salas públicas y salas solicitando jugadores
 app.get('/api/matchmaking/public-rooms', (req, res) => {
   const availableRooms = [];
 
+  // 1. Limpiar y agregar salas públicas
   for (const roomId in publicRooms) {
-    const roomInfo = publicRooms[roomId];
     const room = rooms[roomId];
 
-    // Verificar que la sala aún existe y tiene espacio
-    if (room && Object.keys(room.players).length < room.maxPlayers) {
+    // Limpiar si la sala no existe o está vacía
+    if (!room || Object.keys(room.players).length === 0) {
+      delete publicRooms[roomId];
+      console.log(`🧹 Sala pública ${roomId} removida (vacía o inexistente)`);
+      continue;
+    }
+
+    // Agregar a lista si tiene espacio
+    if (Object.keys(room.players).length < room.maxPlayers) {
       availableRooms.push({
         roomId,
-        hostName: roomInfo.hostName,
+        hostName: room.adminName,
         currentPlayers: Object.keys(room.players).length,
         maxPlayers: room.maxPlayers,
-        createdAt: roomInfo.createdAt
+        requestedPlayers: room.requestedPlayers || 0,
+        isPublic: true,
+        createdAt: publicRooms[roomId].createdAt
+      });
+    } else {
+      // Si está llena, remover de públicas
+      delete publicRooms[roomId];
+      console.log(`🧹 Sala pública ${roomId} removida (llena)`);
+    }
+  }
+
+  // 2. Limpiar y agregar salas que están solicitando jugadores
+  for (const roomId in rooms) {
+    const room = rooms[roomId];
+
+    // Si no tiene solicitudes pendientes, skip
+    if (room.requestedPlayers <= 0) continue;
+
+    // Si está vacía, limpiar solicitudes
+    if (Object.keys(room.players).length === 0) {
+      room.requestedPlayers = 0;
+      console.log(`🧹 Sala ${roomId} sin jugadores - solicitudes limpiadas`);
+      continue;
+    }
+
+    // Si tiene espacio y solicitudes, agregar (si no está en públicas)
+    if (Object.keys(room.players).length < room.maxPlayers && !publicRooms[roomId]) {
+      availableRooms.push({
+        roomId,
+        hostName: room.adminName,
+        currentPlayers: Object.keys(room.players).length,
+        maxPlayers: room.maxPlayers,
+        requestedPlayers: room.requestedPlayers,
+        isPublic: false,
+        createdAt: room.lastActivity
       });
     }
   }
 
-  res.json({ rooms: availableRooms });
+  // 3. Filtrar por adminName - solo mostrar la sala más reciente de cada admin
+  const roomsByAdmin = {}; // {adminName: [room1, room2, ...]}
+
+  availableRooms.forEach(room => {
+    const adminName = room.hostName;
+    if (!roomsByAdmin[adminName]) {
+      roomsByAdmin[adminName] = [];
+    }
+    roomsByAdmin[adminName].push(room);
+  });
+
+  // De cada admin, tomar solo la sala más reciente
+  const filteredRooms = [];
+  for (const adminName in roomsByAdmin) {
+    const adminRooms = roomsByAdmin[adminName];
+    // Ordenar por createdAt (más reciente primero) y tomar la primera
+    adminRooms.sort((a, b) => b.createdAt - a.createdAt);
+    filteredRooms.push(adminRooms[0]);
+
+    // Si había múltiples salas del mismo admin, loggear
+    if (adminRooms.length > 1) {
+      console.log(`🧹 ${adminName} tiene ${adminRooms.length} salas, mostrando solo la más reciente`);
+    }
+  }
+
+  // Ordenar por fecha de creación (más recientes primero)
+  filteredRooms.sort((a, b) => b.createdAt - a.createdAt);
+
+  res.json({ rooms: filteredRooms });
 });
 
 // 📡 GET /api/rooms/:roomId/state
@@ -2185,9 +2265,32 @@ app.put('/api/admin/settings/special-modes', async (req, res) => {
 
 async function matchmakingWorker() {
   try {
-    // 1. Limpiar jugadores que llevan más de 5 minutos en cola
-    const MAX_WAIT_TIME = 5 * 60 * 1000; // 5 minutos
     const now = Date.now();
+
+    // 1. Limpiar salas públicas vacías o llenas
+    for (const roomId in publicRooms) {
+      const room = rooms[roomId];
+
+      if (!room || Object.keys(room.players).length === 0) {
+        delete publicRooms[roomId];
+        console.log(`🧹 Sala pública ${roomId} removida (vacía o inexistente)`);
+      } else if (Object.keys(room.players).length >= room.maxPlayers) {
+        delete publicRooms[roomId];
+        console.log(`🧹 Sala pública ${roomId} removida (llena)`);
+      }
+    }
+
+    // 2. Limpiar solicitudes de salas vacías
+    for (const roomId in rooms) {
+      const room = rooms[roomId];
+      if (room.requestedPlayers > 0 && Object.keys(room.players).length === 0) {
+        room.requestedPlayers = 0;
+        console.log(`🧹 Sala ${roomId} sin jugadores - solicitudes limpiadas`);
+      }
+    }
+
+    // 3. Limpiar jugadores que llevan más de 5 minutos en cola
+    const MAX_WAIT_TIME = 5 * 60 * 1000; // 5 minutos
 
     for (let i = matchmakingQueue.length - 1; i >= 0; i--) {
       const player = matchmakingQueue[i];
@@ -2197,7 +2300,7 @@ async function matchmakingWorker() {
       }
     }
 
-    // 2. Procesar jugadores no matcheados
+    // 4. Procesar jugadores no matcheados
     const unmatchedPlayers = matchmakingQueue.filter(p => !p.matched);
 
     if (unmatchedPlayers.length === 0) {
@@ -2222,6 +2325,13 @@ async function matchmakingWorker() {
         }
 
         const currentPlayers = Object.keys(room.players).length;
+
+        // Limpiar si está vacía
+        if (currentPlayers === 0) {
+          delete publicRooms[roomId];
+          console.log(`🧹 Sala pública ${roomId} removida (vacía) en worker`);
+          continue;
+        }
 
         // Verificar si tiene espacio
         if (currentPlayers < room.maxPlayers && room.status === 'IN_GAME') {
