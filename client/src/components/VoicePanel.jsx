@@ -1,17 +1,21 @@
 import { useEffect, useRef } from "react";
-import { Mic, MicOff, Loader2 } from "lucide-react";
+import { Mic, MicOff, Loader2, Volume2, VolumeX } from "lucide-react";
 
 /**
  * VoicePanel - Control de micrófono y visualizador de audio
  * @param {boolean} micEnabled - Estado del micrófono (activado/desactivado)
+ * @param {boolean} micMuted - Estado de silencio (sin desconectar)
  * @param {Function} onToggleMic - Callback al activar/desactivar micrófono
+ * @param {Function} onToggleMute - Callback al silenciar/activar sin desconectar
  * @param {number} audioLevel - Nivel de audio actual (0-100)
  * @param {boolean} isConnecting - Si está conectando el micrófono
  * @param {string} voiceStatus - Estado de la conexión: 'disconnected', 'connecting', 'connected', 'error'
  */
 export default function VoicePanel({
   micEnabled,
+  micMuted = false,
   onToggleMic,
+  onToggleMute,
   audioLevel = 0,
   isConnecting = false,
   voiceStatus = 'disconnected'
@@ -87,25 +91,47 @@ export default function VoicePanel({
           )}
         </div>
 
-        {/* Botón de toggle */}
-        <button
-          onClick={handleToggle}
-          disabled={isConnecting}
-          className={`relative p-2 rounded-full transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-            micEnabled
-              ? `bg-green-500/30 hover:bg-green-500/40 ${isSpeaking ? 'ring-2 ring-green-400 animate-pulse' : ''}`
-              : 'bg-red-500/30 hover:bg-red-500/40'
-          }`}
-          title={micEnabled ? "Desactivar micrófono" : "Activar micrófono"}
-        >
-          {isConnecting ? (
-            <Loader2 size={18} className="text-white animate-spin" />
-          ) : micEnabled ? (
-            <Mic size={18} className="text-green-300" />
-          ) : (
-            <MicOff size={18} className="text-red-300" />
+        {/* Botones de control */}
+        <div className="flex items-center gap-2">
+          {/* Botón de mute (solo cuando está activado) */}
+          {micEnabled && (
+            <button
+              onClick={onToggleMute}
+              className={`relative p-2 rounded-full transition-all active:scale-95 ${
+                micMuted
+                  ? 'bg-yellow-500/30 hover:bg-yellow-500/40'
+                  : 'bg-blue-500/30 hover:bg-blue-500/40'
+              }`}
+              title={micMuted ? "Activar audio" : "Silenciar"}
+            >
+              {micMuted ? (
+                <VolumeX size={16} className="text-yellow-300" />
+              ) : (
+                <Volume2 size={16} className="text-blue-300" />
+              )}
+            </button>
           )}
-        </button>
+
+          {/* Botón de toggle principal */}
+          <button
+            onClick={handleToggle}
+            disabled={isConnecting}
+            className={`relative p-2 rounded-full transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+              micEnabled
+                ? `bg-green-500/30 hover:bg-green-500/40 ${isSpeaking && !micMuted ? 'ring-2 ring-green-400 animate-pulse' : ''}`
+                : 'bg-red-500/30 hover:bg-red-500/40'
+            }`}
+            title={micEnabled ? "Desactivar micrófono" : "Activar micrófono"}
+          >
+            {isConnecting ? (
+              <Loader2 size={18} className="text-white animate-spin" />
+            ) : micEnabled ? (
+              <Mic size={18} className="text-green-300" />
+            ) : (
+              <MicOff size={18} className="text-red-300" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Visualizador de audio (solo cuando está activo) */}

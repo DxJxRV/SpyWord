@@ -17,7 +17,7 @@ import AppHeader from "../components/AppHeader";
 import VoicePanel from "../components/VoicePanel";
 import VoiceParticipant from "../components/VoiceParticipant";
 import * as voiceChat from "../services/voiceChat";
-import { createHostPeer, connectToHost, closePeer } from "../network/p2p";
+import { createHostPeer, connectToHost, closePeer, broadcastMessage, sendMessage, setLocalMuted } from "../network/p2p";
 
 export default function Room() {
   const { roomId } = useParams(); // Solo necesitamos roomId
@@ -92,6 +92,7 @@ export default function Room() {
 
   // ===== ESTADOS DE VOZ =====
   const [micEnabled, setMicEnabled] = useState(false); // Micrófono activado/desactivado
+  const [micMuted, setMicMuted] = useState(false); // Micrófono silenciado (sin desconectar)
   const [isConnectingMic, setIsConnectingMic] = useState(false); // Conectando micrófono
   const [voiceStatus, setVoiceStatus] = useState('disconnected'); // Estado: disconnected, connecting, connected, error
   const [audioLevel, setAudioLevel] = useState(0); // Nivel de audio local (0-100)
@@ -104,6 +105,8 @@ export default function Room() {
   const peerRef = useRef(null);
   const peerConnectionsRef = useRef({}); // {playerId: connection}
   const audioLevelIntervalRef = useRef(null);
+  const retryTimeoutRef = useRef(null); // Para retry automático
+  const retryCountRef = useRef(0); // Contador de intentos
 
   // Detectar nuevos jugadores y mostrar toast
   useEffect(() => {
@@ -370,10 +373,10 @@ export default function Room() {
   const cleanupVoice = () => {
     console.log("🧹 Limpiando recursos de voz...");
 
-    // Detener micrófono
-    if (localStreamRef.current) {
-      voiceChat.stopMicrophone();
-      localStreamRef.current = null;
+    // Limpiar retry timeout
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
     }
 
     // Detener intervalo de nivel de audio
@@ -382,24 +385,25 @@ export default function Room() {
       audioLevelIntervalRef.current = null;
     }
 
-    // Cerrar conexiones peer
-    Object.values(peerConnectionsRef.current).forEach(conn => {
-      try {
-        conn.close();
-      } catch (e) {
-        console.error("Error al cerrar conexión:", e);
-      }
-    });
-    peerConnectionsRef.current = {};
-
-    // Cerrar peer
+    // Cerrar peer (esto cierra todas las conexiones automáticamente)
     if (peerRef.current) {
       closePeer();
       peerRef.current = null;
     }
 
+    // Detener micrófono
+    if (localStreamRef.current) {
+      voiceChat.stopMicrophone();
+      localStreamRef.current = null;
+    }
+
+    // Limpiar referencias
+    peerConnectionsRef.current = {};
+    retryCountRef.current = 0;
+
     // Resetear estados
     setMicEnabled(false);
+    setMicMuted(false);
     setIsConnectingMic(false);
     setVoiceStatus('disconnected');
     setAudioLevel(0);
@@ -420,17 +424,23 @@ export default function Room() {
     }
   };
 
-  // Inicializar peer (host o cliente)
-  const initializeVoicePeer = async () => {
+  // Inicializar peer (host o cliente) con retry automático
+  const initializeVoicePeer = async (retryAttempt = 0) => {
     try {
       setVoiceStatus('connecting');
+      retryCountRef.current = retryAttempt;
+
+      if (!localStreamRef.current) {
+        throw new Error("No hay stream de audio local");
+      }
 
       if (isAdmin) {
         // Admin: crear peer host
         console.log("🎤 Inicializando como HOST...");
-        const peerId = await createHostPeer((senderId, data) => {
-          handlePeerMessage(senderId, data);
-        });
+        const peerId = await createHostPeer(
+          (senderId, data) => handlePeerMessage(senderId, data),
+          localStreamRef.current
+        );
         setVoicePeerId(peerId);
         setVoiceHostId(peerId);
         peerRef.current = peerId;
@@ -454,30 +464,49 @@ export default function Room() {
         setVoiceHostId(hostPeerId);
 
         // Conectar al host
-        const connection = await connectToHost(hostPeerId, (data) => {
-          handlePeerMessage(hostPeerId, data);
-        });
+        await connectToHost(
+          hostPeerId,
+          (data) => handlePeerMessage(hostPeerId, data),
+          localStreamRef.current
+        );
 
-        peerConnectionsRef.current[hostPeerId] = connection;
         console.log("✅ Conectado al host:", hostPeerId);
       }
 
       setVoiceStatus('connected');
+      retryCountRef.current = 0; // Reset contador al conectar exitosamente
     } catch (error) {
-      console.error("❌ Error al inicializar peer:", error);
+      console.error(`❌ Error al inicializar peer (intento ${retryAttempt + 1}):`, error);
       setVoiceStatus('error');
-      toast.error("Error al conectar el chat de voz");
-      throw error;
+
+      // Retry automático hasta 5 intentos
+      if (retryAttempt < 5) {
+        const retryDelay = Math.min(1000 * Math.pow(2, retryAttempt), 10000); // Exponential backoff
+        console.log(`🔄 Reintentando en ${retryDelay / 1000}s...`);
+
+        retryTimeoutRef.current = setTimeout(() => {
+          initializeVoicePeer(retryAttempt + 1);
+        }, retryDelay);
+      } else {
+        toast.error("No se pudo conectar al chat de voz después de varios intentos");
+        throw error;
+      }
     }
   };
 
   // Toggle del micrófono
   const handleToggleMic = async () => {
     if (micEnabled) {
-      // Desactivar micrófono
+      // Desactivar micrófono completamente
       cleanupVoice();
       toast.success("Micrófono desactivado");
     } else {
+      // Verificar que haya al menos 2 jugadores antes de activar
+      if (totalPlayers < 2) {
+        toast.error("Necesitas al menos 2 jugadores para activar el chat de voz");
+        return;
+      }
+
       // Activar micrófono
       try {
         setIsConnectingMic(true);
@@ -486,8 +515,8 @@ export default function Room() {
         const stream = await voiceChat.initMicrophone();
         localStreamRef.current = stream;
 
-        // 2. Inicializar peer
-        await initializeVoicePeer();
+        // 2. Inicializar peer con retry automático
+        await initializeVoicePeer(0);
 
         // 3. Comenzar a monitorear el nivel de audio
         audioLevelIntervalRef.current = setInterval(() => {
@@ -505,37 +534,38 @@ export default function Room() {
 
             // Si soy host, broadcast a todos los clientes
             if (isAdmin) {
-              Object.values(peerConnectionsRef.current).forEach(conn => {
-                try {
-                  conn.send(message);
-                } catch (e) {
-                  console.error("Error al enviar nivel de audio:", e);
-                }
-              });
+              broadcastMessage(message);
             } else {
               // Si soy cliente, enviar solo al host
-              const hostConn = peerConnectionsRef.current[voiceHostId];
-              if (hostConn) {
-                try {
-                  hostConn.send(message);
-                } catch (e) {
-                  console.error("Error al enviar nivel de audio al host:", e);
-                }
-              }
+              sendMessage(message);
             }
           }
         }, 100); // Actualizar cada 100ms
 
         setMicEnabled(true);
+        setMicMuted(false);
         toast.success("Micrófono activado");
       } catch (error) {
         console.error("Error al activar micrófono:", error);
-        toast.error("Error al activar el micrófono");
-        cleanupVoice();
+        if (!retryTimeoutRef.current) {
+          toast.error("Error al activar el micrófono");
+          cleanupVoice();
+        }
       } finally {
         setIsConnectingMic(false);
       }
     }
+  };
+
+  // Toggle mute (sin desconectar)
+  const handleToggleMute = () => {
+    if (!micEnabled) return;
+
+    const newMutedState = !micMuted;
+    setMicMuted(newMutedState);
+    setLocalMuted(newMutedState);
+
+    toast.success(newMutedState ? "Micrófono silenciado" : "Micrófono activado");
   };
 
   // Efecto: Detectar cambio de admin y transferir host
@@ -1057,8 +1087,10 @@ export default function Room() {
         {roomStatus !== 'GAME_OVER' && roomStatus !== 'VOTING' && roomStatus !== 'RESULTS' && (
           <VoicePanel
             micEnabled={micEnabled}
+            micMuted={micMuted}
             onToggleMic={handleToggleMic}
-            audioLevel={audioLevel}
+            onToggleMute={handleToggleMute}
+            audioLevel={micMuted ? 0 : audioLevel}
             isConnecting={isConnectingMic}
             voiceStatus={voiceStatus}
           />
