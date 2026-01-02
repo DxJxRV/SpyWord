@@ -100,9 +100,9 @@ export default function VoicePanel({
   // Ordenar por nivel de audio (más alto primero)
   const currentSpeakers = allSpeakers.sort((a, b) => b.audioLevel - a.audioLevel);
 
-  // Efecto: Gestionar speakers con delay de 1.5s al dejar de hablar
+  // Efecto: Gestionar speakers con delay de 0.5s al dejar de hablar
   useEffect(() => {
-    const REMOVE_DELAY = 1500; // 1.5 segundos
+    const REMOVE_DELAY = 500; // 0.5 segundos
 
     // IDs de speakers actualmente hablando
     const activeSpeakerIds = currentSpeakers.map(s => s.playerId);

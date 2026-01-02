@@ -12,32 +12,57 @@ function playRemoteStream(remoteStream, peerId) {
     stopRemoteStream(peerId);
   }
 
-  // Crear elemento de audio
-  const audio = new Audio();
+  // Crear elemento de audio y agregarlo al DOM (necesario para algunos navegadores)
+  const audio = document.createElement('audio');
   audio.srcObject = remoteStream;
   audio.autoplay = true;
   audio.volume = 1.0;
+  audio.playsInline = true;
+  audio.muted = false;
 
-  // IMPORTANTE: Forzar reproducción por bocina/speaker (no auricular de llamada)
-  // En móviles, esto evita que salga por el earpiece
-  audio.setAttribute('playsinline', '');
-  audio.setAttribute('webkit-playsinline', '');
+  // Ocultar el elemento pero mantenerlo en el DOM
+  audio.style.display = 'none';
+  document.body.appendChild(audio);
 
-  // Intentar reproducir explícitamente (necesario en algunos navegadores)
-  audio.play().catch(err => {
-    console.warn("Advertencia al reproducir audio:", err);
-  });
+  // IMPORTANTE: Reproducir explícitamente
+  const playPromise = audio.play();
+
+  if (playPromise !== undefined) {
+    playPromise
+      .then(() => {
+        console.log("✅ Audio reproduciéndose de:", peerId);
+      })
+      .catch(err => {
+        console.error("❌ Error al reproducir audio:", err);
+        // Si falla, intentar de nuevo después de interacción del usuario
+        const retryPlay = () => {
+          audio.play()
+            .then(() => console.log("✅ Audio reproduciéndose (retry):", peerId))
+            .catch(e => console.error("❌ Retry falló:", e));
+          document.removeEventListener('click', retryPlay);
+        };
+        document.addEventListener('click', retryPlay, { once: true });
+      });
+  }
 
   // Guardar referencia
   remoteAudios[peerId] = audio;
 
-  console.log("🔊 Reproduciendo audio de:", peerId);
+  console.log("🔊 Stream de audio configurado para:", peerId);
 }
 
 // 🔇 Detener stream de audio remoto
 function stopRemoteStream(peerId) {
   if (remoteAudios[peerId]) {
-    remoteAudios[peerId].srcObject = null;
+    const audio = remoteAudios[peerId];
+    audio.pause();
+    audio.srcObject = null;
+
+    // Remover del DOM si existe
+    if (audio.parentNode) {
+      audio.parentNode.removeChild(audio);
+    }
+
     delete remoteAudios[peerId];
     console.log("🔇 Audio detenido de:", peerId);
   }
@@ -86,9 +111,17 @@ export function createHostPeer(onMessage, localStream) {
       call.answer(localStream);
       activeCalls.push(call);
 
+      console.log("✅ Llamada respondida, esperando stream...");
+
       // Recibir el stream remoto
       call.on("stream", (remoteStream) => {
         console.log("🎵 Stream de audio recibido de:", call.peer);
+        console.log("📊 Stream info:", {
+          id: remoteStream.id,
+          active: remoteStream.active,
+          audioTracks: remoteStream.getAudioTracks().length,
+          tracks: remoteStream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, muted: t.muted }))
+        });
         playRemoteStream(remoteStream, call.peer);
       });
 
@@ -129,6 +162,12 @@ export function connectToHost(hostId, onMessage, localStream) {
         // Recibir el stream remoto del host
         call.on("stream", (remoteStream) => {
           console.log("🎵 Stream de audio del host recibido");
+          console.log("📊 Stream info:", {
+            id: remoteStream.id,
+            active: remoteStream.active,
+            audioTracks: remoteStream.getAudioTracks().length,
+            tracks: remoteStream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, muted: t.muted }))
+          });
           playRemoteStream(remoteStream, hostId);
         });
 
