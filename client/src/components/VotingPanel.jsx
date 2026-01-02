@@ -294,8 +294,8 @@ export default function VotingPanel({ roomState, roomId, myId, word, wordHidden,
         <div className="text-center mb-6">
           {wasEliminated ? (
             <>
-              <div className="mb-4">
-                <XCircle size={80} className="text-red-400 mx-auto animate-bounce" />
+              <div className="mb-4 animate-bounce">
+                <XCircle size={80} className="text-red-400 mx-auto drop-shadow-[0_0_20px_rgba(248,113,113,0.5)]" />
               </div>
               <h3 className="text-2xl font-bold text-red-300 mb-3">¡Jugador Eliminado!</h3>
               <p className="text-lg text-white mb-2">
@@ -308,7 +308,7 @@ export default function VotingPanel({ roomState, roomId, myId, word, wordHidden,
           ) : (
             <>
               <div className="mb-4">
-                <AlertTriangle size={80} className="text-blue-400 mx-auto animate-pulse" />
+                <AlertTriangle size={80} className="text-blue-400 mx-auto animate-pulse drop-shadow-[0_0_20px_rgba(96,165,250,0.5)]" />
               </div>
               <h3 className="text-2xl font-bold text-blue-300 mb-3">Sin Mayoría</h3>
               <p className="text-sm text-gray-400">
@@ -369,14 +369,17 @@ export default function VotingPanel({ roomState, roomId, myId, word, wordHidden,
           <button
             onClick={handleContinue}
             disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white flex items-center justify-center gap-2"
+            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-6 py-4 rounded-xl font-bold text-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white flex items-center justify-center gap-2 shadow-lg animate-pulse"
           >
-            <Play size={20} />
-            <span>{loading ? "Continuando..." : "Continuar"}</span>
+            <Play size={24} fill="white" className="animate-pulse" />
+            <span>{loading ? "Continuando..." : "Continuar Partida"}</span>
           </button>
         ) : (
-          <div className="text-center text-gray-400 text-xs py-2">
-            Esperando al administrador...
+          <div className="text-center text-gray-400 text-xs py-3 bg-gray-800/30 rounded-lg flex items-center justify-center gap-1">
+            <span className="animate-pulse">Esperando al administrador</span>
+            <span className="animate-bounce">.</span>
+            <span className="animate-bounce" style={{animationDelay: '0.2s'}}>.</span>
+            <span className="animate-bounce" style={{animationDelay: '0.4s'}}>.</span>
           </div>
         )}
       </div>

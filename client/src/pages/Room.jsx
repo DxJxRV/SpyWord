@@ -358,11 +358,9 @@ export default function Room() {
 
   return (
     <>
-      <AppHeader />
-
-      {/* Barra de redes sociales - Arriba del bottom bar */}
-      <div className="fixed bottom-14 left-0 right-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-center gap-4">
+      {/* Barra de redes sociales - Arriba del header */}
+      <div className="fixed top-0 left-0 right-0 z-40 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800/50">
+        <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-center gap-4">
           {/* Instagram */}
           <a
             href="https://www.instagram.com/impostorword"
@@ -388,6 +386,8 @@ export default function Room() {
           </a>
         </div>
       </div>
+
+      <AppHeader />
 
       {/* Bottom bar con código de room y botón salir */}
       <div className="fixed bottom-0 left-0 right-0 bg-gray-900/90 backdrop-blur-sm border-t border-gray-800 z-30">
@@ -418,7 +418,7 @@ export default function Room() {
         </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20 pb-32 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-28 pb-24 text-center">
         <div className="max-w-md w-full space-y-6">
 
         {/* Banner Publicitario - Top */}
