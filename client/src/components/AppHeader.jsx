@@ -193,7 +193,7 @@ export default function AppHeader() {
 
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 z-50">
+      <div className="fixed top-6 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 z-50">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           {/* Logo - clickeable para ir al home */}
           <button

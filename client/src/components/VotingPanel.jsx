@@ -375,11 +375,15 @@ export default function VotingPanel({ roomState, roomId, myId, word, wordHidden,
             <span>{loading ? "Continuando..." : "Continuar Partida"}</span>
           </button>
         ) : (
-          <div className="text-center text-gray-400 text-xs py-3 bg-gray-800/30 rounded-lg flex items-center justify-center gap-1">
-            <span className="animate-pulse">Esperando al administrador</span>
-            <span className="animate-bounce">.</span>
-            <span className="animate-bounce" style={{animationDelay: '0.2s'}}>.</span>
-            <span className="animate-bounce" style={{animationDelay: '0.4s'}}>.</span>
+          <div className="text-center py-3 bg-gray-800/30 rounded-lg">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce"></div>
+              <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.15s'}}></div>
+              <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.3s'}}></div>
+            </div>
+            <p className="text-gray-400 text-xs animate-pulse">
+              Esperando al administrador
+            </p>
           </div>
         )}
       </div>
