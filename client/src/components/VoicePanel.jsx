@@ -68,10 +68,22 @@ export default function VoicePanel({
   // Detectar si está hablando (nivel > 15)
   const isSpeaking = audioLevel > 15;
 
-  // Encontrar quién está hablando actualmente
-  const currentSpeakers = Object.entries(speakersData)
-    .filter(([, data]) => data.isSpeaking)
-    .map(([playerId]) => playerId);
+  // Encontrar quién está hablando actualmente con nivel significativo
+  const SPEAKING_THRESHOLD = 25; // Nivel mínimo para mostrar (de 0-100)
+
+  // Recopilar speakers remotos
+  const remoteSpeakers = Object.entries(speakersData)
+    .filter(([, data]) => data.isSpeaking && data.audioLevel > SPEAKING_THRESHOLD)
+    .map(([playerId, data]) => ({ playerId, audioLevel: data.audioLevel }));
+
+  // Agregar el usuario local si está hablando
+  const allSpeakers = [...remoteSpeakers];
+  if (isSpeaking && audioLevel > SPEAKING_THRESHOLD && myId) {
+    allSpeakers.push({ playerId: myId, audioLevel });
+  }
+
+  // Ordenar por nivel de audio (más alto primero)
+  const currentSpeakers = allSpeakers.sort((a, b) => b.audioLevel - a.audioLevel);
 
   if (!voiceEnabled) {
     return null; // No mostrar nada si no está habilitado
@@ -150,27 +162,72 @@ export default function VoicePanel({
         <div className="px-3 py-2 bg-purple-500/10 border-b border-gray-700/50">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] text-purple-300 font-bold">🗣️ Hablando:</span>
-            {currentSpeakers.map(speakerId => {
+            {currentSpeakers.map(({ playerId: speakerId, audioLevel: speakerLevel }) => {
               const player = players[speakerId];
               if (!player) return null;
 
+              // Calcular intensidad del color basado en nivel de audio
+              const intensity = Math.min(speakerLevel / 100, 1);
+              const bgOpacity = Math.round(20 + (intensity * 30)); // 20-50%
+
+              // Determinar color según nivel
+              let colorClass = 'bg-purple-500';
+              let ringClass = 'ring-purple-400';
+              if (speakerLevel > 70) {
+                colorClass = 'bg-red-500';
+                ringClass = 'ring-red-400';
+              } else if (speakerLevel > 50) {
+                colorClass = 'bg-yellow-500';
+                ringClass = 'ring-yellow-400';
+              } else if (speakerLevel > 35) {
+                colorClass = 'bg-green-500';
+                ringClass = 'ring-green-400';
+              }
+
               return (
-                <div key={speakerId} className="flex items-center gap-1 bg-purple-500/20 rounded-full px-2 py-0.5">
+                <div
+                  key={speakerId}
+                  className={`flex items-center gap-1.5 ${colorClass}/${bgOpacity} rounded-full px-2 py-1 ring-2 ${ringClass} animate-pulse`}
+                >
+                  {/* Foto de perfil */}
                   {player.profilePicture ? (
                     <img
                       src={player.profilePicture}
                       alt={player.name}
-                      className="w-4 h-4 rounded-full object-cover"
+                      className="w-5 h-5 rounded-full object-cover border border-white/50"
                     />
                   ) : (
-                    <div className="w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center text-[8px] text-white font-bold">
+                    <div className={`w-5 h-5 rounded-full ${colorClass} flex items-center justify-center text-[8px] text-white font-bold border border-white/50`}>
                       {player.name.charAt(0).toUpperCase()}
                     </div>
                   )}
-                  <span className="text-[10px] text-purple-200 font-medium">
+
+                  {/* Nombre */}
+                  <span className="text-[10px] text-white font-bold">
                     {player.name.split(' ')[0]}
-                    {speakerId === myId && <span className="text-purple-400"> (tú)</span>}
+                    {speakerId === myId && <span className="opacity-70"> (tú)</span>}
                   </span>
+
+                  {/* Indicador de nivel visual (barras) */}
+                  <div className="flex items-center gap-[2px] ml-0.5">
+                    {[...Array(3)].map((_, i) => {
+                      const barThreshold = (i + 1) * 33; // 33%, 66%, 100%
+                      const isActive = speakerLevel > barThreshold;
+                      return (
+                        <div
+                          key={i}
+                          className={`w-[2px] rounded-full transition-all ${
+                            isActive
+                              ? `bg-white h-${i === 0 ? '2' : i === 1 ? '3' : '4'}`
+                              : 'bg-white/30 h-2'
+                          }`}
+                          style={{
+                            height: isActive ? `${4 + i * 2}px` : '4px'
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })}
