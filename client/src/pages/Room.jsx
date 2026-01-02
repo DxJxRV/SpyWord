@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Eye, EyeOff, Share2, QrCode, RotateCw, Copy, ChevronDown, ChevronUp, UserX } from "lucide-react";
+import { Eye, EyeOff, Share2, QrCode, Copy, ChevronDown, ChevronUp, Play, UserPlus, Crown, Settings, UserMinus, UserCheck, X } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import { toast } from "sonner";
 import Joyride from "react-joyride";
@@ -68,11 +68,23 @@ export default function Room() {
   const [isRoomPremium, setIsRoomPremium] = useState(false); // Premium Pass del Anfitrión
   const [showRestartInterstitial, setShowRestartInterstitial] = useState(false);
 
-  // Estado para dropdown de jugadores
-  const [showPlayersDropdown, setShowPlayersDropdown] = useState(false);
+  // Estado para grid de usuarios (nuevo)
+  const [showPlayersGrid, setShowPlayersGrid] = useState(true); // Mostrar por defecto
+
+  // Estado para opciones de invitación
+  const [showInviteOptions, setShowInviteOptions] = useState(false);
+
+  // Estado para menú de configuración de jugadores
+  const [playerMenuOpen, setPlayerMenuOpen] = useState(null); // ID del jugador con menú abierto
+
+  // Estado para posición del tooltip de invitación
+  const [inviteMenuPosition, setInviteMenuPosition] = useState('top');
 
   // Referencia para rastrear IDs de jugadores previos
   const previousPlayerIds = useRef(new Set());
+
+  // Referencia para el botón de añadir
+  const addButtonRef = useRef(null);
 
   // Detectar nuevos jugadores y mostrar toast
   useEffect(() => {
@@ -102,6 +114,44 @@ export default function Room() {
     // Actualizar la referencia
     previousPlayerIds.current = currentPlayerIds;
   }, [players, myId]);
+
+  // Cerrar menús al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const clickedMenuContainer = event.target.closest('.player-menu-container');
+
+      if (playerMenuOpen && !clickedMenuContainer) {
+        setPlayerMenuOpen(null);
+      }
+
+      if (showInviteOptions && !clickedMenuContainer) {
+        setShowInviteOptions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [playerMenuOpen, showInviteOptions]);
+
+  // Calcular posición óptima del tooltip de invitación (preferir arriba)
+  useEffect(() => {
+    if (showInviteOptions && addButtonRef.current) {
+      const rect = addButtonRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      // Preferir arriba: si hay más de 120px arriba, mostrar arriba
+      if (spaceAbove > 120) {
+        setInviteMenuPosition('top');
+      } else if (spaceBelow > 120) {
+        setInviteMenuPosition('bottom');
+      } else {
+        // Si no hay espacio suficiente en ningún lado, preferir arriba
+        setInviteMenuPosition(spaceAbove > spaceBelow ? 'top' : 'bottom');
+      }
+    }
+  }, [showInviteOptions]);
 
   useEffect(() => {
     let isActive = true;
@@ -299,6 +349,35 @@ export default function Room() {
     <>
       <AppHeader />
 
+      {/* Barra de redes sociales - Arriba del bottom bar */}
+      <div className="fixed bottom-14 left-0 right-0 z-20">
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-center gap-4">
+          {/* Instagram */}
+          <a
+            href="https://www.instagram.com/impostorword"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-all hover:scale-105 active:scale-95"
+          >
+            <span className="text-xs font-bold text-purple-400">
+              @impostorword
+            </span>
+          </a>
+
+          {/* TikTok */}
+          <a
+            href="https://www.tiktok.com/@impostorword.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-all hover:scale-105 active:scale-95"
+          >
+            <span className="text-xs font-bold text-rose-400">
+              @impostorword.com
+            </span>
+          </a>
+        </div>
+      </div>
+
       {/* Bottom bar con código de room y botón salir */}
       <div className="fixed bottom-0 left-0 right-0 bg-gray-900/90 backdrop-blur-sm border-t border-gray-800 z-30">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
@@ -328,7 +407,7 @@ export default function Room() {
         </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20 pb-24 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20 pb-32 text-center">
         <div className="max-w-md w-full space-y-6">
 
         {/* Banner Publicitario - Top */}
@@ -338,62 +417,51 @@ export default function Room() {
           </div>
         )}
 
-        <div className="relative">
-          <button
-            data-tutorial="room-info"
-            onClick={() => setShowPlayersDropdown(!showPlayersDropdown)}
-            className="w-full bg-blue-500/20 px-4 py-2 rounded-lg border border-blue-500/30 hover:bg-blue-500/30 transition-all flex items-center justify-center relative"
-          >
-            <p className="text-xs text-gray-400">Ronda {currentRound} • {totalPlayers} jugadores</p>
-            <span className="absolute right-4">
-              {showPlayersDropdown ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-            </span>
-          </button>
+        {/* Mostrar siempre quién inicia (oculto durante votación) */}
+        {starterName && roomStatus !== 'GAME_OVER' && (
+          <div data-tutorial="starter-name" className="relative bg-gradient-to-br from-amber-500/20 to-orange-500/20 px-4 py-3 rounded-xl border border-amber-500/40 shadow-lg">
+            {/* Badge de ronda en esquina superior derecha */}
+            <div className="absolute top-2 right-2">
+              <p className="text-[10px] text-amber-200/80 font-bold">Ronda {currentRound}</p>
+            </div>
 
-          {/* Dropdown de jugadores */}
-          {showPlayersDropdown && (
-            <div className="absolute top-full mt-2 left-0 right-0 bg-gray-800 rounded-lg border border-blue-500/30 shadow-lg z-10 max-h-64 overflow-y-auto">
-              {Object.entries(players).map(([playerId, player]) => (
-                <div
-                  key={playerId}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-700/50 transition-colors border-b border-gray-700 last:border-b-0"
-                >
-                  <span className="text-sm text-white">
-                    {player.name}
-                    {playerId === myId && <span className="text-gray-400 ml-1">(tú)</span>}
-                  </span>
-                  {isAdmin && playerId !== myId && (
-                    <button
-                      onClick={() => handleKickPlayer(playerId, player.name)}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded transition-all"
-                      title={`Eliminar a ${player.name}`}
-                    >
-                      <UserX size={18} />
-                    </button>
+            <p className="text-xs text-amber-300 mb-2 text-center font-semibold">Jugador que Inicia</p>
+            {countdownActive || starterName === previousStarterName ? (
+              // Skeleton durante el countdown
+              <div className="flex items-center justify-center gap-3 animate-pulse">
+                <div className="w-10 h-10 rounded-full bg-amber-400/30"></div>
+                <p className="text-lg font-bold text-amber-400/30">Loading...</p>
+              </div>
+            ) : (
+              // Mostrar nombre y foto
+              <div className="flex items-center justify-center gap-3">
+                {/* Foto de perfil del jugador que inicia */}
+                {(() => {
+                  const starterPlayer = Object.entries(players).find(([, p]) => p.name === starterName);
+                  const starterProfilePic = starterPlayer?.[1]?.profilePicture;
+
+                  return starterProfilePic ? (
+                    <img
+                      src={starterProfilePic}
+                      alt={starterName}
+                      className="w-10 h-10 rounded-full object-cover border-2 border-amber-400 shadow-md"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold shadow-md border-2 border-amber-400">
+                      {starterName.charAt(0).toUpperCase()}
+                    </div>
+                  );
+                })()}
+
+                <div className="flex flex-col items-start">
+                  <p className="text-lg font-bold text-amber-400">
+                    {starterName}
+                  </p>
+                  {myId && players[myId] && players[myId].name === starterName && (
+                    <span className="text-amber-300 text-xs">(tú)</span>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Mostrar siempre quién inicia (oculto durante votación) */}
-        {starterName && roomStatus !== 'VOTING' && (
-          <div data-tutorial="starter-name" className="bg-amber-500/20 px-4 py-2 rounded-lg border border-amber-500/30">
-            <p className="text-xs text-amber-300 mb-1">Jugador que Inicia</p>
-            {countdownActive || starterName === previousStarterName ? (
-              // Skeleton durante el countdown - letras grises pulsantes
-              <p className="text-lg font-bold text-amber-400 animate-pulse">
-                <span className=" text-amber-400/30">Loading...</span>
-              </p>
-            ) : (
-              // Mostrar nombre
-              <p className="text-lg font-bold text-amber-400">
-                {starterName}
-                {myId && players[myId] && players[myId].name === starterName && (
-                  <span className="text-amber-300 ml-1 text-sm">(tú)</span>
-                )}
-              </p>
+              </div>
             )}
           </div>
         )}
@@ -486,8 +554,8 @@ export default function Room() {
           </div>
         )}
 
-        {/* Panel de votación o game over */}
-        {roomStatus === 'GAME_OVER' ? (
+        {/* Panel de game over */}
+        {roomStatus === 'GAME_OVER' && (
           <GameOverPanel
             roomState={{
               winner,
@@ -501,7 +569,10 @@ export default function Room() {
             onRestart={handleRestart}
             isPremium={isPremium}
           />
-        ) : (
+        )}
+
+        {/* Panel de votación cuando hay votación activa (no IN_GAME) */}
+        {roomStatus !== 'GAME_OVER' && roomStatus !== 'IN_GAME' && (
           <VotingPanel
             roomState={{
               status: roomStatus,
@@ -514,55 +585,217 @@ export default function Room() {
             roomId={roomId}
             myId={myId}
             onUpdate={() => {
-              // Forzar una actualización del polling
               setCurrentRound((prev) => prev);
             }}
           />
         )}
 
-        {/* Botones de compartir (ocultos en game over) */}
+        {/* Grid de usuarios e invitación (ocultos en game over) */}
         {roomStatus !== 'GAME_OVER' && (
-        <div className="w-full">
-          {isAdmin ? (
-            // Layout para admin: botón grande a la izquierda, QR y Compartir a la derecha
-            <div className="grid grid-cols-3 grid-rows-2 gap-3">
-              {/* Botón Volver a jugar (admin) - ocupa 1-2 horizontal, 1-2 vertical */}
+        <div className="w-full relative">
+          {/* Layout común: Grid de usuarios (70%) + Columna de botones (30%) */}
+          <div className="flex gap-3">
+            {/* Grid de usuarios colapsable */}
+            <div className={`flex-[0.7] bg-gray-800/50 rounded-lg border border-gray-700/50 ${showPlayersGrid ? 'overflow-visible' : 'overflow-hidden'}`}>
+              {/* Header del grid con toggle */}
               <button
-                data-tutorial="restart-button"
-                onClick={handleRestart}
-                disabled={loading || countdown !== null}
-                className="col-span-2 row-span-2 bg-emerald-500 px-4 py-6 rounded-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-3"
+                onClick={() => setShowPlayersGrid(!showPlayersGrid)}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-700/30 transition-all"
               >
-                <RotateCw size={40} />
-                <span className="text-sm">{loading ? "Reiniciando..." : countdown !== null ? "⏳ Esperando..." : "Volver a jugar"}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-white">👥 Jugadores</span>
+                  <span className="bg-purple-500/30 text-purple-300 text-xs px-2 py-0.5 rounded-full font-bold">{totalPlayers}</span>
+                </div>
+                <span className="text-gray-400">
+                  {showPlayersGrid ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                </span>
               </button>
 
-              {/* Botón Compartir link - 3 horizontal, 1 vertical */}
-              <button data-tutorial="share-button" onClick={copyRoomLink} className="bg-blue-500/80 px-4 py-3 rounded-lg font-semibold hover:bg-blue-600 active:scale-95 transition-all flex flex-col items-center justify-center gap-2">
-                <Share2 size={24} />
-                <span className="text-xs">Compartir</span>
-              </button>
+              {/* Grid de avatares de jugadores */}
+              {showPlayersGrid && (
+                <div className="p-4 pt-0">
+                  <div className="grid grid-cols-3 gap-2">
+                    {Object.entries(players).slice(0, 5).map(([playerId, player]) => (
+                      <div
+                        key={playerId}
+                        className="relative flex flex-col items-center gap-1"
+                        title={player.name}
+                      >
+                        {/* Coronita para el admin */}
+                        {player.isAdmin && (
+                          <div className="absolute -top-1 left-1/2 -translate-x-1/2 z-10">
+                            <Crown size={14} className="text-amber-400 fill-amber-400" />
+                          </div>
+                        )}
 
-              {/* Botón QR - 3 horizontal, 2 vertical */}
-              <button data-tutorial="qr-button" onClick={() => setShowQRModal(true)} className="bg-purple-500/80 px-4 py-3 rounded-lg font-semibold hover:bg-purple-600 active:scale-95 transition-all flex flex-col items-center justify-center gap-2">
-                <QrCode size={24} />
-                <span className="text-xs">QR</span>
-              </button>
+                        {/* Avatar */}
+                        <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${
+                          playerId === myId
+                            ? 'from-amber-500 to-orange-600 ring-2 ring-amber-400'
+                            : 'from-purple-500 to-pink-600'
+                        } flex items-center justify-center text-white font-bold text-base shadow-lg`}>
+                          {player.name ? player.name.charAt(0).toUpperCase() : '?'}
+                        </div>
+
+                        {/* Nombre */}
+                        <span className="text-[10px] text-gray-300 truncate w-full text-center">
+                          {player.name.split(' ')[0]}
+                          {playerId === myId && <span className="text-amber-400"> (tú)</span>}
+                        </span>
+
+                        {/* Botón de configuración (solo para otros jugadores si eres admin) */}
+                        {isAdmin && playerId !== myId && (
+                          <div className="relative player-menu-container">
+                            <button
+                              onClick={() => setPlayerMenuOpen(playerMenuOpen === playerId ? null : playerId)}
+                              className="text-gray-400 hover:text-white transition-colors"
+                            >
+                              <Settings size={14} />
+                            </button>
+
+                            {/* Menú desplegable */}
+                            {playerMenuOpen === playerId && (
+                              <div className="absolute top-full mt-1 right-0 bg-gray-900 rounded-lg border border-gray-700 shadow-xl z-50 min-w-[140px] overflow-hidden">
+                                {/* Opción: Eliminar jugador */}
+                                <button
+                                  onClick={() => {
+                                    handleKickPlayer(playerId, player.name);
+                                    setPlayerMenuOpen(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
+                                >
+                                  <UserMinus size={14} />
+                                  <span>Eliminar</span>
+                                </button>
+
+                                {/* Opción: Añadir a amigos (deshabilitado) */}
+                                <button
+                                  disabled
+                                  className="w-full px-3 py-2 text-left text-sm text-gray-500 cursor-not-allowed flex flex-col gap-1"
+                                  title="Próximamente"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <UserCheck size={14} />
+                                    <span>Añadir amigo</span>
+                                  </div>
+                                  <span className="text-[9px] text-gray-600 italic">Próximamente</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Burbuja de Añadir amigos */}
+                    <div className="relative flex flex-col items-center gap-1 player-menu-container" ref={addButtonRef}>
+                      <button
+                        data-tutorial="add-friends-button"
+                        onClick={() => setShowInviteOptions(!showInviteOptions)}
+                        className="w-12 h-12 rounded-full bg-gray-800/50 border-2 border-dashed border-gray-600 hover:border-purple-500 hover:bg-gray-700/50 flex items-center justify-center text-gray-400 hover:text-white shadow-lg transition-all active:scale-95 relative"
+                      >
+                        <UserPlus size={20} className="absolute" />
+                      </button>
+
+                      <span className="text-[10px] text-gray-300 text-center">
+                        Añadir
+                      </span>
+
+                      {/* Menú desplegable de opciones de invitación */}
+                      {showInviteOptions && (
+                        <div className={`absolute left-1/2 -translate-x-1/2 bg-gray-900 rounded-lg border border-gray-700 shadow-xl z-50 min-w-[120px] overflow-hidden ${
+                          inviteMenuPosition === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+                        }`}>
+                          {/* Opción: Compartir link */}
+                          <button
+                            data-tutorial="share-button"
+                            onClick={() => {
+                              copyRoomLink();
+                              setShowInviteOptions(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-blue-500/20 transition-colors flex items-center gap-2"
+                          >
+                            <Share2 size={14} />
+                            <span>Compartir</span>
+                          </button>
+
+                          {/* Opción: Mostrar QR */}
+                          <button
+                            data-tutorial="qr-button"
+                            onClick={() => {
+                              setShowQRModal(true);
+                              setShowInviteOptions(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-purple-400 hover:bg-purple-500/20 transition-colors flex items-center gap-2"
+                          >
+                            <QrCode size={14} />
+                            <span>QR</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
-            // Layout para jugadores: QR y Compartir del mismo tamaño, cada uno ocupa mitad
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={copyRoomLink} className="bg-blue-500/80 px-4 py-4 rounded-lg font-semibold hover:bg-blue-600 active:scale-95 transition-all flex flex-col items-center justify-center gap-2">
-                <Share2 size={28} />
-                <span className="text-sm">Compartir</span>
-              </button>
 
-              <button onClick={() => setShowQRModal(true)} className="bg-purple-500/80 px-4 py-4 rounded-lg font-semibold hover:bg-purple-600 active:scale-95 transition-all flex flex-col items-center justify-center gap-2">
-                <QrCode size={28} />
-                <span className="text-sm">QR</span>
-              </button>
+            {/* Columna de botones (30%) */}
+            <div className="flex-[0.3] flex flex-col gap-3">
+              {isAdmin ? (
+                // Admin: Siguiente palabra arriba (80%) + Votación abajo (20%)
+                <>
+                  {/* Botón Siguiente palabra (80% del alto) */}
+                  <button
+                    data-tutorial="restart-button"
+                    onClick={handleRestart}
+                    disabled={loading || countdown !== null}
+                    className="flex-[0.8] bg-emerald-500 px-3 py-6 rounded-lg font-semibold hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-2"
+                  >
+                    <Play size={32} fill="white" />
+                    <span className="text-xs text-center leading-tight">{loading ? "Cargando..." : countdown !== null ? "⏳ Esperando..." : "Siguiente palabra"}</span>
+                  </button>
+
+                  {/* Botón Llamar a Votación (20% del alto) */}
+                  <div className="flex-[0.2]">
+                    <VotingPanel
+                      roomState={{
+                        status: roomStatus,
+                        players,
+                        votesTally,
+                        votersRemaining,
+                        eliminatedPlayerId,
+                        isAdmin,
+                      }}
+                      roomId={roomId}
+                      myId={myId}
+                      onUpdate={() => {
+                        setCurrentRound((prev) => prev);
+                      }}
+                    />
+                  </div>
+                </>
+              ) : (
+                // Jugador: Solo botón de votación (100% del alto)
+                <div className="flex-1 h-full flex flex-col">
+                  <VotingPanel
+                    roomState={{
+                      status: roomStatus,
+                      players,
+                      votesTally,
+                      votersRemaining,
+                      eliminatedPlayerId,
+                      isAdmin,
+                    }}
+                    roomId={roomId}
+                    myId={myId}
+                    onUpdate={() => {
+                      setCurrentRound((prev) => prev);
+                    }}
+                  />
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
         )}
 
@@ -581,38 +814,45 @@ export default function Room() {
           onClick={() => setShowQRModal(false)}
         >
           <div
-            className="bg-gray-900 rounded-2xl p-8 max-w-sm w-full border-2 border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.3)]"
+            className="relative bg-gray-900 rounded-2xl p-6 max-w-sm w-full border-2 border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.3)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold text-center mb-2">Impostor<br/>Word 🕵️‍♂️</h2>
-            <p className="text-sm text-gray-400 text-center mb-6">Escanea para unirte</p>
+            {/* Botón cerrar flotante */}
+            <button
+              onClick={() => setShowQRModal(false)}
+              className="absolute top-3 right-3 bg-gray-800 hover:bg-gray-700 rounded-full p-2 transition-all active:scale-95"
+            >
+              <X size={16} className="text-gray-400 hover:text-white" />
+            </button>
 
-            <div className="bg-white p-6 rounded-xl mb-6">
-              <QRCodeCanvas
-                value={`${import.meta.env.DEV ? (import.meta.env.VITE_DEV_HOST || window.location.origin) : import.meta.env.VITE_BASE_URL}/#/?join=${roomId}`}
-                size={240}
-                bgColor="#ffffff"
-                fgColor="#000000"
-                level="H"
-              />
-            </div>
+            <h2 className="text-xl font-bold text-center mb-1">Impostor Word</h2>
+            <p className="text-xs text-gray-400 text-center mb-4">Escanea para unirte</p>
 
-            <div className="bg-purple-500/20 px-6 py-3 rounded-lg border-2 border-purple-500/50 mb-4">
-              <p className="text-xs text-purple-300 mb-1 text-center">Código de sala:</p>
-              <p className="text-purple-400 font-mono text-3xl font-bold tracking-widest text-center">{roomId}</p>
-            </div>
-
-            <div className="bg-blue-500/20 px-4 py-2 rounded-lg border border-blue-500/30 mb-6">
-              <p className="text-xs text-blue-300 text-center">
-                💡 También puedes usar la cámara nativa de tu teléfono para escanear el QR
-              </p>
+            <div className="flex justify-center mb-4">
+              <div className="bg-gray-800 p-4 rounded-xl inline-block border border-purple-500/30">
+                <QRCodeCanvas
+                  value={`${import.meta.env.DEV ? (import.meta.env.VITE_DEV_HOST || window.location.origin) : import.meta.env.VITE_BASE_URL}/#/?join=${roomId}`}
+                  size={200}
+                  bgColor="#1f2937"
+                  fgColor="#c084fc"
+                  level="H"
+                />
+              </div>
             </div>
 
             <button
-              onClick={() => setShowQRModal(false)}
-              className="w-full bg-white/20 px-4 py-3 rounded-lg font-semibold hover:bg-white/30 active:scale-95 transition-all"
+              onClick={() => {
+                navigator.clipboard.writeText(roomId);
+                toast.success("¡Código copiado!");
+                if (navigator.vibrate) navigator.vibrate(30);
+              }}
+              className="w-full bg-purple-500/20 px-4 py-2 rounded-lg border border-purple-500/50 hover:bg-purple-500/30 transition-all active:scale-95 flex items-center justify-center gap-2"
             >
-              ✕ Cerrar
+              <div className="flex flex-col items-center flex-1">
+                <p className="text-[10px] text-purple-300">Código de sala:</p>
+                <p className="text-purple-400 font-mono text-2xl font-bold tracking-widest">{roomId}</p>
+              </div>
+              <Copy size={18} className="text-purple-400" />
             </button>
           </div>
         </div>

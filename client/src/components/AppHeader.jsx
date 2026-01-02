@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
-import { User, LogOut, Settings, Crown, Pencil, Check, X } from "lucide-react";
+import { User, LogOut, Settings, Crown, Pencil, Check, X, MessageCircle } from "lucide-react";
 import { getUserName, setUserName } from "../utils/nameGenerator";
 import { api, authApi } from "../services/api";
 import { toast } from "sonner";
@@ -440,6 +440,36 @@ export default function AppHeader() {
                       </div>
                     </button>
                   )}
+
+                  {/* Sección de Feedback - Para todos los usuarios */}
+                  <div className="my-2 border-t border-gray-700"></div>
+                  <div className="px-4 py-3 bg-blue-500/10">
+                    <div className="flex items-start gap-2 mb-2">
+                      <MessageCircle size={16} className="text-blue-400 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-blue-300">Quejas y sugerencias</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Escríbenos:</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <a
+                        href="https://www.instagram.com/impostorword"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 px-3 py-1.5 rounded-lg text-white text-xs font-semibold transition-all active:scale-95 text-center"
+                      >
+                        Instagram
+                      </a>
+                      <a
+                        href="https://www.tiktok.com/@impostorword.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-gray-900 hover:bg-gray-800 px-3 py-1.5 rounded-lg text-white text-xs font-semibold transition-all active:scale-95 text-center border border-gray-700"
+                      >
+                        TikTok
+                      </a>
+                    </div>
+                  </div>
 
                   {!isAuthLoading && user && (
                     // Usuario autenticado - Mostrar logout
