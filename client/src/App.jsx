@@ -20,7 +20,18 @@ import PremiumTab from "./components/PremiumTab";
 import RouletteModal from "./components/RouletteModal";
 import { TutorialProvider } from "./contexts/TutorialContext";
 import { AuthProvider } from "./contexts/AuthContext";
-import { getUserName, setUserName as saveUserName } from "./utils/nameGenerator";
+import { getUserName, setUserName as saveUserName, initializeUserName } from "./utils/nameGenerator";
+
+// Inicializar nombre de usuario al montar la app
+function UserNameInitializer() {
+  useEffect(() => {
+    initializeUserName().catch(err => {
+      console.error('Error al inicializar nombre:', err);
+    });
+  }, []);
+
+  return null;
+}
 
 function ScrollToTop() {
   const location = useLocation();
@@ -168,6 +179,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <UserNameInitializer />
       <AuthProvider>
         <TutorialProvider>
           <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden flex flex-col">

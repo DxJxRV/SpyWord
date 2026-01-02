@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette, Star, Lock, BarChart3, MessageSquare, ChevronDown } from "lucide-react";
+import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette, Star, Lock, BarChart3, MessageSquare, ChevronDown, Type } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import UserManagement from "../components/UserManagement";
 import BannerManager from "../components/BannerManager";
+import NamesManager from "../components/NamesManager";
 import { useAuth } from "../contexts/AuthContext";
 
 const ADMIN_PIN = "5523";
@@ -726,6 +727,7 @@ export default function Admin() {
           <div className="hidden md:flex gap-2">
             <TabButton icon={BarChart3} label="Dashboard" tab="dashboard" activeTab={activeTab} setActiveTab={setActiveTab} />
             <TabButton icon={MessageSquare} label="Banners" tab="banners" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <TabButton icon={Type} label="Nombres" tab="nombres" activeTab={activeTab} setActiveTab={setActiveTab} />
             <TabButton icon={BookOpen} label="Palabras" tab="words" activeTab={activeTab} setActiveTab={setActiveTab} />
             <TabButton icon={Gamepad2} label="Modos" tab="modes" activeTab={activeTab} setActiveTab={setActiveTab} />
             <TabButton icon={Users} label="Usuarios" tab="users" activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -740,6 +742,7 @@ export default function Admin() {
               <span className="flex items-center gap-2">
                 {activeTab === 'dashboard' && <><BarChart3 size={20} /> Dashboard</>}
                 {activeTab === 'banners' && <><MessageSquare size={20} /> Banners</>}
+                {activeTab === 'nombres' && <><Type size={20} /> Nombres</>}
                 {activeTab === 'words' && <><BookOpen size={20} /> Palabras</>}
                 {activeTab === 'modes' && <><Gamepad2 size={20} /> Modos</>}
                 {activeTab === 'users' && <><Users size={20} /> Usuarios</>}
@@ -751,6 +754,7 @@ export default function Admin() {
               <div className="absolute top-full left-0 right-0 bg-gray-900 border border-gray-800 rounded-b-lg z-50">
                 <TabDropdownItem icon={BarChart3} label="Dashboard" tab="dashboard" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
                 <TabDropdownItem icon={MessageSquare} label="Banners" tab="banners" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
+                <TabDropdownItem icon={Type} label="Nombres" tab="nombres" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
                 <TabDropdownItem icon={BookOpen} label="Palabras" tab="words" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
                 <TabDropdownItem icon={Gamepad2} label="Modos" tab="modes" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
                 <TabDropdownItem icon={Users} label="Usuarios" tab="users" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
@@ -1850,6 +1854,11 @@ export default function Admin() {
         {/* Contenido de la tab de Banners */}
         {activeTab === "banners" && (
           <BannerManager />
+        )}
+
+        {/* Contenido de la tab de Nombres */}
+        {activeTab === "nombres" && (
+          <NamesManager />
         )}
       </div>
     </div>

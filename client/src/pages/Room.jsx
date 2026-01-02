@@ -921,7 +921,7 @@ export default function Room() {
                       className={`p-1.5 rounded-lg transition-all active:scale-95 ${
                         roomIsPublic
                           ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
-                          : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-400'
+                          : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
                       }`}
                       title={roomIsPublic ? "Sala pública - Click para hacer privada" : "Sala privada - Click para hacer pública"}
                     >
@@ -1136,7 +1136,7 @@ export default function Room() {
                 <div className="px-4 pb-2">
                   <div className="flex items-center gap-3 text-[9px] text-gray-500 flex-wrap">
                     {isAdmin && (
-                      <span className="text-green-400 flex items-center gap-1">
+                      <span className={`flex items-center gap-1 ${roomIsPublic ? 'text-green-400' : 'text-red-400'}`}>
                         {roomIsPublic ? <LockOpen size={10} /> : <Lock size={10} />}
                         {roomIsPublic ? 'Pública' : 'Privada'}
                       </span>

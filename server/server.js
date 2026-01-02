@@ -119,6 +119,37 @@ const activeBanners = []; // Lista de banners
 // ============================================
 const recentRoomCreations = new Map(); // userId/sessionId -> {roomId, timestamp}
 
+// ============================================
+// 📛 SISTEMA DE NOMBRES ALEATORIOS
+// ============================================
+const nouns = []; // Sustantivos para nombres
+const verbs = []; // Verbos para nombres
+
+// Listas hardcodeadas de fallback
+const fallbackNouns = [
+  'Gato', 'Perro', 'León', 'Tigre', 'Águila', 'Lobo', 'Zorro', 'Oso',
+  'Dragón', 'Fénix', 'Ninja', 'Pirata', 'Rey', 'Reina', 'Héroe', 'Mago',
+  'Guerrero', 'Caballero', 'Samurai', 'Robot', 'Alien', 'Zombie', 'Vampiro', 'Unicornio'
+];
+
+const fallbackVerbs = [
+  'Corre', 'Salta', 'Vuela', 'Nada', 'Baila', 'Canta', 'Lucha', 'Gana',
+  'Brilla', 'Ríe', 'Grita', 'Juega', 'Ataca', 'Defiende', 'Conquista', 'Explora',
+  'Crea', 'Destruye', 'Salva', 'Protege', 'Domina', 'Reina', 'Triunfa', 'Sorprende'
+];
+
+// Función para generar nombre aleatorio: Sustantivo + Verbo + 3 dígitos
+function generateRandomName() {
+  const nounsList = nouns.length > 0 ? nouns : fallbackNouns;
+  const verbsList = verbs.length > 0 ? verbs : fallbackVerbs;
+
+  const noun = nounsList[Math.floor(Math.random() * nounsList.length)];
+  const verb = verbsList[Math.floor(Math.random() * verbsList.length)];
+  const numbers = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+
+  return `${noun}${verb}${numbers}`;
+}
+
 // Array WORDS eliminado - Ahora usamos base de datos con Prisma
 
 
@@ -2482,6 +2513,84 @@ app.put('/api/admin/banners/:id/toggle', (req, res) => {
 
   console.log(`✅ Banner ${banner.active ? 'activado' : 'desactivado'}: ${id}`);
   res.json({ success: true, active: banner.active });
+});
+
+// ============================================
+// 📛 ENDPOINTS DE NOMBRES ALEATORIOS
+// ============================================
+
+// 🌐 GET /api/names/generate - Generar nombre aleatorio (público)
+app.get('/api/names/generate', (req, res) => {
+  const name = generateRandomName();
+  res.json({ name });
+});
+
+// 🔒 GET /api/admin/names - Listar sustantivos y verbos
+app.get('/api/admin/names', (req, res) => {
+  res.json({
+    nouns,
+    verbs,
+    fallbackNouns,
+    fallbackVerbs,
+    usingFallback: {
+      nouns: nouns.length === 0,
+      verbs: verbs.length === 0
+    }
+  });
+});
+
+// 🔒 POST /api/admin/names - Agregar sustantivo o verbo
+app.post('/api/admin/names', (req, res) => {
+  const { type, word } = req.body;
+
+  if (!type || !word || !word.trim()) {
+    return res.status(400).json({ error: 'Tipo y palabra son requeridos' });
+  }
+
+  if (type !== 'noun' && type !== 'verb') {
+    return res.status(400).json({ error: 'Tipo debe ser "noun" o "verb"' });
+  }
+
+  const trimmedWord = word.trim();
+
+  if (type === 'noun') {
+    if (!nouns.includes(trimmedWord)) {
+      nouns.push(trimmedWord);
+      console.log(`✅ Sustantivo agregado: ${trimmedWord}`);
+    }
+  } else {
+    if (!verbs.includes(trimmedWord)) {
+      verbs.push(trimmedWord);
+      console.log(`✅ Verbo agregado: ${trimmedWord}`);
+    }
+  }
+
+  res.json({ success: true, word: trimmedWord, type });
+});
+
+// 🔒 DELETE /api/admin/names - Eliminar sustantivo o verbo
+app.delete('/api/admin/names', (req, res) => {
+  const { type, word } = req.body;
+
+  if (!type || !word) {
+    return res.status(400).json({ error: 'Tipo y palabra son requeridos' });
+  }
+
+  if (type === 'noun') {
+    const index = nouns.indexOf(word);
+    if (index > -1) {
+      nouns.splice(index, 1);
+      console.log(`✅ Sustantivo eliminado: ${word}`);
+    }
+  } else {
+    const index = verbs.indexOf(word);
+    if (index > -1) {
+      verbs.splice(index, 1);
+      console.log(`✅ Verbo eliminado: ${word}`);
+    }
+  }
+
+  res.json({ success: true });
 });
 
 // ============================================
