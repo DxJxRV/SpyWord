@@ -518,7 +518,7 @@ export default function Room() {
         // 3. Comenzar a monitorear el nivel de audio
         audioLevelIntervalRef.current = setInterval(() => {
           const level = voiceChat.getAudioLevel();
-          const speaking = voiceChat.isSpeaking(10); // Más sensible: threshold 10
+          const speaking = voiceChat.isSpeaking(4); // Muy sensible: threshold 4
           setAudioLevel(level);
 
           // Enviar nivel de audio a otros peers
@@ -940,7 +940,7 @@ export default function Room() {
                           {/* Badge de voz */}
                           {voiceEnabled && (
                             <VoiceParticipant
-                              isSpeaking={speakersData[playerId]?.isSpeaking || (playerId === myId && voiceChat.isSpeaking(10))}
+                              isSpeaking={speakersData[playerId]?.isSpeaking || (playerId === myId && voiceChat.isSpeaking(4))}
                               micEnabled={playerId === myId ? voiceEnabled : speakersData[playerId]?.audioLevel > 0}
                               audioLevel={playerId === myId ? audioLevel : (speakersData[playerId]?.audioLevel || 0)}
                               position="bottom-right"

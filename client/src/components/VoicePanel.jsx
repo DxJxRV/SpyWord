@@ -75,11 +75,11 @@ export default function VoicePanel({
     }
   }, [audioLevel, voiceEnabled, maxReference, speakersData]);
 
-  // Detectar si está hablando (nivel > 10)
-  const isSpeaking = audioLevel > 10;
+  // Detectar si está hablando (nivel > 4)
+  const isSpeaking = audioLevel > 4;
 
   // Encontrar quién está hablando actualmente con nivel significativo
-  const SPEAKING_THRESHOLD = 10; // Nivel mínimo para mostrar (de 0-100) - Más sensible
+  const SPEAKING_THRESHOLD = 4; // Nivel mínimo para mostrar (de 0-100) - Muy sensible
 
   // Recopilar speakers remotos (solo filtrar por nivel, no por flag isSpeaking)
   const remoteSpeakers = Object.entries(speakersData)
@@ -170,17 +170,11 @@ export default function VoicePanel({
         </div>
       </div>
 
-      {/* Quién está hablando */}
-      <div className="px-3 py-2 bg-purple-500/10 border-b border-gray-700/50">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] text-purple-300 font-bold">🗣️ Hablando:</span>
-
-          {/* Mostrar mensaje si no hay nadie hablando */}
-          {currentSpeakers.length === 0 ? (
-            <span className="text-[10px] text-gray-500 italic">Nadie (threshold: {SPEAKING_THRESHOLD})</span>
-          ) : (
-            <>
-            {/* Speakers activos */}
+      {/* Quién está hablando - Solo mostrar cuando hay speakers */}
+      {currentSpeakers.length > 0 && (
+        <div className="px-3 py-2 bg-purple-500/10 border-b border-gray-700/50">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] text-purple-300 font-bold">🗣️ Hablando:</span>
             {currentSpeakers.map(({ playerId: speakerId, audioLevel: speakerLevel }) => {
               const player = players[speakerId];
               if (!player) return null;
@@ -255,10 +249,9 @@ export default function VoicePanel({
                 </div>
               );
             })}
-            </>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Visualizador de audio */}
       <div className="px-3 py-3">
