@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Eye, EyeOff, Share2, QrCode, Copy, ChevronDown, ChevronUp, Play, UserPlus, Crown, Settings, UserMinus, UserCheck, X, PhoneOff } from "lucide-react";
+import { Eye, EyeOff, Share2, QrCode, Copy, ChevronDown, ChevronUp, Play, UserPlus, Crown, MoreVertical, UserMinus, UserCheck, X, PhoneOff } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import { toast } from "sonner";
 import Joyride from "react-joyride";
@@ -609,26 +609,34 @@ export default function Room() {
                           </div>
                         )}
 
-                        {/* Botón de configuración en esquina superior derecha (solo para otros jugadores si eres admin) */}
-                        {isAdmin && playerId !== myId && (
-                          <div className="absolute top-0 right-0 z-20 player-menu-container">
+                        {/* Botón de configuración superpuesto al avatar (solo para otros jugadores) */}
+                        {playerId !== myId && (
+                          <div className="absolute right-[15px] z-20 player-menu-container">
                             <button
                               onClick={() => setPlayerMenuOpen(playerMenuOpen === playerId ? null : playerId)}
-                              className="bg-gray-900/80 hover:bg-gray-800 rounded-full p-1 text-gray-400 hover:text-white transition-colors"
+                              className="bg-gray-900/80 hover:bg-gray-800 rounded-full p-1 text-gray-300 hover:text-white transition-colors shadow-lg"
                             >
-                              <Settings size={12} />
+                              <MoreVertical size={14} />
                             </button>
 
                             {/* Menú desplegable */}
                             {playerMenuOpen === playerId && (
                               <div className="absolute top-full mt-1 right-0 bg-gray-900 rounded-lg border border-gray-700 shadow-xl z-50 min-w-[140px] overflow-hidden">
-                                {/* Opción: Eliminar jugador */}
+                                {/* Opción: Eliminar jugador (solo admin) */}
                                 <button
                                   onClick={() => {
-                                    handleKickPlayer(playerId, player.name);
-                                    setPlayerMenuOpen(null);
+                                    if (isAdmin) {
+                                      handleKickPlayer(playerId, player.name);
+                                      setPlayerMenuOpen(null);
+                                    }
                                   }}
-                                  className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
+                                  disabled={!isAdmin}
+                                  className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
+                                    isAdmin
+                                      ? 'text-red-400 hover:bg-red-500/20 cursor-pointer'
+                                      : 'text-gray-600 cursor-not-allowed'
+                                  }`}
+                                  title={!isAdmin ? 'Solo el admin puede eliminar jugadores' : ''}
                                 >
                                   <UserMinus size={14} />
                                   <span>Eliminar</span>

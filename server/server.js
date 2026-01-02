@@ -932,7 +932,8 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
         name: room.players[pId].name,
         isAlive: room.players[pId].isAlive !== false, // Default true si no existe
         hasVoted: room.players[pId].hasVoted || false,
-        profilePicture: room.players[pId].profilePicture || null
+        profilePicture: room.players[pId].profilePicture || null,
+        isAdmin: pId === room.adminId // Marcar si este jugador es el admin
       };
     }
 
