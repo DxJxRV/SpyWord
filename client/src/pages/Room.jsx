@@ -550,60 +550,55 @@ export default function Room() {
     }
   };
 
-  // Inicializar voz automáticamente cuando hay 2+ jugadores
-  useEffect(() => {
+  // Activar chat de voz manualmente (cuando el usuario hace click)
+  const handleEnableVoice = async () => {
     if (voiceEnabled) return; // Ya está activado
-    if (totalPlayers < 2) return; // Necesita 2+ jugadores
 
-    // Auto-inicializar
-    const initVoice = async () => {
-      try {
-        setIsConnectingMic(true);
+    try {
+      setIsConnectingMic(true);
 
-        // 1. Inicializar micrófono
-        const stream = await voiceChat.initMicrophone();
-        localStreamRef.current = stream;
+      // 1. Inicializar micrófono
+      const stream = await voiceChat.initMicrophone();
+      localStreamRef.current = stream;
 
-        // 2. Inicializar peer con retry automático
-        await initializeVoicePeer(0);
+      // 2. Inicializar peer con retry automático
+      await initializeVoicePeer(0);
 
-        // 3. Comenzar a monitorear el nivel de audio
-        audioLevelIntervalRef.current = setInterval(() => {
-          const level = voiceChat.getAudioLevel();
-          const speaking = voiceChat.isSpeaking(4); // Muy sensible: threshold 4
-          setAudioLevel(level);
+      // 3. Comenzar a monitorear el nivel de audio
+      audioLevelIntervalRef.current = setInterval(() => {
+        const level = voiceChat.getAudioLevel();
+        const speaking = voiceChat.isSpeaking(4); // Muy sensible: threshold 4
+        setAudioLevel(level);
 
-          // Enviar nivel de audio a otros peers
-          if (peerRef.current && myId) {
-            const message = {
-              type: 'audioLevel',
-              playerId: myId, // IMPORTANTE: Enviar el player ID, no el peer ID
-              level: level,
-              isSpeaking: speaking
-            };
+        // Enviar nivel de audio a otros peers
+        if (peerRef.current && myId) {
+          const message = {
+            type: 'audioLevel',
+            playerId: myId, // IMPORTANTE: Enviar el player ID, no el peer ID
+            level: level,
+            isSpeaking: speaking
+          };
 
-            if (isAdmin) {
-              broadcastMessage(message);
-            } else {
-              sendMessage(message);
-            }
+          if (isAdmin) {
+            broadcastMessage(message);
+          } else {
+            sendMessage(message);
           }
-        }, 100); // Actualizar cada 100ms
-
-        setVoiceEnabled(true);
-        console.log("✅ Chat de voz activado automáticamente");
-      } catch (error) {
-        console.error("Error al auto-inicializar voz:", error);
-        if (!retryTimeoutRef.current) {
-          cleanupVoice();
         }
-      } finally {
-        setIsConnectingMic(false);
-      }
-    };
+      }, 100); // Actualizar cada 100ms
 
-    initVoice();
-  }, [isAdmin, totalPlayers, voiceEnabled]);
+      setVoiceEnabled(true);
+      toast.success("Chat de voz activado");
+    } catch (error) {
+      console.error("Error al activar chat de voz:", error);
+      toast.error("No se pudo activar el chat de voz. Verifica los permisos del micrófono.");
+      if (!retryTimeoutRef.current) {
+        cleanupVoice();
+      }
+    } finally {
+      setIsConnectingMic(false);
+    }
+  };
 
   // Toggle mute micrófono (sin desconectar)
   const handleToggleMuteMic = () => {
@@ -1190,6 +1185,7 @@ export default function Room() {
             speakersMuted={speakersMuted}
             onToggleMuteMic={handleToggleMuteMic}
             onToggleMuteSpeakers={handleToggleMuteSpeakers}
+            onEnableVoice={handleEnableVoice}
             audioLevel={micMuted ? 0 : audioLevel}
             isConnecting={isConnectingMic}
             voiceStatus={voiceStatus}

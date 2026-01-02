@@ -8,6 +8,7 @@ import { Mic, MicOff, Volume2, VolumeX, Loader2 } from "lucide-react";
  * @param {boolean} speakersMuted - Audio silenciado
  * @param {Function} onToggleMuteMic - Callback al silenciar/activar micrófono
  * @param {Function} onToggleMuteSpeakers - Callback al silenciar/activar audio
+ * @param {Function} onEnableVoice - Callback para activar chat de voz por primera vez
  * @param {number} audioLevel - Nivel de audio actual (0-100)
  * @param {boolean} isConnecting - Si está conectando el micrófono
  * @param {string} voiceStatus - Estado de la conexión: 'disconnected', 'connecting', 'connected', 'error'
@@ -21,6 +22,7 @@ export default function VoicePanel({
   speakersMuted = false,
   onToggleMuteMic,
   onToggleMuteSpeakers,
+  onEnableVoice,
   audioLevel = 0,
   isConnecting = false,
   voiceStatus = 'disconnected',
@@ -168,8 +170,40 @@ export default function VoicePanel({
     };
   }, []);
 
+  // Si no está activado, mostrar botón para activar
   if (!voiceEnabled) {
-    return null; // No mostrar nada si no está habilitado
+    return (
+      <div className="w-full bg-gray-800/50 rounded-lg border border-gray-700/50 overflow-hidden">
+        <div className="p-4 flex flex-col items-center gap-3">
+          <div className="text-center">
+            <h3 className="text-sm font-semibold text-white mb-1">🎤 Chat de Voz</h3>
+            <p className="text-xs text-gray-400">Habla con otros jugadores en tiempo real</p>
+          </div>
+
+          <button
+            onClick={onEnableVoice}
+            disabled={isConnecting}
+            className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 px-6 py-3 rounded-lg font-semibold transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isConnecting ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                <span>Conectando...</span>
+              </>
+            ) : (
+              <>
+                <Mic size={18} />
+                <span>Activar Chat de Voz</span>
+              </>
+            )}
+          </button>
+
+          <p className="text-[10px] text-gray-500 text-center">
+            Se solicitará permiso para usar tu micrófono
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
