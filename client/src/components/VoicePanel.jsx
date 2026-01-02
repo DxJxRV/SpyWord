@@ -106,22 +106,18 @@ export default function VoicePanel({
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-white">🎤 Chat de Voz</span>
 
-          {/* Badge de estado */}
+          {/* Indicador de estado */}
           {voiceStatus === 'connected' && (
-            <span className="bg-green-500/30 text-green-300 text-[10px] px-2 py-0.5 rounded-full font-bold">
-              Conectado
-            </span>
+            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" title="Conectado" />
           )}
           {voiceStatus === 'connecting' && (
-            <span className="bg-yellow-500/30 text-yellow-300 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-              <Loader2 size={10} className="animate-spin" />
-              Conectando
-            </span>
+            <div className="flex items-center gap-1">
+              <Loader2 size={12} className="text-yellow-400 animate-spin" />
+              <span className="text-[10px] text-yellow-300 font-bold">Conectando</span>
+            </div>
           )}
           {voiceStatus === 'error' && (
-            <span className="bg-red-500/30 text-red-300 text-[10px] px-2 py-0.5 rounded-full font-bold">
-              Error
-            </span>
+            <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" title="Error" />
           )}
         </div>
 
