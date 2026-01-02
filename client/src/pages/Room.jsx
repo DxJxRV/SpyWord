@@ -109,6 +109,12 @@ export default function Room() {
   const retryTimeoutRef = useRef(null); // Para retry automático
   const retryCountRef = useRef(0); // Contador de intentos
 
+  // ===== ESTADOS DE MATCHMAKING =====
+  const [roomIsPublic, setRoomIsPublic] = useState(false); // Sala pública
+  const [roomRequestedPlayers, setRoomRequestedPlayers] = useState(0); // Jugadores solicitados
+  const [matchmakingMode, setMatchmakingMode] = useState('private'); // 'private' | 'public' | 'request'
+  const [requestCount, setRequestCount] = useState(1); // Cantidad a solicitar
+
   // Detectar nuevos jugadores y mostrar toast
   useEffect(() => {
     if (Object.keys(players).length === 0) return;
@@ -240,6 +246,21 @@ export default function Room() {
         // Actualizar estado de anuncios (isRoomPremium = Premium Pass del Anfitrión)
         setIsRoomPremium(res.data.isRoomPremium || false);
 
+        // Actualizar estado de matchmaking
+        if (res.data.isPublic !== undefined) {
+          setRoomIsPublic(res.data.isPublic);
+          if (res.data.isPublic && matchmakingMode !== 'public') {
+            setMatchmakingMode('public');
+          }
+        }
+        if (res.data.requestedPlayers !== undefined) {
+          setRoomRequestedPlayers(res.data.requestedPlayers);
+          if (res.data.requestedPlayers > 0 && matchmakingMode !== 'request') {
+            setMatchmakingMode('request');
+            setRequestCount(res.data.requestedPlayers);
+          }
+        }
+
         if (res.data.nextRoundAt && !nextRoundTimestamp.current) {
           nextRoundTimestamp.current = res.data.nextRoundAt;
           setCountdownActive(true); // Activar el countdown
@@ -365,6 +386,48 @@ export default function Room() {
     } catch (err) {
       console.error("Error al cancelar votación:", err);
       toast.error(err.response?.data?.error || "Error al cancelar la votación");
+    }
+  };
+
+  // ===== FUNCIONES DE MATCHMAKING =====
+
+  const handleMatchmakingChange = async (mode) => {
+    setMatchmakingMode(mode);
+
+    try {
+      if (mode === 'private') {
+        // Hacer sala privada
+        await api.post(`/rooms/${roomId}/set-public`, {
+          isPublic: false,
+          requestedPlayers: 0
+        });
+        setRoomIsPublic(false);
+        setRoomRequestedPlayers(0);
+        toast.success("Sala configurada como privada");
+      } else if (mode === 'public') {
+        // Hacer sala pública
+        await api.post(`/rooms/${roomId}/set-public`, {
+          isPublic: true,
+          requestedPlayers: 0
+        });
+        setRoomIsPublic(true);
+        setRoomRequestedPlayers(0);
+        toast.success("Sala ahora es pública - Jugadores se unirán automáticamente");
+      } else if (mode === 'request') {
+        // Solicitar jugadores específicos
+        await api.post(`/rooms/${roomId}/set-public`, {
+          isPublic: false,
+          requestedPlayers: requestCount
+        });
+        setRoomIsPublic(false);
+        setRoomRequestedPlayers(requestCount);
+        toast.success(`Buscando ${requestCount} jugador(es)...`);
+      }
+
+      if (navigator.vibrate) navigator.vibrate(30);
+    } catch (err) {
+      console.error("Error al cambiar configuración:", err);
+      toast.error("Error al cambiar la configuración");
     }
   };
 
@@ -1102,6 +1165,90 @@ export default function Room() {
             players={players}
             myId={myId}
           />
+        )}
+
+        {/* Panel de Matchmaking (solo admin) */}
+        {isAdmin && roomStatus !== 'GAME_OVER' && (
+          <div className="w-full bg-gray-800/50 rounded-lg border border-gray-700/50 p-4">
+            <h3 className="text-sm font-semibold text-white mb-3">🎯 Opciones de Matchmaking</h3>
+
+            <div className="space-y-3">
+              {/* Opción: Privada */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="radio"
+                  name="matchmaking"
+                  value="private"
+                  checked={matchmakingMode === 'private'}
+                  onChange={() => handleMatchmakingChange('private')}
+                  className="w-4 h-4"
+                />
+                <div className="flex-1">
+                  <span className="text-sm text-white group-hover:text-gray-300">🔒 Sala privada</span>
+                  <p className="text-xs text-gray-500">Solo con código QR o link</p>
+                </div>
+              </label>
+
+              {/* Opción: Pública */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="radio"
+                  name="matchmaking"
+                  value="public"
+                  checked={matchmakingMode === 'public'}
+                  onChange={() => handleMatchmakingChange('public')}
+                  className="w-4 h-4"
+                />
+                <div className="flex-1">
+                  <span className="text-sm text-white group-hover:text-gray-300">🌐 Sala pública</span>
+                  <p className="text-xs text-gray-500">Jugadores aleatorios pueden unirse</p>
+                </div>
+              </label>
+
+              {/* Opción: Solicitar jugadores */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="radio"
+                  name="matchmaking"
+                  value="request"
+                  checked={matchmakingMode === 'request'}
+                  onChange={() => handleMatchmakingChange('request')}
+                  className="w-4 h-4"
+                />
+                <div className="flex-1">
+                  <span className="text-sm text-white group-hover:text-gray-300">👥 Solicitar jugadores</span>
+                  <p className="text-xs text-gray-500">Especifica cuántos jugadores necesitas</p>
+                </div>
+              </label>
+
+              {/* Input de cantidad si está en modo request */}
+              {matchmakingMode === 'request' && (
+                <div className="pl-7 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="9"
+                    value={requestCount}
+                    onChange={(e) => setRequestCount(Math.min(9, Math.max(1, parseInt(e.target.value) || 1)))}
+                    className="bg-gray-900 px-3 py-2 rounded-lg text-white text-sm w-20 border border-gray-700 focus:border-purple-500 focus:outline-none"
+                  />
+                  <span className="text-xs text-gray-400">jugadores</span>
+                </div>
+              )}
+
+              {/* Estado actual */}
+              {roomIsPublic && (
+                <div className="bg-green-500/10 px-3 py-2 rounded-lg border border-green-500/30">
+                  <p className="text-xs text-green-300">✅ Sala pública activa</p>
+                </div>
+              )}
+              {roomRequestedPlayers > 0 && (
+                <div className="bg-purple-500/10 px-3 py-2 rounded-lg border border-purple-500/30">
+                  <p className="text-xs text-purple-300">🔍 Buscando {roomRequestedPlayers} jugador(es)...</p>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Banner Publicitario - Bottom */}

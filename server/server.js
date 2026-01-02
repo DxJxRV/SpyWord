@@ -99,6 +99,15 @@ app.use('/uploads', express.static('uploads'));
 // Almacenamiento en memoria
 const rooms = {};
 
+// ============================================
+// 🎯 MATCHMAKING - Estructuras en memoria
+// ============================================
+const matchmakingQueue = []; // Cola de jugadores buscando partida
+// Estructura: [{ playerId, playerName, joinedAt, preferences: {minPlayers, maxWait} }]
+
+const publicRooms = {}; // Salas públicas disponibles
+// Estructura: { [roomId]: { hostName, currentPlayers, maxPlayers, createdAt } }
+
 // Array WORDS eliminado - Ahora usamos base de datos con Prisma
 
 
@@ -205,7 +214,13 @@ app.post('/api/rooms/create', checkAuth, async (req, res) => {
       status: 'IN_GAME',
       votes: {},
       votersRemaining: 0,
-      eliminatedPlayerId: null
+      eliminatedPlayerId: null,
+      // Matchmaking
+      isPublic: false,
+      requestedPlayers: 0, // Cantidad de jugadores solicitados
+      maxPlayers: 10,
+      autoCreated: false,
+      createdVia: 'host'
     };
 
     // Si hay modeId, usar modo especial con imágenes
@@ -937,6 +952,178 @@ app.get('/api/rooms/:roomId/voice_host', (req, res) => {
   });
 });
 
+// ============================================
+// 🎯 ENDPOINTS DE MATCHMAKING
+// ============================================
+
+// 🔍 POST /api/matchmaking/queue
+// Entrar en la cola de búsqueda de partida
+app.post('/api/matchmaking/queue', checkAuth, (req, res) => {
+  const playerId = uuidv4();
+  const { playerName, preferences } = req.body;
+
+  // Validar
+  if (!playerName || !playerName.trim()) {
+    return res.status(400).json({ error: 'Nombre de jugador requerido' });
+  }
+
+  // Agregar a la cola
+  matchmakingQueue.push({
+    playerId,
+    playerName: playerName.trim(),
+    joinedAt: Date.now(),
+    preferences: preferences || { minPlayers: 3, maxWait: 120000 }, // Default: 3 jugadores, 2 min
+    matched: false,
+    matchedRoomId: null
+  });
+
+  console.log(`🔍 Jugador agregado a cola de matchmaking: ${playerName} (${playerId})`);
+  console.log(`📊 Cola actual: ${matchmakingQueue.length} jugadores`);
+
+  // Establecer cookie de sesión
+  res.cookie('sid', playerId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24 horas
+  });
+
+  res.json({
+    success: true,
+    playerId,
+    queuePosition: matchmakingQueue.length
+  });
+});
+
+// 🔍 GET /api/matchmaking/status
+// Ver estado de matchmaking del jugador
+app.get('/api/matchmaking/status', (req, res) => {
+  const playerId = req.cookies.sid;
+
+  if (!playerId) {
+    return res.status(401).json({ error: 'No estás en la cola' });
+  }
+
+  // Buscar en la cola
+  const playerInQueue = matchmakingQueue.find(p => p.playerId === playerId);
+
+  if (!playerInQueue) {
+    return res.status(404).json({ error: 'No estás en la cola' });
+  }
+
+  const waitTime = Date.now() - playerInQueue.joinedAt;
+  const queuePosition = matchmakingQueue.findIndex(p => p.playerId === playerId) + 1;
+
+  res.json({
+    matched: playerInQueue.matched,
+    matchedRoomId: playerInQueue.matchedRoomId,
+    waitTime,
+    queuePosition,
+    totalInQueue: matchmakingQueue.length
+  });
+});
+
+// 🔍 POST /api/matchmaking/cancel
+// Salir de la cola de matchmaking
+app.post('/api/matchmaking/cancel', (req, res) => {
+  const playerId = req.cookies.sid;
+
+  if (!playerId) {
+    return res.status(401).json({ error: 'No estás en la cola' });
+  }
+
+  const index = matchmakingQueue.findIndex(p => p.playerId === playerId);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'No estás en la cola' });
+  }
+
+  const player = matchmakingQueue[index];
+  matchmakingQueue.splice(index, 1);
+
+  console.log(`❌ Jugador salió de cola: ${player.playerName}`);
+  console.log(`📊 Cola actual: ${matchmakingQueue.length} jugadores`);
+
+  res.json({ success: true });
+});
+
+// 🌐 POST /api/rooms/:roomId/set-public
+// Hacer sala pública o solicitar jugadores
+app.post('/api/rooms/:roomId/set-public', (req, res) => {
+  const { roomId } = req.params;
+  const playerId = req.cookies.sid;
+  const { isPublic, requestedPlayers } = req.body;
+
+  if (!rooms[roomId]) {
+    return res.status(404).json({ error: 'Sala no encontrada' });
+  }
+
+  const room = rooms[roomId];
+
+  // Verificar que es el admin
+  if (room.adminId !== playerId) {
+    return res.status(403).json({ error: 'Solo el admin puede modificar la sala' });
+  }
+
+  // Actualizar configuración
+  if (typeof isPublic === 'boolean') {
+    room.isPublic = isPublic;
+
+    if (isPublic) {
+      // Agregar a salas públicas
+      publicRooms[roomId] = {
+        hostName: room.adminName,
+        currentPlayers: Object.keys(room.players).length,
+        maxPlayers: room.maxPlayers,
+        createdAt: Date.now()
+      };
+      console.log(`🌐 Sala ${roomId} ahora es PÚBLICA`);
+    } else {
+      // Remover de salas públicas
+      delete publicRooms[roomId];
+      console.log(`🔒 Sala ${roomId} ahora es PRIVADA`);
+    }
+  }
+
+  if (typeof requestedPlayers === 'number' && requestedPlayers >= 0) {
+    room.requestedPlayers = requestedPlayers;
+    console.log(`👥 Sala ${roomId} solicita ${requestedPlayers} jugadores`);
+  }
+
+  room.lastActivity = Date.now();
+  notifyWaitingClients(roomId);
+
+  res.json({
+    success: true,
+    isPublic: room.isPublic,
+    requestedPlayers: room.requestedPlayers
+  });
+});
+
+// 🌐 GET /api/matchmaking/public-rooms
+// Listar salas públicas disponibles
+app.get('/api/matchmaking/public-rooms', (req, res) => {
+  const availableRooms = [];
+
+  for (const roomId in publicRooms) {
+    const roomInfo = publicRooms[roomId];
+    const room = rooms[roomId];
+
+    // Verificar que la sala aún existe y tiene espacio
+    if (room && Object.keys(room.players).length < room.maxPlayers) {
+      availableRooms.push({
+        roomId,
+        hostName: roomInfo.hostName,
+        currentPlayers: Object.keys(room.players).length,
+        maxPlayers: room.maxPlayers,
+        createdAt: roomInfo.createdAt
+      });
+    }
+  }
+
+  res.json({ rooms: availableRooms });
+});
+
 // 📡 GET /api/rooms/:roomId/state
 // Al principio del archivo
 const LONG_POLL_TIMEOUT = 30000; // 30 segundos
@@ -1071,7 +1258,10 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
       // Si el usuario está autenticado y es premium, se desactivan los anuncios para él
       isPremium: req.user && req.user.isPremium ? true : IS_PREMIUM_MODE_ACTIVE,
       // Premium Pass del Anfitrión: se verifica si el admin es premium consultando la DB
-      isRoomPremium: false // Se actualiza a continuación si el admin es premium
+      isRoomPremium: false, // Se actualiza a continuación si el admin es premium
+      // Matchmaking
+      isPublic: room.isPublic || false,
+      requestedPlayers: room.requestedPlayers || 0
     };
 
     // Verificar si el admin de la sala es premium (Premium Pass)
@@ -1988,6 +2178,202 @@ app.put('/api/admin/settings/special-modes', async (req, res) => {
     res.status(500).json({ error: 'Error al cambiar configuración' });
   }
 });
+
+// ============================================
+// 🤖 WORKER DE MATCHMAKING
+// ============================================
+
+async function matchmakingWorker() {
+  try {
+    // 1. Limpiar jugadores que llevan más de 5 minutos en cola
+    const MAX_WAIT_TIME = 5 * 60 * 1000; // 5 minutos
+    const now = Date.now();
+
+    for (let i = matchmakingQueue.length - 1; i >= 0; i--) {
+      const player = matchmakingQueue[i];
+      if (now - player.joinedAt > MAX_WAIT_TIME) {
+        matchmakingQueue.splice(i, 1);
+        console.log(`⏱️ Jugador removido por timeout: ${player.playerName}`);
+      }
+    }
+
+    // 2. Procesar jugadores no matcheados
+    const unmatchedPlayers = matchmakingQueue.filter(p => !p.matched);
+
+    if (unmatchedPlayers.length === 0) {
+      return; // No hay nadie esperando
+    }
+
+    console.log(`🔍 Worker ejecutando... ${unmatchedPlayers.length} jugadores en cola`);
+
+    // 3. Buscar salas públicas con espacio
+    for (const player of unmatchedPlayers) {
+      if (player.matched) continue; // Ya fue matcheado en esta iteración
+
+      // Buscar sala pública con espacio
+      let bestRoom = null;
+      let bestRoomPlayers = 0;
+
+      for (const roomId in publicRooms) {
+        const room = rooms[roomId];
+        if (!room) {
+          delete publicRooms[roomId]; // Limpiar sala inexistente
+          continue;
+        }
+
+        const currentPlayers = Object.keys(room.players).length;
+
+        // Verificar si tiene espacio
+        if (currentPlayers < room.maxPlayers && room.status === 'IN_GAME') {
+          // Preferir salas con más jugadores (más activas)
+          if (!bestRoom || currentPlayers > bestRoomPlayers) {
+            bestRoom = roomId;
+            bestRoomPlayers = currentPlayers;
+          }
+        }
+      }
+
+      // Si encontró sala pública, agregar jugador
+      if (bestRoom) {
+        const room = rooms[bestRoom];
+
+        // Agregar jugador a la sala
+        room.players[player.playerId] = {
+          lastSeen: Date.now(),
+          name: player.playerName,
+          isAlive: true,
+          hasVoted: false,
+          profilePicture: null
+        };
+
+        // Actualizar info de sala pública
+        publicRooms[bestRoom].currentPlayers = Object.keys(room.players).length;
+
+        // Marcar como matcheado
+        player.matched = true;
+        player.matchedRoomId = bestRoom;
+
+        console.log(`✅ ${player.playerName} matcheado a sala pública ${bestRoom} (${publicRooms[bestRoom].currentPlayers}/${room.maxPlayers})`);
+
+        // Notificar a todos los jugadores de la sala
+        notifyWaitingClients(bestRoom);
+        continue;
+      }
+
+      // 4. Si hay salas solicitando jugadores, matchear
+      for (const roomId in rooms) {
+        const room = rooms[roomId];
+
+        if (room.requestedPlayers > 0 &&
+            Object.keys(room.players).length < room.maxPlayers &&
+            room.status === 'IN_GAME') {
+
+          // Agregar jugador a la sala
+          room.players[player.playerId] = {
+            lastSeen: Date.now(),
+            name: player.playerName,
+            isAlive: true,
+            hasVoted: false,
+            profilePicture: null
+          };
+
+          // Decrementar solicitudes pendientes
+          room.requestedPlayers--;
+
+          // Marcar como matcheado
+          player.matched = true;
+          player.matchedRoomId = roomId;
+
+          console.log(`✅ ${player.playerName} matcheado a sala solicitante ${roomId} (quedan ${room.requestedPlayers} solicitudes)`);
+
+          // Notificar
+          notifyWaitingClients(roomId);
+          break; // Siguiente jugador
+        }
+      }
+    }
+
+    // 5. Auto-crear salas si hay 3+ jugadores esperando 30s+
+    const MIN_PLAYERS_FOR_AUTO_ROOM = 3;
+    const MIN_WAIT_FOR_AUTO_ROOM = 30 * 1000; // 30 segundos
+
+    const readyPlayers = unmatchedPlayers.filter(p =>
+      !p.matched && (now - p.joinedAt >= MIN_WAIT_FOR_AUTO_ROOM)
+    );
+
+    if (readyPlayers.length >= MIN_PLAYERS_FOR_AUTO_ROOM) {
+      // Tomar los primeros 3 jugadores
+      const playersForRoom = readyPlayers.slice(0, MIN_PLAYERS_FOR_AUTO_ROOM);
+
+      // Crear sala automática
+      const newRoomId = generateRoomId();
+      const firstPlayer = playersForRoom[0];
+
+      // Obtener palabra aleatoria
+      const wordData = await getRandomWordWeighted();
+
+      const newRoom = {
+        adminId: firstPlayer.playerId, // El primero es admin
+        adminUserId: null,
+        adminName: firstPlayer.playerName,
+        round: 1,
+        players: {},
+        impostorId: null,
+        starterPlayerId: null,
+        lastStarterPlayerId: null,
+        lastActivity: Date.now(),
+        nextRoundAt: null,
+        status: 'IN_GAME',
+        votes: {},
+        votersRemaining: 0,
+        eliminatedPlayerId: null,
+        // Matchmaking
+        isPublic: false,
+        requestedPlayers: 0,
+        maxPlayers: 10,
+        autoCreated: true,
+        createdVia: 'matchmaking',
+        // Palabra
+        modeId: null,
+        modeName: null,
+        modeType: 'word',
+        word: wordData.word,
+        itemImageUrl: null,
+        itemIndex: null,
+        wordId: wordData.id,
+        category: wordData.category,
+        lastWord: wordData.word
+      };
+
+      // Agregar todos los jugadores a la sala
+      playersForRoom.forEach(player => {
+        newRoom.players[player.playerId] = {
+          lastSeen: Date.now(),
+          name: player.playerName,
+          isAlive: true,
+          hasVoted: false,
+          profilePicture: null
+        };
+
+        // Marcar como matcheado
+        player.matched = true;
+        player.matchedRoomId = newRoomId;
+      });
+
+      rooms[newRoomId] = newRoom;
+
+      console.log(`🎮 Sala AUTO-CREADA: ${newRoomId} con ${playersForRoom.length} jugadores`);
+      console.log(`👥 Jugadores: ${playersForRoom.map(p => p.playerName).join(', ')}`);
+    }
+
+  } catch (error) {
+    console.error('❌ Error en matchmaking worker:', error);
+  }
+}
+
+// Ejecutar worker cada 5 segundos
+setInterval(matchmakingWorker, 5000);
+console.log('🤖 Matchmaking worker iniciado (cada 5s)');
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor Impostor Word escuchando en http://0.0.0.0:${PORT}`);

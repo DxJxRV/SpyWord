@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, ArrowLeft, Link2, Camera, HelpCircle } from "lucide-react";
+import { Play, ArrowLeft, Link2, Camera, HelpCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../services/api";
 import { getUserName } from "../utils/nameGenerator";
@@ -8,6 +8,7 @@ import AppHeader from "../components/AppHeader";
 import AdPlaceholder from "../components/AdPlaceholder";
 import InterstitialAd from "../components/InterstitialAd";
 import QRScanner from "../components/QRScanner";
+import MatchmakingModal from "../components/MatchmakingModal";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function Online() {
@@ -20,6 +21,10 @@ export default function Online() {
   const [showHelp, setShowHelp] = useState(false);
   const { isPremium } = useAuth();
   const isRoomPremium = false; // Premium Pass - false porque aún no hay sala
+
+  // Estados para matchmaking
+  const [isSearching, setIsSearching] = useState(false);
+  const [matchmakingStatus, setMatchmakingStatus] = useState(null);
 
   // Cambiar título de la página
   useEffect(() => {
@@ -88,6 +93,69 @@ export default function Online() {
     setShowQRScanner(true);
   };
 
+  // Funciones de matchmaking
+  const handleFindMatch = async () => {
+    setIsSearching(true);
+    setLoading(true);
+
+    try {
+      const playerName = getUserName();
+      const response = await api.post('/matchmaking/queue', {
+        playerName,
+        preferences: { minPlayers: 3, maxWait: 120000 }
+      });
+
+      console.log('✅ En cola de matchmaking:', response.data);
+
+      // Polling para verificar estado
+      startMatchmakingPolling();
+    } catch (error) {
+      console.error('Error al entrar en cola:', error);
+      toast.error('Error al buscar partida');
+      setIsSearching(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startMatchmakingPolling = () => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await api.get('/matchmaking/status');
+        setMatchmakingStatus(response.data);
+
+        // Si fue matcheado, navegar a la sala
+        if (response.data.matched && response.data.matchedRoomId) {
+          clearInterval(interval);
+          setIsSearching(false);
+          toast.success('¡Partida encontrada!');
+          if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+          navigate(`/room/${response.data.matchedRoomId}`);
+        }
+      } catch (error) {
+        // Si no está en la cola, detener polling
+        clearInterval(interval);
+        setIsSearching(false);
+        console.error('Error al verificar estado:', error);
+      }
+    }, 2000); // Cada 2 segundos
+
+    // Guardar intervalo para limpieza
+    return interval;
+  };
+
+  const handleCancelSearch = async () => {
+    try {
+      await api.post('/matchmaking/cancel');
+      setIsSearching(false);
+      setMatchmakingStatus(null);
+      toast.success('Búsqueda cancelada');
+    } catch (error) {
+      console.error('Error al cancelar:', error);
+      setIsSearching(false);
+    }
+  };
+
   const handleQRScanResult = async (roomCode) => {
     setShowQRScanner(false);
     toast.success(`Código detectado: ${roomCode}`);
@@ -125,6 +193,21 @@ export default function Online() {
 
         {!mode && (
           <div className="flex flex-col gap-4 max-w-md w-full">
+            {/* Botón Encontrar Partida - PRINCIPAL */}
+            <button
+              onClick={handleFindMatch}
+              disabled={loading}
+              className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-6 rounded-xl hover:from-purple-600 hover:to-pink-700 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-4 shadow-lg ring-2 ring-purple-400/50"
+            >
+              <div className="bg-white/20 p-3 rounded-lg">
+                <Zap size={32} />
+              </div>
+              <div className="flex flex-col items-start text-left">
+                <span className="text-2xl font-bold">Encontrar partida</span>
+                <span className="text-sm text-purple-100 opacity-90">Entra en cola automática con otros jugadores</span>
+              </div>
+            </button>
+
             {/* Botón Crear Partida */}
             <button
               onClick={handleCreateRoom}
@@ -255,6 +338,13 @@ export default function Online() {
             onClose={() => setShowQRScanner(false)}
           />
         )}
+
+        {/* Modal de Matchmaking */}
+        <MatchmakingModal
+          isSearching={isSearching}
+          onCancel={handleCancelSearch}
+          status={matchmakingStatus}
+        />
       </div>
     </>
   );
