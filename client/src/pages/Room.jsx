@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Eye, EyeOff, Share2, QrCode, Copy, ChevronDown, ChevronUp, Play, UserPlus, Crown, Settings, UserMinus, UserCheck, X } from "lucide-react";
+import { Eye, EyeOff, Share2, QrCode, Copy, ChevronDown, ChevronUp, Play, UserPlus, Crown, Settings, UserMinus, UserCheck, X, Phone } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import { toast } from "sonner";
 import Joyride from "react-joyride";
@@ -571,8 +571,8 @@ export default function Room() {
           />
         )}
 
-        {/* Panel de votación cuando hay votación activa (no IN_GAME) */}
-        {roomStatus !== 'GAME_OVER' && roomStatus !== 'IN_GAME' && (
+        {/* Panel de votación cuando hay votación activa (VOTING o RESULTS) */}
+        {(roomStatus === 'VOTING' || roomStatus === 'RESULTS') && (
           <VotingPanel
             roomState={{
               status: roomStatus,
@@ -757,6 +757,37 @@ export default function Room() {
 
                   {/* Botón Llamar a Votación (20% del alto) */}
                   <div className="flex-[0.2]">
+                    {roomStatus === 'IN_GAME' ? (
+                      <VotingPanel
+                        roomState={{
+                          status: roomStatus,
+                          players,
+                          votesTally,
+                          votersRemaining,
+                          eliminatedPlayerId,
+                          isAdmin,
+                        }}
+                        roomId={roomId}
+                        myId={myId}
+                        onUpdate={() => {
+                          setCurrentRound((prev) => prev);
+                        }}
+                      />
+                    ) : (
+                      <button
+                        disabled
+                        className="w-full h-full bg-gray-600 px-2 py-2 rounded-lg font-semibold cursor-not-allowed opacity-50 flex flex-col items-center justify-center gap-1"
+                      >
+                        <Phone size={20} />
+                        <span className="text-[10px]">En votación</span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                // Jugador: Solo botón de votación (100% del alto)
+                <div className="flex-1 h-full flex flex-col">
+                  {roomStatus === 'IN_GAME' ? (
                     <VotingPanel
                       roomState={{
                         status: roomStatus,
@@ -772,26 +803,15 @@ export default function Room() {
                         setCurrentRound((prev) => prev);
                       }}
                     />
-                  </div>
-                </>
-              ) : (
-                // Jugador: Solo botón de votación (100% del alto)
-                <div className="flex-1 h-full flex flex-col">
-                  <VotingPanel
-                    roomState={{
-                      status: roomStatus,
-                      players,
-                      votesTally,
-                      votersRemaining,
-                      eliminatedPlayerId,
-                      isAdmin,
-                    }}
-                    roomId={roomId}
-                    myId={myId}
-                    onUpdate={() => {
-                      setCurrentRound((prev) => prev);
-                    }}
-                  />
+                  ) : (
+                    <button
+                      disabled
+                      className="w-full h-full bg-gray-600 px-6 py-3 rounded-xl font-semibold cursor-not-allowed opacity-50 flex flex-col items-center justify-center gap-2"
+                    >
+                      <Phone size={28} />
+                      <span className="text-sm">En votación</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
