@@ -2293,13 +2293,10 @@ async function matchmakingWorker() {
       }
     }
 
-    // 5. Auto-crear salas si hay 3+ jugadores esperando 30s+
+    // 5. Auto-crear salas si hay 3+ jugadores en cola (inmediato, sin espera)
     const MIN_PLAYERS_FOR_AUTO_ROOM = 3;
-    const MIN_WAIT_FOR_AUTO_ROOM = 30 * 1000; // 30 segundos
 
-    const readyPlayers = unmatchedPlayers.filter(p =>
-      !p.matched && (now - p.joinedAt >= MIN_WAIT_FOR_AUTO_ROOM)
-    );
+    const readyPlayers = unmatchedPlayers.filter(p => !p.matched);
 
     if (readyPlayers.length >= MIN_PLAYERS_FOR_AUTO_ROOM) {
       // Tomar los primeros 3 jugadores
