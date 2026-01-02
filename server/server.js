@@ -114,6 +114,11 @@ const publicRooms = {}; // Salas públicas disponibles
 const activeBanners = []; // Lista de banners
 // Estructura: [{ id, message, description, backgroundColor, textColor, icon, priority, active, createdAt, schedule }]
 
+// ============================================
+// 🛡️ DEDUPLICACIÓN DE CREACIÓN DE SALAS
+// ============================================
+const recentRoomCreations = new Map(); // userId/sessionId -> {roomId, timestamp}
+
 // Array WORDS eliminado - Ahora usamos base de datos con Prisma
 
 
@@ -187,8 +192,44 @@ setInterval(() => {
 app.post('/api/rooms/create', checkAuth, async (req, res) => {
   try {
     const { adminName, modeId } = req.body; // modeId es opcional
+    const userId = req.user?.userId || adminName; // Usar userId o nombre como key
+    const now = Date.now();
+
+    console.log(`🔴 [CREATE_ROOM] Solicitud de creación recibida de: ${adminName} (userId: ${userId})`);
+
+    // Deduplicación: verificar si ya creó una sala hace menos de 3 segundos
+    if (recentRoomCreations.has(userId)) {
+      const { roomId, timestamp } = recentRoomCreations.get(userId);
+      const timeSince = now - timestamp;
+
+      if (timeSince < 3000) {
+        console.log(`⚠️ [DEDUP] Usuario ${adminName} intentó crear sala duplicada (${timeSince}ms después). Devolviendo sala anterior: ${roomId}`);
+        // Devolver la sala anterior en vez de crear una nueva
+        return res.json({
+          roomId,
+          word: rooms[roomId]?.word,
+          imageUrl: rooms[roomId]?.itemImageUrl || null,
+          modeType: rooms[roomId]?.modeType,
+          modeName: rooms[roomId]?.modeName || null,
+          isPremium: req.user && req.user.isPremium ? true : false
+        });
+      }
+    }
+
     const roomId = generateRoomId();
     const adminId = uuidv4();
+
+    // Guardar en registro de creaciones recientes
+    recentRoomCreations.set(userId, { roomId, timestamp: now });
+
+    // Limpiar registros antiguos (mayores a 5 minutos)
+    for (const [key, val] of recentRoomCreations.entries()) {
+      if (now - val.timestamp > 5 * 60 * 1000) {
+        recentRoomCreations.delete(key);
+      }
+    }
+
+    console.log(`🟢 [CREATE_ROOM] Creando nueva sala: ${roomId} para ${adminName}`);
 
     // Obtener profilePicture si el usuario está autenticado
     let profilePicture = null;

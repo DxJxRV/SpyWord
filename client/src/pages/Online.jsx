@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Play, ArrowLeft, Link2, Camera, HelpCircle, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +26,9 @@ export default function Online() {
   const [isSearching, setIsSearching] = useState(false);
   const [matchmakingStatus, setMatchmakingStatus] = useState(null);
   const [availableRooms, setAvailableRooms] = useState([]); // Salas públicas/solicitando
+
+  // Ref para prevenir doble creación de sala
+  const isCreatingRoomRef = useRef(false);
 
   // Cambiar título de la página
   useEffect(() => {
@@ -58,19 +61,35 @@ export default function Online() {
   };
 
   const createRoom = async () => {
+    // Prevenir doble ejecución
+    if (isCreatingRoomRef.current) {
+      console.warn('⚠️ Creación de sala ya en progreso, cancelando duplicada');
+      return;
+    }
+
+    isCreatingRoomRef.current = true;
     setLoading(true);
+
+    console.log('🔴 [CREATE_ROOM] Iniciando creación de sala...');
+
     try {
       const playerName = getUserName();
       const response = await api.post('/rooms/create', { adminName: playerName });
       const roomId = response.data.roomId;
-      // toast.success(`¡Partida creada! Código: ${roomId}`);
+
+      console.log('✅ [CREATE_ROOM] Sala creada:', roomId);
+
       if (navigator.vibrate) navigator.vibrate(50);
       navigate(`/room/${roomId}`);
     } catch (error) {
-      console.error("Error al crear sala:", error);
+      console.error("❌ [CREATE_ROOM] Error al crear sala:", error);
       toast.error("Error al crear la sala. Intenta de nuevo.");
     } finally {
       setLoading(false);
+      // Reset después de 2 segundos por seguridad
+      setTimeout(() => {
+        isCreatingRoomRef.current = false;
+      }, 2000);
     }
   };
 
