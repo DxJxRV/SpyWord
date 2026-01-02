@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Mic, MicOff, Volume2, VolumeX, Loader2 } from "lucide-react";
 
 /**
@@ -86,19 +86,22 @@ export default function VoicePanel({
   // Encontrar quién está hablando actualmente con nivel significativo
   const SPEAKING_THRESHOLD = 4; // Nivel mínimo para mostrar (de 0-100) - Muy sensible
 
-  // Recopilar speakers remotos (solo filtrar por nivel, no por flag isSpeaking)
-  const remoteSpeakers = Object.entries(speakersData)
-    .filter(([, data]) => data.audioLevel > SPEAKING_THRESHOLD)
-    .map(([playerId, data]) => ({ playerId, audioLevel: data.audioLevel }));
+  // Memorizar currentSpeakers para evitar loops infinitos
+  const currentSpeakers = useMemo(() => {
+    // Recopilar speakers remotos (solo filtrar por nivel, no por flag isSpeaking)
+    const remoteSpeakers = Object.entries(speakersData)
+      .filter(([, data]) => data.audioLevel > SPEAKING_THRESHOLD)
+      .map(([playerId, data]) => ({ playerId, audioLevel: data.audioLevel }));
 
-  // Agregar el usuario local si está hablando
-  const allSpeakers = [...remoteSpeakers];
-  if (audioLevel > SPEAKING_THRESHOLD && myId) {
-    allSpeakers.push({ playerId: myId, audioLevel });
-  }
+    // Agregar el usuario local si está hablando
+    const allSpeakers = [...remoteSpeakers];
+    if (audioLevel > SPEAKING_THRESHOLD && myId) {
+      allSpeakers.push({ playerId: myId, audioLevel });
+    }
 
-  // Ordenar por nivel de audio (más alto primero)
-  const currentSpeakers = allSpeakers.sort((a, b) => b.audioLevel - a.audioLevel);
+    // Ordenar por nivel de audio (más alto primero)
+    return allSpeakers.sort((a, b) => b.audioLevel - a.audioLevel);
+  }, [speakersData, audioLevel, myId]);
 
   // Efecto: Gestionar speakers con delay de 0.5s al dejar de hablar
   useEffect(() => {
