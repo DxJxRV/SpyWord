@@ -150,9 +150,10 @@ export default function MainMenu() {
 
   return (
     <>
+    
       <AppHeader />
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
-        <div className="max-w-md w-full space-y-6">
+        <div className="max-w-md w-full space-y-6 mt-10">
           {/* Botones de modo de juego */}
           <div className="space-y-3">
             {/* Juego Online */}

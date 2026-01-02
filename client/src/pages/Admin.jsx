@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette, Star, Lock, BarChart3 } from "lucide-react";
+import { Plus, Trash2, RefreshCw, TrendingUp, Filter, X, Users, BookOpen, Gamepad2, Image as ImageIcon, Upload, Edit, Eye, EyeOff, Palette, Star, Lock, BarChart3, MessageSquare, ChevronDown } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import UserManagement from "../components/UserManagement";
+import BannerManager from "../components/BannerManager";
 import { useAuth } from "../contexts/AuthContext";
 
 const ADMIN_PIN = "5523";
@@ -12,7 +13,8 @@ export default function Admin() {
   const [hasAccess, setHasAccess] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
 
-  const [activeTab, setActiveTab] = useState("dashboard"); // "dashboard", "words", "users", "modes"
+  const [activeTab, setActiveTab] = useState("dashboard"); // "dashboard", "words", "users", "modes", "banners"
+  const [showTabDropdown, setShowTabDropdown] = useState(false); // Para mobile
   const [words, setWords] = useState([]);
   const [categories, setCategories] = useState([]);
   const [stats, setStats] = useState(null);
@@ -23,6 +25,7 @@ export default function Admin() {
   const [dashboardSections, setDashboardSections] = useState({
     server: { data: null, loading: false, error: null },
     rooms: { data: null, loading: false, error: null },
+    matchmaking: { data: null, loading: false, error: null },
     users: { data: null, loading: false, error: null },
     words: { data: null, loading: false, error: null },
     modes: { data: null, loading: false, error: null }
@@ -103,6 +106,7 @@ export default function Admin() {
         setDashboardSections({
           server: { data: null, loading: true, error: null },
           rooms: { data: null, loading: true, error: null },
+          matchmaking: { data: null, loading: true, error: null },
           users: { data: null, loading: true, error: null },
           words: { data: null, loading: true, error: null },
           modes: { data: null, loading: true, error: null }
@@ -125,6 +129,7 @@ export default function Admin() {
         ...prev,
         server: { data: data.server, loading: false, error: null },
         rooms: { data: data.rooms, loading: false, error: null },
+        matchmaking: { data: data.matchmaking, loading: false, error: null },
         users: { data: data.users, loading: false, error: null },
         words: { data: data.words, loading: false, error: null },
         modes: { data: data.modes, loading: false, error: null }
@@ -715,51 +720,43 @@ export default function Admin() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 border-b border-gray-800">
-          <button
-            onClick={() => setActiveTab("dashboard")}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
-              activeTab === "dashboard"
-                ? "text-purple-400 border-b-2 border-purple-400"
-                : "text-gray-400 hover:text-gray-300"
-            }`}
-          >
-            <BarChart3 size={20} />
-            Dashboard
-          </button>
-          <button
-            onClick={() => setActiveTab("words")}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
-              activeTab === "words"
-                ? "text-purple-400 border-b-2 border-purple-400"
-                : "text-gray-400 hover:text-gray-300"
-            }`}
-          >
-            <BookOpen size={20} />
-            Palabras
-          </button>
-          <button
-            onClick={() => setActiveTab("modes")}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
-              activeTab === "modes"
-                ? "text-purple-400 border-b-2 border-purple-400"
-                : "text-gray-400 hover:text-gray-300"
-            }`}
-          >
-            <Gamepad2 size={20} />
-            Modos Especiales
-          </button>
-          <button
-            onClick={() => setActiveTab("users")}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
-              activeTab === "users"
-                ? "text-purple-400 border-b-2 border-purple-400"
-                : "text-gray-400 hover:text-gray-300"
-            }`}
-          >
-            <Users size={20} />
-            Usuarios
-          </button>
+        {/* Tabs - Responsive con dropdown en mobile */}
+        <div className="mb-8 border-b border-gray-800">
+          {/* Desktop: Mostrar todas las tabs */}
+          <div className="hidden md:flex gap-2">
+            <TabButton icon={BarChart3} label="Dashboard" tab="dashboard" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <TabButton icon={MessageSquare} label="Banners" tab="banners" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <TabButton icon={BookOpen} label="Palabras" tab="words" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <TabButton icon={Gamepad2} label="Modos" tab="modes" activeTab={activeTab} setActiveTab={setActiveTab} />
+            <TabButton icon={Users} label="Usuarios" tab="users" activeTab={activeTab} setActiveTab={setActiveTab} />
+          </div>
+
+          {/* Mobile: Dropdown */}
+          <div className="md:hidden relative">
+            <button
+              onClick={() => setShowTabDropdown(!showTabDropdown)}
+              className="w-full flex items-center justify-between px-6 py-3 text-purple-400 font-semibold"
+            >
+              <span className="flex items-center gap-2">
+                {activeTab === 'dashboard' && <><BarChart3 size={20} /> Dashboard</>}
+                {activeTab === 'banners' && <><MessageSquare size={20} /> Banners</>}
+                {activeTab === 'words' && <><BookOpen size={20} /> Palabras</>}
+                {activeTab === 'modes' && <><Gamepad2 size={20} /> Modos</>}
+                {activeTab === 'users' && <><Users size={20} /> Usuarios</>}
+              </span>
+              <ChevronDown size={20} className={`transition-transform ${showTabDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showTabDropdown && (
+              <div className="absolute top-full left-0 right-0 bg-gray-900 border border-gray-800 rounded-b-lg z-50">
+                <TabDropdownItem icon={BarChart3} label="Dashboard" tab="dashboard" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
+                <TabDropdownItem icon={MessageSquare} label="Banners" tab="banners" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
+                <TabDropdownItem icon={BookOpen} label="Palabras" tab="words" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
+                <TabDropdownItem icon={Gamepad2} label="Modos" tab="modes" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
+                <TabDropdownItem icon={Users} label="Usuarios" tab="users" activeTab={activeTab} setActiveTab={setActiveTab} setShowDropdown={setShowTabDropdown} />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Dashboard Content */}
@@ -777,83 +774,102 @@ export default function Admin() {
               </button>
             </div>
 
-            {/* Server Metrics */}
-            <DashboardSection
-              title="Servidor"
-              loading={dashboardSections.server.loading}
-              error={dashboardSections.server.error}
-            >
+            {/* Grid de Stats Consolidadas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Card: Servidor */}
               {dashboardSections.server.data && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <MetricCard
-                    title="Tiempo de ejecución"
-                    value={`${Math.floor(dashboardSections.server.data.uptime / 3600)}h ${Math.floor((dashboardSections.server.data.uptime % 3600) / 60)}m`}
-                    icon={TrendingUp}
-                    gradient="from-blue-600/20 to-cyan-600/20"
-                  />
-                  <MetricCard
-                    title="Memoria Usada"
-                    value={`${dashboardSections.server.data.memoryUsageMB.toFixed(1)} MB`}
-                    icon={BarChart3}
-                    gradient="from-cyan-600/20 to-teal-600/20"
-                  />
+                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <BarChart3 size={20} className="text-blue-400" />
+                    Servidor
+                  </h3>
+                  <div className="space-y-3">
+                    <StatRow label="Uptime" value={`${Math.floor(dashboardSections.server.data.uptime / 3600)}h ${Math.floor((dashboardSections.server.data.uptime % 3600) / 60)}m`} />
+                    <StatRow label="Memoria" value={`${dashboardSections.server.data.memoryUsageMB.toFixed(1)} MB`} />
+                  </div>
                 </div>
               )}
-            </DashboardSection>
 
-            {/* Rooms & Players */}
-            <DashboardSection
-              title="Partidas Activas"
-              loading={dashboardSections.rooms.loading}
-              error={dashboardSections.rooms.error}
-            >
+              {/* Card: Salas */}
               {dashboardSections.rooms.data && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <MetricCard
-                    title="Salas Activas"
-                    value={dashboardSections.rooms.data.total}
-                    icon={Gamepad2}
-                    gradient="from-purple-600/20 to-pink-600/20"
-                  />
-                  <MetricCard
-                    title="Jugadores en Partida"
-                    value={dashboardSections.rooms.data.players}
-                    icon={Users}
-                    gradient="from-pink-600/20 to-rose-600/20"
-                  />
+                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Gamepad2 size={20} className="text-purple-400" />
+                    Salas
+                  </h3>
+                  <div className="space-y-3">
+                    <StatRow label="Total" value={dashboardSections.rooms.data.total} />
+                    <StatRow label="Jugadores" value={dashboardSections.rooms.data.players} />
+                    {dashboardSections.rooms.data.public !== undefined && (
+                      <>
+                        <StatRow label="Públicas" value={dashboardSections.rooms.data.public} color="green" />
+                        <StatRow label="Privadas" value={dashboardSections.rooms.data.private} color="gray" />
+                        <StatRow label="Promedio jugadores" value={dashboardSections.rooms.data.avgPlayersPerRoom} />
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
-            </DashboardSection>
 
-            {/* Users Statistics */}
-            <DashboardSection
-              title="Usuarios"
-              loading={dashboardSections.users.loading}
-              error={dashboardSections.users.error}
-            >
-              {dashboardSections.users.data && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <MetricCard
-                    title="Usuarios Totales"
-                    value={dashboardSections.users.data.total}
-                    icon={Users}
-                    gradient="from-emerald-600/20 to-green-600/20"
-                  />
-                  <MetricCard
-                    title="Premium"
-                    value={dashboardSections.users.data.premium}
-                    icon={Star}
-                    gradient="from-amber-600/20 to-orange-600/20"
-                  />
-                  <MetricCard
-                    title="Administradores"
-                    value={dashboardSections.users.data.admins}
-                    icon={Lock}
-                    gradient="from-violet-600/20 to-purple-600/20"
-                  />
+              {/* Card: Matchmaking */}
+              {dashboardSections.matchmaking && dashboardSections.matchmaking.data && (
+                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Users size={20} className="text-cyan-400" />
+                    Matchmaking
+                  </h3>
+                  <div className="space-y-3">
+                    <StatRow label="En cola" value={dashboardSections.matchmaking.data.queueTotal} color="cyan" />
+                    <StatRow label="Sin matchear" value={dashboardSections.matchmaking.data.queueUnmatched} color="yellow" />
+                    <StatRow label="Salas disponibles" value={dashboardSections.matchmaking.data.publicRoomsAvailable} />
+                  </div>
                 </div>
               )}
-            </DashboardSection>
+
+              {/* Card: Usuarios */}
+              {dashboardSections.users.data && (
+                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Users size={20} className="text-green-400" />
+                    Usuarios
+                  </h3>
+                  <div className="space-y-3">
+                    <StatRow label="Total" value={dashboardSections.users.data.total} />
+                    <StatRow label="Premium" value={dashboardSections.users.data.premium} color="amber" />
+                    <StatRow label="Admins" value={dashboardSections.users.data.admins} color="purple" />
+                  </div>
+                </div>
+              )}
+
+              {/* Card: Palabras */}
+              {dashboardSections.words.data && (
+                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <BookOpen size={20} className="text-emerald-400" />
+                    Palabras
+                  </h3>
+                  <div className="space-y-3">
+                    <StatRow label="Total" value={dashboardSections.words.data.total} />
+                    <StatRow label="Activas" value={dashboardSections.words.data.active} color="green" />
+                    <StatRow label="Categorías" value={dashboardSections.words.data.categories} />
+                  </div>
+                </div>
+              )}
+
+              {/* Card: Modos */}
+              {dashboardSections.modes.data && (
+                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Palette size={20} className="text-pink-400" />
+                    Modos Especiales
+                  </h3>
+                  <div className="space-y-3">
+                    <StatRow label="Total" value={dashboardSections.modes.data.total} />
+                    <StatRow label="Activos" value={dashboardSections.modes.data.active} color="green" />
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Words Statistics */}
             <DashboardSection
@@ -1830,7 +1846,69 @@ export default function Admin() {
         {activeTab === "users" && (
           <UserManagement />
         )}
+
+        {/* Contenido de la tab de Banners */}
+        {activeTab === "banners" && (
+          <BannerManager />
+        )}
       </div>
+    </div>
+  );
+}
+
+// Componentes helper para las tabs
+function TabButton({ icon: Icon, label, tab, activeTab, setActiveTab }) {
+  return (
+    <button
+      onClick={() => setActiveTab(tab)}
+      className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
+        activeTab === tab
+          ? "text-purple-400 border-b-2 border-purple-400"
+          : "text-gray-400 hover:text-gray-300"
+      }`}
+    >
+      <Icon size={20} />
+      {label}
+    </button>
+  );
+}
+
+function TabDropdownItem({ icon: Icon, label, tab, activeTab, setActiveTab, setShowDropdown }) {
+  return (
+    <button
+      onClick={() => {
+        setActiveTab(tab);
+        setShowDropdown(false);
+      }}
+      className={`w-full flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
+        activeTab === tab
+          ? "bg-purple-600/20 text-purple-400"
+          : "text-gray-400 hover:bg-gray-800"
+      }`}
+    >
+      <Icon size={20} />
+      {label}
+    </button>
+  );
+}
+
+// Componente helper para filas de stats
+function StatRow({ label, value, color }) {
+  const colorClasses = {
+    green: 'text-green-400',
+    amber: 'text-amber-400',
+    purple: 'text-purple-400',
+    cyan: 'text-cyan-400',
+    yellow: 'text-yellow-400',
+    gray: 'text-gray-400'
+  };
+
+  const textColor = color ? colorClasses[color] : 'text-white';
+
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-gray-400">{label}:</span>
+      <span className={`text-lg font-bold ${textColor}`}>{value}</span>
     </div>
   );
 }

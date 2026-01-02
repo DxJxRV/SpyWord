@@ -108,6 +108,12 @@ const matchmakingQueue = []; // Cola de jugadores buscando partida
 const publicRooms = {}; // Salas públicas disponibles
 // Estructura: { [roomId]: { hostName, currentPlayers, maxPlayers, createdAt } }
 
+// ============================================
+// 🎨 SISTEMA DE BANNERS
+// ============================================
+const activeBanners = []; // Lista de banners
+// Estructura: [{ id, message, description, backgroundColor, textColor, icon, priority, active, createdAt, schedule }]
+
 // Array WORDS eliminado - Ahora usamos base de datos con Prisma
 
 
@@ -1801,9 +1807,22 @@ app.get('/api/admin/dashboard', async (req, res) => {
     const memoryUsage = process.memoryUsage();
     
     // Obtener salas activas
-    const activeRooms = Object.values(rooms).filter(room => room.isActive !== false);
-    const totalPlayersInRooms = activeRooms.reduce((sum, room) => sum + (room.players?.length || 0), 0);
-    
+    const activeRooms = Object.values(rooms);
+    const totalPlayersInRooms = activeRooms.reduce((sum, room) => sum + Object.keys(room.players || {}).length, 0);
+
+    // Stats de salas por tipo
+    const publicRoomsCount = activeRooms.filter(r => r.isPublic).length;
+    const privateRoomsCount = activeRooms.filter(r => !r.isPublic).length;
+    const autoCreatedRooms = activeRooms.filter(r => r.autoCreated).length;
+    const hostCreatedRooms = activeRooms.filter(r => !r.autoCreated).length;
+
+    // Matchmaking stats
+    const queueCount = matchmakingQueue.length;
+    const unmatchedInQueue = matchmakingQueue.filter(p => !p.matched).length;
+
+    // Promedio de jugadores por sala
+    const avgPlayersPerRoom = activeRooms.length > 0 ? (totalPlayersInRooms / activeRooms.length).toFixed(1) : 0;
+
     // Obtener usuarios
     const totalUsers = await prisma.user.count();
     const premiumUsers = await prisma.user.count({ where: { isPremium: true } });
@@ -1841,7 +1860,17 @@ app.get('/api/admin/dashboard', async (req, res) => {
       },
       rooms: {
         total: activeRooms.length,
-        players: totalPlayersInRooms
+        players: totalPlayersInRooms,
+        public: publicRoomsCount,
+        private: privateRoomsCount,
+        avgPlayersPerRoom: parseFloat(avgPlayersPerRoom),
+        autoCreated: autoCreatedRooms,
+        hostCreated: hostCreatedRooms
+      },
+      matchmaking: {
+        queueTotal: queueCount,
+        queueUnmatched: unmatchedInQueue,
+        publicRoomsAvailable: Object.keys(publicRooms).length
       },
       users: {
         total: totalUsers,
@@ -2257,6 +2286,161 @@ app.put('/api/admin/settings/special-modes', async (req, res) => {
     console.error('❌ Error al cambiar configuración:', error);
     res.status(500).json({ error: 'Error al cambiar configuración' });
   }
+});
+
+// ============================================
+// 🎨 ENDPOINTS DE BANNERS
+// ============================================
+
+// Helper: Verificar si banner está activo según horario
+function isBannerActive(banner) {
+  if (!banner.active) return false;
+
+  const now = new Date();
+
+  // Verificar fechas
+  if (banner.schedule?.startDate && new Date(banner.schedule.startDate) > now) return false;
+  if (banner.schedule?.endDate && new Date(banner.schedule.endDate) < now) return false;
+
+  // Verificar día de la semana
+  if (banner.schedule?.daysOfWeek && !banner.schedule.daysOfWeek.includes(now.getDay())) return false;
+
+  return true;
+}
+
+// Helper: Obtener banner actual (mayor prioridad)
+function getCurrentBanner() {
+  const activeBannersList = activeBanners.filter(isBannerActive);
+
+  if (activeBannersList.length === 0) return null;
+
+  // Ordenar por prioridad (mayor primero)
+  activeBannersList.sort((a, b) => b.priority - a.priority);
+
+  return activeBannersList[0];
+}
+
+// 🌐 GET /api/banners/active - Público (sin autenticación)
+app.get('/api/banners/active', (req, res) => {
+  const banner = getCurrentBanner();
+
+  if (!banner) {
+    return res.json({ banner: null });
+  }
+
+  res.json({
+    banner: {
+      message: banner.message,
+      backgroundColor: banner.backgroundColor,
+      textColor: banner.textColor,
+      icon: banner.icon
+    },
+    priority: banner.priority
+  });
+});
+
+// 🔒 GET /api/admin/banners - Listar todos los banners
+app.get('/api/admin/banners', (req, res) => {
+  const currentBanner = getCurrentBanner();
+
+  res.json({
+    banners: activeBanners,
+    currentBanner,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 🔒 POST /api/admin/banners - Crear nuevo banner
+app.post('/api/admin/banners', (req, res) => {
+  const {
+    message,
+    description,
+    backgroundColor,
+    textColor,
+    icon,
+    priority,
+    schedule
+  } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ error: 'Mensaje es requerido' });
+  }
+
+  const newBanner = {
+    id: uuidv4(),
+    message: message.trim(),
+    description: description || '',
+    backgroundColor: backgroundColor || '#3B82F6',
+    textColor: textColor || '#FFFFFF',
+    icon: icon || 'info',
+    priority: priority || 1,
+    active: true,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    schedule: schedule || {
+      startDate: null,
+      endDate: null,
+      daysOfWeek: [0, 1, 2, 3, 4, 5, 6]
+    }
+  };
+
+  activeBanners.push(newBanner);
+
+  console.log(`✅ Banner creado: ${newBanner.id} - "${newBanner.message}"`);
+  res.json({ success: true, banner: newBanner });
+});
+
+// 🔒 PUT /api/admin/banners/:id - Editar banner
+app.put('/api/admin/banners/:id', (req, res) => {
+  const { id } = req.params;
+  const updateData = req.body;
+
+  const bannerIndex = activeBanners.findIndex(b => b.id === id);
+  if (bannerIndex === -1) {
+    return res.status(404).json({ error: 'Banner no encontrado' });
+  }
+
+  // Actualizar
+  activeBanners[bannerIndex] = {
+    ...activeBanners[bannerIndex],
+    ...updateData,
+    id, // No permitir cambiar ID
+    updatedAt: Date.now()
+  };
+
+  console.log(`✅ Banner actualizado: ${id}`);
+  res.json({ success: true, banner: activeBanners[bannerIndex] });
+});
+
+// 🔒 DELETE /api/admin/banners/:id - Eliminar banner
+app.delete('/api/admin/banners/:id', (req, res) => {
+  const { id } = req.params;
+
+  const bannerIndex = activeBanners.findIndex(b => b.id === id);
+  if (bannerIndex === -1) {
+    return res.status(404).json({ error: 'Banner no encontrado' });
+  }
+
+  const [deleted] = activeBanners.splice(bannerIndex, 1);
+
+  console.log(`✅ Banner eliminado: ${id} - "${deleted.message}"`);
+  res.json({ success: true, message: 'Banner eliminado', deletedId: id });
+});
+
+// 🔒 PUT /api/admin/banners/:id/toggle - Activar/Desactivar
+app.put('/api/admin/banners/:id/toggle', (req, res) => {
+  const { id } = req.params;
+  const banner = activeBanners.find(b => b.id === id);
+
+  if (!banner) {
+    return res.status(404).json({ error: 'Banner no encontrado' });
+  }
+
+  banner.active = !banner.active;
+  banner.updatedAt = Date.now();
+
+  console.log(`✅ Banner ${banner.active ? 'activado' : 'desactivado'}: ${id}`);
+  res.json({ success: true, active: banner.active });
 });
 
 // ============================================
