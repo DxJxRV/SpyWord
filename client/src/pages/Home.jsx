@@ -9,6 +9,7 @@ import { tutorialStepsHome } from "../data/tutorialSteps";
 import TutorialButton from "../components/TutorialButton";
 import UserNameBar from "../components/UserNameBar";
 import QRScanner from "../components/QRScanner";
+import SocialTopBar from "../components/SocialTopBar";
 import { getUserName } from "../utils/nameGenerator";
 
 export default function Home() {
@@ -139,8 +140,9 @@ export default function Home() {
 
   return (
     <>
+      <SocialTopBar />
       <UserNameBar />
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-28 text-center">
       <h1 className="text-3xl font-bold mb-6">Impostor<br/>Word 🕵️‍♂️</h1>
       {!mode && (
         <div className="flex flex-col gap-4 max-w-md w-full">
