@@ -289,78 +289,95 @@ export default function VotingPanel({ roomState, roomId, myId, word, wordHidden,
     const eliminatedPlayer = wasEliminated ? players[eliminatedPlayerId] : null;
 
     return (
-      <div
-        className={`p-6 rounded-xl border-2 ${
-          wasEliminated
-            ? "bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/50"
-            : "bg-gradient-to-br from-blue-600/20 to-cyan-600/20 border-blue-500/50"
-        }`}
-      >
-        <div className="flex flex-col items-center text-center gap-4 mb-6">
+      <div className="w-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl border border-purple-500/40 shadow-lg p-6">
+        {/* Resultado principal - estilo dramático */}
+        <div className="text-center mb-6">
           {wasEliminated ? (
             <>
-              <XCircle size={64} className="text-red-400" />
-              <div>
-                <h3 className="text-3xl font-bold text-red-300 mb-2">¡Jugador Eliminado!</h3>
-                <p className="text-xl text-white">
-                  <span className="font-bold">{eliminatedPlayer?.name}</span> ha sido eliminado por mayoría de votos
-                </p>
+              <div className="mb-4">
+                <XCircle size={80} className="text-red-400 mx-auto animate-bounce" />
               </div>
+              <h3 className="text-2xl font-bold text-red-300 mb-3">¡Jugador Eliminado!</h3>
+              <p className="text-lg text-white mb-2">
+                <span className="font-bold text-red-400">{eliminatedPlayer?.name}</span>
+              </p>
+              <p className="text-sm text-gray-400">
+                Eliminado por mayoría de votos
+              </p>
             </>
           ) : (
             <>
-              <CheckCircle size={64} className="text-blue-400" />
-              <div>
-                <h3 className="text-3xl font-bold text-blue-300 mb-2">Empate o Sin Mayoría</h3>
-                <p className="text-xl text-white">No se alcanzó la mayoría necesaria. Nadie fue eliminado.</p>
+              <div className="mb-4">
+                <AlertTriangle size={80} className="text-blue-400 mx-auto animate-pulse" />
               </div>
+              <h3 className="text-2xl font-bold text-blue-300 mb-3">Sin Mayoría</h3>
+              <p className="text-sm text-gray-400">
+                No se alcanzó la mayoría necesaria
+              </p>
             </>
           )}
         </div>
 
-        {/* Vote results breakdown */}
+        {/* Resultados compactos */}
         {Object.keys(votesTally).length > 0 && (
-          <div className="bg-gray-800/50 backdrop-blur-sm p-4 rounded-xl mb-6">
-            <h4 className="text-sm font-semibold text-gray-300 mb-3 text-center">Resultados de la votación:</h4>
+          <div className="bg-gray-800/50 rounded-lg p-4 mb-4">
+            <h4 className="text-xs font-semibold text-gray-300 mb-3 text-center">Votos recibidos:</h4>
             <div className="space-y-2">
               {Object.entries(votesTally)
                 .sort(([, a], [, b]) => b - a)
-                .map(([playerId, count]) => (
-                  <div
-                    key={playerId}
-                    className={`px-4 py-2 rounded-lg flex justify-between items-center ${
-                      playerId === eliminatedPlayerId ? "bg-red-500/30 border border-red-500/50" : "bg-gray-700/50"
-                    }`}
-                  >
-                    <span className="text-white font-medium">{players[playerId]?.name || "Desconocido"}</span>
-                    <span className="bg-purple-500/30 px-3 py-1 rounded-full text-sm font-bold text-purple-300">
-                      {count} {count === 1 ? "voto" : "votos"}
-                    </span>
-                  </div>
-                ))}
+                .map(([playerId, count]) => {
+                  const playerData = players[playerId];
+                  const profilePicture = playerData?.profilePicture;
+
+                  return (
+                    <div
+                      key={playerId}
+                      className={`px-3 py-2 rounded-lg flex items-center justify-between ${
+                        playerId === eliminatedPlayerId ? "bg-red-500/30" : "bg-gray-700/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {/* Foto de perfil o avatar */}
+                        {profilePicture ? (
+                          <img
+                            src={profilePicture}
+                            alt={playerData?.name}
+                            className="w-8 h-8 rounded-full object-cover border-2 border-white/50"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white text-xs font-bold border-2 border-white/50">
+                            {playerData?.name?.charAt(0).toUpperCase() || '?'}
+                          </div>
+                        )}
+                        <span className="text-white text-sm font-medium">{playerData?.name || "?"}</span>
+                      </div>
+                      <span className="bg-purple-500/30 px-2 py-1 rounded-full text-xs font-bold text-purple-300">
+                        {count} 🗳️
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
-            <p className="text-xs text-gray-400 mt-3 text-center">
-              Se necesitaban {majorityNeeded} votos para eliminar
+            <p className="text-[10px] text-gray-400 mt-2 text-center">
+              Necesarios: {majorityNeeded} votos
             </p>
           </div>
         )}
 
-        {/* Continue button (admin only) */}
-        {isAdmin && (
+        {/* Botón continuar (admin) */}
+        {isAdmin ? (
           <button
             onClick={handleContinue}
             disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-4 rounded-xl font-bold text-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white flex items-center justify-center gap-2"
           >
-            <Play size={24} />
-            <span>{loading ? "Continuando..." : "Continuar Partida"}</span>
+            <Play size={20} />
+            <span>{loading ? "Continuando..." : "Continuar"}</span>
           </button>
-        )}
-
-        {!isAdmin && (
-          <p className="text-center text-gray-400 text-sm">
-            Esperando a que el administrador continúe el juego...
-          </p>
+        ) : (
+          <div className="text-center text-gray-400 text-xs py-2">
+            Esperando al administrador...
+          </div>
         )}
       </div>
     );
