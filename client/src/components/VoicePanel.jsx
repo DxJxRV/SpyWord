@@ -30,6 +30,15 @@ export default function VoicePanel({
 }) {
   const canvasRef = useRef(null);
 
+  // Calcular el nivel máximo de la sala (para normalizar visualización)
+  const maxRoomLevel = Math.max(
+    audioLevel, // Mi nivel
+    ...Object.values(speakersData).map(d => d.audioLevel || 0) // Niveles remotos
+  );
+
+  // Nivel máximo de referencia (el más alto o mínimo 30 para tener algo de rango)
+  const maxReference = Math.max(maxRoomLevel, 30);
+
   // Dibujar visualizador de audio en canvas
   useEffect(() => {
     if (!canvasRef.current || !voiceEnabled) return;
@@ -45,7 +54,8 @@ export default function VoicePanel({
     // Dibujar barras de nivel
     const barCount = 20;
     const barWidth = width / barCount;
-    const normalizedLevel = audioLevel / 100;
+    // Normalizar basado en el máximo de la sala (rango dinámico)
+    const normalizedLevel = Math.min(audioLevel / maxReference, 1);
 
     for (let i = 0; i < barCount; i++) {
       const barHeight = (i / barCount) <= normalizedLevel ? height * (i / barCount) : 0;
@@ -63,7 +73,7 @@ export default function VoicePanel({
       ctx.fillStyle = color;
       ctx.fillRect(i * barWidth, height - barHeight, barWidth - 2, barHeight);
     }
-  }, [audioLevel, voiceEnabled]);
+  }, [audioLevel, voiceEnabled, maxReference, speakersData]);
 
   // Detectar si está hablando (nivel > 15)
   const isSpeaking = audioLevel > 15;
@@ -166,20 +176,23 @@ export default function VoicePanel({
               const player = players[speakerId];
               if (!player) return null;
 
-              // Calcular intensidad del color basado en nivel de audio
-              const intensity = Math.min(speakerLevel / 100, 1);
+              // Normalizar nivel basado en el máximo de la sala
+              const normalizedSpeakerLevel = (speakerLevel / maxReference) * 100;
+
+              // Calcular intensidad del color basado en nivel normalizado
+              const intensity = Math.min(normalizedSpeakerLevel / 100, 1);
               const bgOpacity = Math.round(20 + (intensity * 30)); // 20-50%
 
-              // Determinar color según nivel
+              // Determinar color según nivel normalizado
               let colorClass = 'bg-purple-500';
               let ringClass = 'ring-purple-400';
-              if (speakerLevel > 70) {
+              if (normalizedSpeakerLevel > 70) {
                 colorClass = 'bg-red-500';
                 ringClass = 'ring-red-400';
-              } else if (speakerLevel > 50) {
+              } else if (normalizedSpeakerLevel > 50) {
                 colorClass = 'bg-yellow-500';
                 ringClass = 'ring-yellow-400';
-              } else if (speakerLevel > 35) {
+              } else if (normalizedSpeakerLevel > 35) {
                 colorClass = 'bg-green-500';
                 ringClass = 'ring-green-400';
               }
@@ -208,11 +221,13 @@ export default function VoicePanel({
                     {speakerId === myId && <span className="opacity-70"> (tú)</span>}
                   </span>
 
-                  {/* Indicador de nivel visual (barras) */}
+                  {/* Indicador de nivel visual (barras) - Normalizado al máximo de la sala */}
                   <div className="flex items-center gap-[2px] ml-0.5">
                     {[...Array(3)].map((_, i) => {
+                      // Normalizar el nivel del speaker basado en el máximo de la sala
+                      const normalizedLevel = (speakerLevel / maxReference) * 100;
                       const barThreshold = (i + 1) * 33; // 33%, 66%, 100%
-                      const isActive = speakerLevel > barThreshold;
+                      const isActive = normalizedLevel > barThreshold;
                       return (
                         <div
                           key={i}

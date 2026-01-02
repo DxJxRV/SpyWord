@@ -414,11 +414,12 @@ export default function Room() {
   };
 
   // Manejar mensajes de otros peers (niveles de audio)
-  const handlePeerMessage = (senderId, data) => {
-    if (data.type === 'audioLevel') {
+  const handlePeerMessage = (_senderId, data) => {
+    if (data.type === 'audioLevel' && data.playerId) {
+      // Usar playerId del mensaje (player ID de la sala), no senderId (peer ID)
       setSpeakersData(prev => ({
         ...prev,
-        [senderId]: {
+        [data.playerId]: {
           isSpeaking: data.isSpeaking,
           audioLevel: data.level
         }
@@ -520,9 +521,10 @@ export default function Room() {
           setAudioLevel(level);
 
           // Enviar nivel de audio a otros peers
-          if (peerRef.current) {
+          if (peerRef.current && myId) {
             const message = {
               type: 'audioLevel',
+              playerId: myId, // IMPORTANTE: Enviar el player ID, no el peer ID
               level: level,
               isSpeaking: speaking
             };
