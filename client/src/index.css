@@ -146,3 +146,13 @@ html, body {
 .animate-dramatic-reveal {
   animation: dramaticReveal 2s ease-out;
 }
+
+
+@keyframes player-name-marquee {
+  0%, 16.6% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-33.33%);
+  }
+}

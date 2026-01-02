@@ -16,6 +16,7 @@ import InterstitialAd from "../components/InterstitialAd";
 import AppHeader from "../components/AppHeader";
 import VoicePanel from "../components/VoicePanel";
 import VoiceParticipant from "../components/VoiceParticipant";
+import PlayerNameCarousel from "../components/PlayerNameCarousel";
 import * as voiceChat from "../services/voiceChat";
 import { createHostPeer, connectToHost, closePeer, broadcastMessage, sendMessage, setLocalMuted, setSpeakersMuted as setSpeakersMutedP2P } from "../network/p2p";
 
@@ -960,6 +961,7 @@ export default function Room() {
                             <button
                               onClick={() => setPlayerMenuOpen(playerMenuOpen === playerId ? null : playerId)}
                               className="bg-gray-900/80 hover:bg-gray-800 rounded-full p-1 text-gray-300 hover:text-white transition-colors shadow-lg"
+                              title={player.name}
                             >
                               <MoreVertical size={14} />
                             </button>
@@ -967,6 +969,11 @@ export default function Room() {
                             {/* Menú desplegable */}
                             {playerMenuOpen === playerId && (
                               <div className="absolute top-full mt-1 right-0 bg-gray-900 rounded-lg border border-gray-700 shadow-xl z-50 min-w-[140px] overflow-hidden">
+                                {/* Nombre del jugador */}
+                                <div className="px-3 py-2 text-xs text-gray-400 border-b border-gray-700 truncate">
+                                  {player.name}
+                                </div>
+
                                 {/* Opción: Eliminar jugador (solo admin) */}
                                 <button
                                   onClick={() => {
@@ -1023,11 +1030,12 @@ export default function Room() {
                           )}
                         </div>
 
-                        {/* Nombre */}
-                        <span className="text-[10px] text-gray-300 truncate w-full text-center">
-                          {player.name.split(' ')[0]}
-                          {playerId === myId && <span className="text-amber-400"> (tú)</span>}
-                        </span>
+                        {/* Nombre con animación de carrusel */}
+                        <PlayerNameCarousel
+                          name={player.name}
+                          isCurrentUser={playerId === myId}
+                          className="text-[10px] text-gray-300"
+                        />
                       </div>
                     ))}
 
