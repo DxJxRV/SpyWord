@@ -120,13 +120,30 @@ function cleanInactivePlayers(room) {
   const INACTIVE_THRESHOLD = 50 * 1000; // 50 segundos
 
   const activePlayerIds = [];
+  const inactivePlayers = [];
 
   for (const [playerId, playerData] of Object.entries(room.players)) {
     if (now - playerData.lastSeen < INACTIVE_THRESHOLD) {
       activePlayerIds.push(playerId);
     } else {
+      inactivePlayers.push(playerId);
       delete room.players[playerId];
       console.log(`🗑️ Jugador inactivo eliminado: ${playerId}`);
+    }
+  }
+
+  // Si el admin fue eliminado por inactividad, transferir a otro jugador
+  if (inactivePlayers.includes(room.adminId)) {
+    const remainingPlayers = Object.keys(room.players);
+    if (remainingPlayers.length > 0) {
+      room.adminId = remainingPlayers[0];
+      console.log(`👑 Nuevo admin asignado (por inactividad): ${room.adminId}`);
+
+      // Resetear el voice host peer ID
+      if (room.voiceHostPeerId) {
+        room.voiceHostPeerId = null;
+        console.log(`🎤 Voice host reseteado por inactividad del admin`);
+      }
     }
   }
 
@@ -493,6 +510,21 @@ app.post('/api/rooms/:roomId/kick', (req, res) => {
   const playerName = room.players[playerId].name;
   delete room.players[playerId];
 
+  // Si el jugador eliminado era el admin (transferencia de admin automática)
+  if (room.adminId === playerId) {
+    const remainingPlayers = Object.keys(room.players);
+    if (remainingPlayers.length > 0) {
+      room.adminId = remainingPlayers[0];
+      console.log(`👑 Nuevo admin asignado: ${room.adminId}`);
+
+      // Resetear el voice host peer ID (el nuevo admin deberá configurarlo)
+      if (room.voiceHostPeerId) {
+        room.voiceHostPeerId = null;
+        console.log(`🎤 Voice host reseteado por transferencia de admin`);
+      }
+    }
+  }
+
   // Si el jugador eliminado era el impostor, seleccionar un nuevo impostor
   if (room.impostorId === playerId) {
     const activePlayers = getActivePlayers(room);
@@ -849,6 +881,59 @@ app.post('/api/rooms/:roomId/update_name', (req, res) => {
   res.json({
     success: true,
     newName: trimmedName
+  });
+});
+
+// 🎤 POST /api/rooms/:roomId/voice_host
+// Establecer el peer ID del host de voz (solo admin)
+app.post('/api/rooms/:roomId/voice_host', (req, res) => {
+  const { roomId } = req.params;
+  const playerId = req.cookies.sid;
+  const { peerId } = req.body;
+
+  if (!rooms[roomId]) {
+    return res.status(404).json({ error: 'Sala no encontrada' });
+  }
+
+  const room = rooms[roomId];
+
+  // Verificar que es el admin
+  if (room.adminId !== playerId) {
+    return res.status(403).json({ error: 'Solo el admin puede activar el chat de voz' });
+  }
+
+  if (!peerId) {
+    return res.status(400).json({ error: 'peerId es requerido' });
+  }
+
+  // Guardar el peer ID del host
+  room.voiceHostPeerId = peerId;
+  room.lastActivity = Date.now();
+
+  console.log(`🎤 Host de voz establecido en ${roomId}: ${peerId}`);
+
+  // Notificar a todos los clientes
+  notifyWaitingClients(roomId);
+
+  res.json({
+    success: true,
+    peerId: peerId
+  });
+});
+
+// 🎤 GET /api/rooms/:roomId/voice_host
+// Obtener el peer ID del host de voz
+app.get('/api/rooms/:roomId/voice_host', (req, res) => {
+  const { roomId } = req.params;
+
+  if (!rooms[roomId]) {
+    return res.status(404).json({ error: 'Sala no encontrada' });
+  }
+
+  const room = rooms[roomId];
+
+  res.json({
+    hostPeerId: room.voiceHostPeerId || null
   });
 });
 

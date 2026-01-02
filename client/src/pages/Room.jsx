@@ -14,6 +14,10 @@ import GameOverPanel from "../components/GameOverPanel";
 import AdPlaceholder from "../components/AdPlaceholder";
 import InterstitialAd from "../components/InterstitialAd";
 import AppHeader from "../components/AppHeader";
+import VoicePanel from "../components/VoicePanel";
+import VoiceParticipant from "../components/VoiceParticipant";
+import * as voiceChat from "../services/voiceChat";
+import { createHostPeer, connectToHost, closePeer } from "../network/p2p";
 
 export default function Room() {
   const { roomId } = useParams(); // Solo necesitamos roomId
@@ -85,6 +89,21 @@ export default function Room() {
 
   // Referencia para el botón de añadir
   const addButtonRef = useRef(null);
+
+  // ===== ESTADOS DE VOZ =====
+  const [micEnabled, setMicEnabled] = useState(false); // Micrófono activado/desactivado
+  const [isConnectingMic, setIsConnectingMic] = useState(false); // Conectando micrófono
+  const [voiceStatus, setVoiceStatus] = useState('disconnected'); // Estado: disconnected, connecting, connected, error
+  const [audioLevel, setAudioLevel] = useState(0); // Nivel de audio local (0-100)
+  const [speakersData, setSpeakersData] = useState({}); // {playerId: {isSpeaking, audioLevel}}
+  const [voicePeerId, setVoicePeerId] = useState(null); // ID del peer local
+  const [voiceHostId, setVoiceHostId] = useState(null); // ID del peer host (admin)
+
+  // Referencias para gestión de voz
+  const localStreamRef = useRef(null);
+  const peerRef = useRef(null);
+  const peerConnectionsRef = useRef({}); // {playerId: connection}
+  const audioLevelIntervalRef = useRef(null);
 
   // Detectar nuevos jugadores y mostrar toast
   useEffect(() => {
@@ -344,6 +363,211 @@ export default function Room() {
       toast.error(err.response?.data?.error || "Error al cancelar la votación");
     }
   };
+
+  // ===== FUNCIONES DE VOZ =====
+
+  // Limpiar recursos de voz
+  const cleanupVoice = () => {
+    console.log("🧹 Limpiando recursos de voz...");
+
+    // Detener micrófono
+    if (localStreamRef.current) {
+      voiceChat.stopMicrophone();
+      localStreamRef.current = null;
+    }
+
+    // Detener intervalo de nivel de audio
+    if (audioLevelIntervalRef.current) {
+      clearInterval(audioLevelIntervalRef.current);
+      audioLevelIntervalRef.current = null;
+    }
+
+    // Cerrar conexiones peer
+    Object.values(peerConnectionsRef.current).forEach(conn => {
+      try {
+        conn.close();
+      } catch (e) {
+        console.error("Error al cerrar conexión:", e);
+      }
+    });
+    peerConnectionsRef.current = {};
+
+    // Cerrar peer
+    if (peerRef.current) {
+      closePeer();
+      peerRef.current = null;
+    }
+
+    // Resetear estados
+    setMicEnabled(false);
+    setIsConnectingMic(false);
+    setVoiceStatus('disconnected');
+    setAudioLevel(0);
+    setSpeakersData({});
+    setVoicePeerId(null);
+  };
+
+  // Manejar mensajes de otros peers (niveles de audio)
+  const handlePeerMessage = (senderId, data) => {
+    if (data.type === 'audioLevel') {
+      setSpeakersData(prev => ({
+        ...prev,
+        [senderId]: {
+          isSpeaking: data.isSpeaking,
+          audioLevel: data.level
+        }
+      }));
+    }
+  };
+
+  // Inicializar peer (host o cliente)
+  const initializeVoicePeer = async () => {
+    try {
+      setVoiceStatus('connecting');
+
+      if (isAdmin) {
+        // Admin: crear peer host
+        console.log("🎤 Inicializando como HOST...");
+        const peerId = await createHostPeer((senderId, data) => {
+          handlePeerMessage(senderId, data);
+        });
+        setVoicePeerId(peerId);
+        setVoiceHostId(peerId);
+        peerRef.current = peerId;
+
+        // Enviar el peer ID al servidor para que otros jugadores puedan conectarse
+        await api.post(`/rooms/${roomId}/voice_host`, { peerId });
+
+        console.log("✅ Host peer creado:", peerId);
+      } else {
+        // Jugador: conectar al host
+        console.log("🎤 Inicializando como CLIENTE...");
+
+        // Obtener el peer ID del host desde el servidor
+        const response = await api.get(`/rooms/${roomId}/voice_host`);
+        const hostPeerId = response.data.hostPeerId;
+
+        if (!hostPeerId) {
+          throw new Error("El host no ha activado el chat de voz");
+        }
+
+        setVoiceHostId(hostPeerId);
+
+        // Conectar al host
+        const connection = await connectToHost(hostPeerId, (data) => {
+          handlePeerMessage(hostPeerId, data);
+        });
+
+        peerConnectionsRef.current[hostPeerId] = connection;
+        console.log("✅ Conectado al host:", hostPeerId);
+      }
+
+      setVoiceStatus('connected');
+    } catch (error) {
+      console.error("❌ Error al inicializar peer:", error);
+      setVoiceStatus('error');
+      toast.error("Error al conectar el chat de voz");
+      throw error;
+    }
+  };
+
+  // Toggle del micrófono
+  const handleToggleMic = async () => {
+    if (micEnabled) {
+      // Desactivar micrófono
+      cleanupVoice();
+      toast.success("Micrófono desactivado");
+    } else {
+      // Activar micrófono
+      try {
+        setIsConnectingMic(true);
+
+        // 1. Inicializar micrófono
+        const stream = await voiceChat.initMicrophone();
+        localStreamRef.current = stream;
+
+        // 2. Inicializar peer
+        await initializeVoicePeer();
+
+        // 3. Comenzar a monitorear el nivel de audio
+        audioLevelIntervalRef.current = setInterval(() => {
+          const level = voiceChat.getAudioLevel();
+          const speaking = voiceChat.isSpeaking(15);
+          setAudioLevel(level);
+
+          // Enviar nivel de audio a otros peers
+          if (peerRef.current) {
+            const message = {
+              type: 'audioLevel',
+              level: level,
+              isSpeaking: speaking
+            };
+
+            // Si soy host, broadcast a todos los clientes
+            if (isAdmin) {
+              Object.values(peerConnectionsRef.current).forEach(conn => {
+                try {
+                  conn.send(message);
+                } catch (e) {
+                  console.error("Error al enviar nivel de audio:", e);
+                }
+              });
+            } else {
+              // Si soy cliente, enviar solo al host
+              const hostConn = peerConnectionsRef.current[voiceHostId];
+              if (hostConn) {
+                try {
+                  hostConn.send(message);
+                } catch (e) {
+                  console.error("Error al enviar nivel de audio al host:", e);
+                }
+              }
+            }
+          }
+        }, 100); // Actualizar cada 100ms
+
+        setMicEnabled(true);
+        toast.success("Micrófono activado");
+      } catch (error) {
+        console.error("Error al activar micrófono:", error);
+        toast.error("Error al activar el micrófono");
+        cleanupVoice();
+      } finally {
+        setIsConnectingMic(false);
+      }
+    }
+  };
+
+  // Efecto: Detectar cambio de admin y transferir host
+  useEffect(() => {
+    if (!micEnabled || !voiceHostId) return;
+
+    // Si el admin actual no está en la sala, necesitamos transferir
+    const adminPlayer = Object.entries(players).find(([, p]) => p.isAdmin);
+    const newAdminId = adminPlayer?.[0];
+
+    if (!newAdminId) return;
+
+    // Si cambió el admin y yo soy el nuevo admin
+    if (newAdminId === myId && !isAdmin) {
+      console.log("🔄 Transferencia de admin detectada. Convirtiéndome en host...");
+
+      // Limpiar conexión anterior
+      cleanupVoice();
+
+      // Reinicializar como host
+      setTimeout(() => {
+        handleToggleMic();
+      }, 1000);
+    }
+  }, [isAdmin, myId, players, micEnabled, voiceHostId]);
+
+  // Efecto: Cleanup al desmontar componente o salir de la sala
+  useEffect(() => {
+    return () => {
+      cleanupVoice();
+    };
+  }, []);
 
   if (error) {
     return (
@@ -672,12 +896,22 @@ export default function Room() {
                         )}
 
                         {/* Avatar */}
-                        <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${
+                        <div className={`relative w-12 h-12 rounded-full bg-gradient-to-br ${
                           playerId === myId
                             ? 'from-amber-500 to-orange-600 ring-2 ring-amber-400'
                             : 'from-purple-500 to-pink-600'
                         } flex items-center justify-center text-white font-bold text-base shadow-lg`}>
                           {player.name ? player.name.charAt(0).toUpperCase() : '?'}
+
+                          {/* Badge de voz */}
+                          {micEnabled && (
+                            <VoiceParticipant
+                              isSpeaking={speakersData[playerId]?.isSpeaking || (playerId === myId && voiceChat.isSpeaking(15))}
+                              micEnabled={playerId === myId ? micEnabled : speakersData[playerId]?.audioLevel > 0}
+                              audioLevel={playerId === myId ? audioLevel : (speakersData[playerId]?.audioLevel || 0)}
+                              position="bottom-right"
+                            />
+                          )}
                         </div>
 
                         {/* Nombre */}
@@ -817,6 +1051,17 @@ export default function Room() {
             </div>
           </div>
         </div>
+        )}
+
+        {/* Panel de control de voz (solo mostrar cuando no hay votación activa) */}
+        {roomStatus !== 'GAME_OVER' && roomStatus !== 'VOTING' && roomStatus !== 'RESULTS' && (
+          <VoicePanel
+            micEnabled={micEnabled}
+            onToggleMic={handleToggleMic}
+            audioLevel={audioLevel}
+            isConnecting={isConnectingMic}
+            voiceStatus={voiceStatus}
+          />
         )}
 
         {/* Banner Publicitario - Bottom */}
