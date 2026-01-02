@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Volume2, VolumeX, Loader2 } from "lucide-react";
 
 /**
@@ -29,6 +29,11 @@ export default function VoicePanel({
   myId
 }) {
   const canvasRef = useRef(null);
+
+  // Estado para speakers con delay de salida
+  const [displayedSpeakers, setDisplayedSpeakers] = useState([]);
+  const speakerTimersRef = useRef({}); // {playerId: timeoutId}
+  const speakerColorsRef = useRef({}); // {playerId: {colorClass, ringClass}} para mantener colores consistentes
 
   // Calcular el nivel máximo de la sala (para normalizar visualización)
   const maxRoomLevel = Math.max(
@@ -95,12 +100,70 @@ export default function VoicePanel({
   // Ordenar por nivel de audio (más alto primero)
   const currentSpeakers = allSpeakers.sort((a, b) => b.audioLevel - a.audioLevel);
 
-  // Debug: Log de speakers y datos
+  // Efecto: Gestionar speakers con delay de 1.5s al dejar de hablar
   useEffect(() => {
-    console.log('📊 speakersData completo:', speakersData);
-    console.log('🎤 Mi audioLevel:', audioLevel, 'isSpeaking:', isSpeaking);
-    console.log('👥 Current speakers filtered:', currentSpeakers);
-  }, [speakersData, audioLevel, currentSpeakers]);
+    const REMOVE_DELAY = 1500; // 1.5 segundos
+
+    // IDs de speakers actualmente hablando
+    const activeSpeakerIds = currentSpeakers.map(s => s.playerId);
+
+    // 1. Agregar nuevos speakers inmediatamente
+    activeSpeakerIds.forEach(playerId => {
+      // Si está hablando y tiene un timer de remoción, cancelarlo
+      if (speakerTimersRef.current[playerId]) {
+        clearTimeout(speakerTimersRef.current[playerId]);
+        delete speakerTimersRef.current[playerId];
+      }
+
+      // Asignar color consistente si es nuevo
+      if (!speakerColorsRef.current[playerId]) {
+        const colors = [
+          { bg: 'bg-purple-500', ring: 'ring-purple-400' },
+          { bg: 'bg-green-500', ring: 'ring-green-400' },
+          { bg: 'bg-blue-500', ring: 'ring-blue-400' },
+          { bg: 'bg-pink-500', ring: 'ring-pink-400' },
+          { bg: 'bg-indigo-500', ring: 'ring-indigo-400' },
+        ];
+        const hash = playerId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        speakerColorsRef.current[playerId] = colors[hash % colors.length];
+      }
+    });
+
+    // 2. Configurar timers para speakers que dejaron de hablar
+    const currentDisplayed = displayedSpeakers.map(s => s.playerId);
+    currentDisplayed.forEach(playerId => {
+      // Si estaba mostrado pero ya no está hablando
+      if (!activeSpeakerIds.includes(playerId) && !speakerTimersRef.current[playerId]) {
+        // Crear timer para quitarlo después de 1.5s
+        speakerTimersRef.current[playerId] = setTimeout(() => {
+          setDisplayedSpeakers(prev => prev.filter(s => s.playerId !== playerId));
+          delete speakerTimersRef.current[playerId];
+          delete speakerColorsRef.current[playerId]; // Limpiar color también
+        }, REMOVE_DELAY);
+      }
+    });
+
+    // 3. Actualizar displayedSpeakers con los que están hablando
+    setDisplayedSpeakers(prev => {
+      const newSpeakers = [...currentSpeakers];
+
+      // Mantener los que tienen timer pendiente (aún no removidos)
+      prev.forEach(speaker => {
+        if (!newSpeakers.find(s => s.playerId === speaker.playerId) && speakerTimersRef.current[speaker.playerId]) {
+          newSpeakers.push(speaker);
+        }
+      });
+
+      return newSpeakers;
+    });
+  }, [currentSpeakers]);
+
+  // Cleanup de timers al desmontar
+  useEffect(() => {
+    return () => {
+      Object.values(speakerTimersRef.current).forEach(timer => clearTimeout(timer));
+    };
+  }, []);
 
   if (!voiceEnabled) {
     return null; // No mostrar nada si no está habilitado
@@ -171,40 +234,32 @@ export default function VoicePanel({
       </div>
 
       {/* Quién está hablando - Solo mostrar cuando hay speakers */}
-      {currentSpeakers.length > 0 && (
+      {displayedSpeakers.length > 0 && (
         <div className="px-3 py-2 bg-purple-500/10 border-b border-gray-700/50">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] text-purple-300 font-bold">🗣️ Hablando:</span>
-            {currentSpeakers.map(({ playerId: speakerId, audioLevel: speakerLevel }) => {
-              const player = players[speakerId];
-              if (!player) return null;
+            {displayedSpeakers
+              .sort((a, b) => b.audioLevel - a.audioLevel)
+              .map(({ playerId: speakerId, audioLevel: speakerLevel }) => {
+                const player = players[speakerId];
+                if (!player) return null;
 
-              // Normalizar nivel basado en el máximo de la sala
-              const normalizedSpeakerLevel = (speakerLevel / maxReference) * 100;
+                // Usar color consistente guardado (no recalcular)
+                const { bg: colorClass, ring: ringClass } = speakerColorsRef.current[speakerId] || {
+                  bg: 'bg-purple-500',
+                  ring: 'ring-purple-400'
+                };
 
-              // Calcular intensidad del color basado en nivel normalizado
-              const intensity = Math.min(normalizedSpeakerLevel / 100, 1);
-              const bgOpacity = Math.round(20 + (intensity * 30)); // 20-50%
+                // Calcular opacidad basada en nivel
+                const normalizedSpeakerLevel = (speakerLevel / maxReference) * 100;
+                const intensity = Math.min(normalizedSpeakerLevel / 100, 1);
+                const bgOpacity = Math.round(20 + (intensity * 30)); // 20-50%
 
-              // Determinar color según nivel normalizado
-              let colorClass = 'bg-purple-500';
-              let ringClass = 'ring-purple-400';
-              if (normalizedSpeakerLevel > 70) {
-                colorClass = 'bg-red-500';
-                ringClass = 'ring-red-400';
-              } else if (normalizedSpeakerLevel > 50) {
-                colorClass = 'bg-yellow-500';
-                ringClass = 'ring-yellow-400';
-              } else if (normalizedSpeakerLevel > 35) {
-                colorClass = 'bg-green-500';
-                ringClass = 'ring-green-400';
-              }
-
-              return (
-                <div
-                  key={speakerId}
-                  className={`flex items-center gap-1.5 ${colorClass}/${bgOpacity} rounded-full px-2 py-1 ring-2 ${ringClass} animate-pulse`}
-                >
+                return (
+                  <div
+                    key={speakerId}
+                    className={`flex items-center gap-1.5 ${colorClass}/${bgOpacity} rounded-full px-2 py-1 ring-2 ${ringClass} animate-pulse`}
+                  >
                   {/* Foto de perfil */}
                   {player.profilePicture ? (
                     <img
