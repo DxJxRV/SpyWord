@@ -250,6 +250,9 @@ export default function Room() {
           setRoomIsPublic(res.data.isPublic);
         }
         if (res.data.requestedPlayers !== undefined) {
+          if (res.data.requestedPlayers !== roomRequestedPlayers) {
+            console.log(`📊 Solicitudes actualizadas: ${roomRequestedPlayers} → ${res.data.requestedPlayers}`);
+          }
           setRoomRequestedPlayers(res.data.requestedPlayers);
         }
 
@@ -390,6 +393,12 @@ export default function Room() {
       return;
     }
 
+    // Límite de 10 solicitudes simultáneas
+    if (roomRequestedPlayers >= 10) {
+      toast.error("Máximo 10 solicitudes simultáneas");
+      return;
+    }
+
     try {
       const newCount = roomRequestedPlayers + 1;
 
@@ -405,6 +414,27 @@ export default function Room() {
     } catch (err) {
       console.error("Error al solicitar jugador:", err);
       toast.error("Error al solicitar jugador");
+    }
+  };
+
+  // Cancelar una solicitud
+  const handleCancelRequest = async () => {
+    if (!isAdmin || roomRequestedPlayers === 0) return;
+
+    try {
+      const newCount = Math.max(0, roomRequestedPlayers - 1);
+
+      await api.post(`/rooms/${roomId}/set-public`, {
+        isPublic: false,
+        requestedPlayers: newCount
+      });
+
+      setRoomRequestedPlayers(newCount);
+      toast.success("Solicitud cancelada");
+      if (navigator.vibrate) navigator.vibrate(30);
+    } catch (err) {
+      console.error("Error al cancelar solicitud:", err);
+      toast.error("Error al cancelar solicitud");
     }
   };
 
@@ -1007,6 +1037,17 @@ export default function Room() {
                         key={`waiting-${index}`}
                         className="relative flex flex-col items-center gap-1"
                       >
+                        {/* Botón X para cancelar esta solicitud */}
+                        {isAdmin && (
+                          <button
+                            onClick={handleCancelRequest}
+                            className="absolute -top-1 -right-1 bg-red-500/80 hover:bg-red-600 rounded-full p-0.5 z-10 transition-all active:scale-95"
+                            title="Cancelar solicitud"
+                          >
+                            <X size={10} className="text-white" />
+                          </button>
+                        )}
+
                         {/* Avatar animado de espera */}
                         <div className="w-12 h-12 rounded-full bg-purple-500/20 border-2 border-dashed border-purple-500 flex items-center justify-center text-purple-400 shadow-lg animate-pulse">
                           <Users size={20} className="animate-spin" style={{ animationDuration: '2s' }} />
@@ -1072,13 +1113,18 @@ export default function Room() {
                       <div className="relative flex flex-col items-center gap-1">
                         <button
                           onClick={handleRequestPlayer}
-                          className="w-12 h-12 rounded-full bg-purple-500/20 border-2 border-dashed border-purple-500 hover:border-purple-400 hover:bg-purple-500/30 flex items-center justify-center text-purple-400 hover:text-purple-300 shadow-lg transition-all active:scale-95 relative"
-                          title="Solicitar jugador del matchmaking"
+                          disabled={roomRequestedPlayers >= 10}
+                          className={`w-12 h-12 rounded-full border-2 border-dashed flex items-center justify-center shadow-lg transition-all active:scale-95 relative ${
+                            roomRequestedPlayers >= 10
+                              ? 'bg-gray-700/20 border-gray-600 text-gray-600 cursor-not-allowed'
+                              : 'bg-purple-500/20 border-purple-500 hover:border-purple-400 hover:bg-purple-500/30 text-purple-400 hover:text-purple-300'
+                          }`}
+                          title={roomRequestedPlayers >= 10 ? 'Máximo 10 solicitudes' : `Solicitar jugador (${roomRequestedPlayers}/10)`}
                         >
                           <Users size={20} className="absolute" />
                         </button>
 
-                        <span className="text-[10px] text-purple-300 text-center">
+                        <span className={`text-[10px] text-center ${roomRequestedPlayers >= 10 ? 'text-gray-600' : 'text-purple-300'}`}>
                           Solicitar
                         </span>
                       </div>
@@ -1090,12 +1136,27 @@ export default function Room() {
                 <div className="px-4 pb-2">
                   <div className="flex items-center gap-3 text-[9px] text-gray-500 flex-wrap">
                     {isAdmin && (
-                      <span className="text-green-400">
-                        {roomIsPublic ? '🔓 Pública' : '🔒 Privada'}
+                      <span className="text-green-400 flex items-center gap-1">
+                        {roomIsPublic ? <LockOpen size={10} /> : <Lock size={10} />}
+                        {roomIsPublic ? 'Pública' : 'Privada'}
                       </span>
                     )}
-                    <span>👥 Amigos: Invita con QR/Link</span>
-                    {isAdmin && <span className="text-purple-400">🔍 Solicitar: Busca jugadores</span>}
+                    <span className="flex items-center gap-1">
+                      <UserPlus size={10} />
+                      Amigos: Invita con QR/Link
+                    </span>
+                    {isAdmin && (
+                      <span className="text-purple-400 flex items-center gap-1">
+                        <Users size={10} />
+                        Solicitar: Busca jugadores (máx 10)
+                      </span>
+                    )}
+                    {isAdmin && roomRequestedPlayers > 0 && (
+                      <span className="text-red-400 flex items-center gap-1">
+                        <X size={10} />
+                        Click para cancelar
+                      </span>
+                    )}
                   </div>
                 </div>
             </div>

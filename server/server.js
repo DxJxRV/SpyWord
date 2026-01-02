@@ -2662,9 +2662,9 @@ async function matchmakingWorker() {
   }
 }
 
-// Ejecutar worker cada 5 segundos
-setInterval(matchmakingWorker, 5000);
-console.log('🤖 Matchmaking worker iniciado (cada 5s)');
+// Ejecutar worker cada 2 segundos
+setInterval(matchmakingWorker, 2000);
+console.log('🤖 Matchmaking worker iniciado (cada 2s)');
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor Impostor Word escuchando en http://0.0.0.0:${PORT}`);
