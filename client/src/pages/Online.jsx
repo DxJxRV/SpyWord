@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, ArrowLeft, Link2, Camera, HelpCircle, Zap } from "lucide-react";
+import { Play, ArrowLeft, Link2, Camera, HelpCircle, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../services/api";
 import { getUserName } from "../utils/nameGenerator";
@@ -275,14 +275,14 @@ export default function Online() {
             <button
               onClick={handleFindMatch}
               disabled={loading}
-              className="bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-6 rounded-xl hover:from-purple-600 hover:to-pink-700 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-4 shadow-lg ring-2 ring-purple-400/50"
+              className="bg-gradient-to-r from-blue-500 to-cyan-600 px-6 py-6 rounded-xl hover:from-blue-600 hover:to-cyan-700 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-4 shadow-lg ring-2 ring-blue-400/50"
             >
               <div className="bg-white/20 p-3 rounded-lg">
-                <Zap size={32} />
+                <Users size={32} />
               </div>
               <div className="flex flex-col items-start text-left">
                 <span className="text-2xl font-bold">Encontrar partida</span>
-                <span className="text-sm text-purple-100 opacity-90">Entra en cola automática con otros jugadores</span>
+                <span className="text-sm text-blue-100 opacity-90">Juega con otros jugadores al azar</span>
               </div>
             </button>
 
