@@ -75,25 +75,32 @@ export default function VoicePanel({
     }
   }, [audioLevel, voiceEnabled, maxReference, speakersData]);
 
-  // Detectar si está hablando (nivel > 15)
-  const isSpeaking = audioLevel > 15;
+  // Detectar si está hablando (nivel > 10)
+  const isSpeaking = audioLevel > 10;
 
   // Encontrar quién está hablando actualmente con nivel significativo
-  const SPEAKING_THRESHOLD = 25; // Nivel mínimo para mostrar (de 0-100)
+  const SPEAKING_THRESHOLD = 10; // Nivel mínimo para mostrar (de 0-100) - Más sensible
 
-  // Recopilar speakers remotos
+  // Recopilar speakers remotos (solo filtrar por nivel, no por flag isSpeaking)
   const remoteSpeakers = Object.entries(speakersData)
-    .filter(([, data]) => data.isSpeaking && data.audioLevel > SPEAKING_THRESHOLD)
+    .filter(([, data]) => data.audioLevel > SPEAKING_THRESHOLD)
     .map(([playerId, data]) => ({ playerId, audioLevel: data.audioLevel }));
 
   // Agregar el usuario local si está hablando
   const allSpeakers = [...remoteSpeakers];
-  if (isSpeaking && audioLevel > SPEAKING_THRESHOLD && myId) {
+  if (audioLevel > SPEAKING_THRESHOLD && myId) {
     allSpeakers.push({ playerId: myId, audioLevel });
   }
 
   // Ordenar por nivel de audio (más alto primero)
   const currentSpeakers = allSpeakers.sort((a, b) => b.audioLevel - a.audioLevel);
+
+  // Debug: Log de speakers y datos
+  useEffect(() => {
+    console.log('📊 speakersData completo:', speakersData);
+    console.log('🎤 Mi audioLevel:', audioLevel, 'isSpeaking:', isSpeaking);
+    console.log('👥 Current speakers filtered:', currentSpeakers);
+  }, [speakersData, audioLevel, currentSpeakers]);
 
   if (!voiceEnabled) {
     return null; // No mostrar nada si no está habilitado
@@ -164,10 +171,16 @@ export default function VoicePanel({
       </div>
 
       {/* Quién está hablando */}
-      {currentSpeakers.length > 0 && (
-        <div className="px-3 py-2 bg-purple-500/10 border-b border-gray-700/50">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] text-purple-300 font-bold">🗣️ Hablando:</span>
+      <div className="px-3 py-2 bg-purple-500/10 border-b border-gray-700/50">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] text-purple-300 font-bold">🗣️ Hablando:</span>
+
+          {/* Mostrar mensaje si no hay nadie hablando */}
+          {currentSpeakers.length === 0 ? (
+            <span className="text-[10px] text-gray-500 italic">Nadie (threshold: {SPEAKING_THRESHOLD})</span>
+          ) : (
+            <>
+            {/* Speakers activos */}
             {currentSpeakers.map(({ playerId: speakerId, audioLevel: speakerLevel }) => {
               const player = players[speakerId];
               if (!player) return null;
@@ -242,9 +255,10 @@ export default function VoicePanel({
                 </div>
               );
             })}
-          </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Visualizador de audio */}
       <div className="px-3 py-3">
