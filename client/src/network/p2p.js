@@ -18,6 +18,16 @@ function playRemoteStream(remoteStream, peerId) {
   audio.autoplay = true;
   audio.volume = 1.0;
 
+  // IMPORTANTE: Forzar reproducción por bocina/speaker (no auricular de llamada)
+  // En móviles, esto evita que salga por el earpiece
+  audio.setAttribute('playsinline', '');
+  audio.setAttribute('webkit-playsinline', '');
+
+  // Intentar reproducir explícitamente (necesario en algunos navegadores)
+  audio.play().catch(err => {
+    console.warn("Advertencia al reproducir audio:", err);
+  });
+
   // Guardar referencia
   remoteAudios[peerId] = audio;
 
@@ -177,7 +187,7 @@ export function sendMessage(message) {
   }
 }
 
-// 🔇 Silenciar/activar todos los streams locales
+// 🔇 Silenciar/activar todos los streams locales (micrófono)
 export function setLocalMuted(muted) {
   activeCalls.forEach((call) => {
     // Obtener todos los tracks de audio del stream local de la llamada
@@ -191,6 +201,14 @@ export function setLocalMuted(muted) {
     }
   });
   console.log(`🎤 Micrófono ${muted ? 'silenciado' : 'activado'}`);
+}
+
+// 🔇 Silenciar/activar todos los streams remotos (audio/speakers)
+export function setSpeakersMuted(muted) {
+  Object.values(remoteAudios).forEach((audio) => {
+    audio.muted = muted;
+  });
+  console.log(`🔊 Audio ${muted ? 'silenciado' : 'activado'}`);
 }
 
 // 🧹 Cerrar conexiones

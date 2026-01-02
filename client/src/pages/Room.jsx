@@ -17,7 +17,7 @@ import AppHeader from "../components/AppHeader";
 import VoicePanel from "../components/VoicePanel";
 import VoiceParticipant from "../components/VoiceParticipant";
 import * as voiceChat from "../services/voiceChat";
-import { createHostPeer, connectToHost, closePeer, broadcastMessage, sendMessage, setLocalMuted } from "../network/p2p";
+import { createHostPeer, connectToHost, closePeer, broadcastMessage, sendMessage, setLocalMuted, setSpeakersMuted as setSpeakersMutedP2P } from "../network/p2p";
 
 export default function Room() {
   const { roomId } = useParams(); // Solo necesitamos roomId
@@ -91,8 +91,9 @@ export default function Room() {
   const addButtonRef = useRef(null);
 
   // ===== ESTADOS DE VOZ =====
-  const [micEnabled, setMicEnabled] = useState(false); // Micrófono activado/desactivado
+  const [voiceEnabled, setVoiceEnabled] = useState(false); // Sistema de voz activado (auto-connect)
   const [micMuted, setMicMuted] = useState(false); // Micrófono silenciado (sin desconectar)
+  const [speakersMuted, setSpeakersMuted] = useState(false); // Audio silenciado (sin desconectar)
   const [isConnectingMic, setIsConnectingMic] = useState(false); // Conectando micrófono
   const [voiceStatus, setVoiceStatus] = useState('disconnected'); // Estado: disconnected, connecting, connected, error
   const [audioLevel, setAudioLevel] = useState(0); // Nivel de audio local (0-100)
@@ -402,8 +403,9 @@ export default function Room() {
     retryCountRef.current = 0;
 
     // Resetear estados
-    setMicEnabled(false);
+    setVoiceEnabled(false);
     setMicMuted(false);
+    setSpeakersMuted(false);
     setIsConnectingMic(false);
     setVoiceStatus('disconnected');
     setAudioLevel(0);
@@ -494,20 +496,13 @@ export default function Room() {
     }
   };
 
-  // Toggle del micrófono
-  const handleToggleMic = async () => {
-    if (micEnabled) {
-      // Desactivar micrófono completamente
-      cleanupVoice();
-      toast.success("Micrófono desactivado");
-    } else {
-      // Verificar que haya al menos 2 jugadores antes de activar
-      if (totalPlayers < 2) {
-        toast.error("Necesitas al menos 2 jugadores para activar el chat de voz");
-        return;
-      }
+  // Inicializar voz automáticamente cuando hay 2+ jugadores
+  useEffect(() => {
+    if (voiceEnabled) return; // Ya está activado
+    if (totalPlayers < 2) return; // Necesita 2+ jugadores
 
-      // Activar micrófono
+    // Auto-inicializar
+    const initVoice = async () => {
       try {
         setIsConnectingMic(true);
 
@@ -532,34 +527,32 @@ export default function Room() {
               isSpeaking: speaking
             };
 
-            // Si soy host, broadcast a todos los clientes
             if (isAdmin) {
               broadcastMessage(message);
             } else {
-              // Si soy cliente, enviar solo al host
               sendMessage(message);
             }
           }
         }, 100); // Actualizar cada 100ms
 
-        setMicEnabled(true);
-        setMicMuted(false);
-        toast.success("Micrófono activado");
+        setVoiceEnabled(true);
+        console.log("✅ Chat de voz activado automáticamente");
       } catch (error) {
-        console.error("Error al activar micrófono:", error);
+        console.error("Error al auto-inicializar voz:", error);
         if (!retryTimeoutRef.current) {
-          toast.error("Error al activar el micrófono");
           cleanupVoice();
         }
       } finally {
         setIsConnectingMic(false);
       }
-    }
-  };
+    };
 
-  // Toggle mute (sin desconectar)
-  const handleToggleMute = () => {
-    if (!micEnabled) return;
+    initVoice();
+  }, [isAdmin, totalPlayers, voiceEnabled]);
+
+  // Toggle mute micrófono (sin desconectar)
+  const handleToggleMuteMic = () => {
+    if (!voiceEnabled) return;
 
     const newMutedState = !micMuted;
     setMicMuted(newMutedState);
@@ -568,9 +561,20 @@ export default function Room() {
     toast.success(newMutedState ? "Micrófono silenciado" : "Micrófono activado");
   };
 
+  // Toggle mute speakers (sin desconectar)
+  const handleToggleMuteSpeakers = () => {
+    if (!voiceEnabled) return;
+
+    const newMutedState = !speakersMuted;
+    setSpeakersMuted(newMutedState);
+    setSpeakersMutedP2P(newMutedState); // Llamar a la función de p2p
+
+    toast.success(newMutedState ? "Audio silenciado" : "Audio activado");
+  };
+
   // Efecto: Detectar cambio de admin y transferir host
   useEffect(() => {
-    if (!micEnabled || !voiceHostId) return;
+    if (!voiceEnabled || !voiceHostId) return;
 
     // Si el admin actual no está en la sala, necesitamos transferir
     const adminPlayer = Object.entries(players).find(([, p]) => p.isAdmin);
@@ -585,12 +589,9 @@ export default function Room() {
       // Limpiar conexión anterior
       cleanupVoice();
 
-      // Reinicializar como host
-      setTimeout(() => {
-        handleToggleMic();
-      }, 1000);
+      // El auto-connect se encargará de reinicializar
     }
-  }, [isAdmin, myId, players, micEnabled, voiceHostId]);
+  }, [isAdmin, myId, players, voiceEnabled, voiceHostId]);
 
   // Efecto: Cleanup al desmontar componente o salir de la sala
   useEffect(() => {
@@ -934,10 +935,10 @@ export default function Room() {
                           {player.name ? player.name.charAt(0).toUpperCase() : '?'}
 
                           {/* Badge de voz */}
-                          {micEnabled && (
+                          {voiceEnabled && (
                             <VoiceParticipant
                               isSpeaking={speakersData[playerId]?.isSpeaking || (playerId === myId && voiceChat.isSpeaking(15))}
-                              micEnabled={playerId === myId ? micEnabled : speakersData[playerId]?.audioLevel > 0}
+                              micEnabled={playerId === myId ? voiceEnabled : speakersData[playerId]?.audioLevel > 0}
                               audioLevel={playerId === myId ? audioLevel : (speakersData[playerId]?.audioLevel || 0)}
                               position="bottom-right"
                             />
@@ -1086,13 +1087,17 @@ export default function Room() {
         {/* Panel de control de voz (solo mostrar cuando no hay votación activa) */}
         {roomStatus !== 'GAME_OVER' && roomStatus !== 'VOTING' && roomStatus !== 'RESULTS' && (
           <VoicePanel
-            micEnabled={micEnabled}
+            voiceEnabled={voiceEnabled}
             micMuted={micMuted}
-            onToggleMic={handleToggleMic}
-            onToggleMute={handleToggleMute}
+            speakersMuted={speakersMuted}
+            onToggleMuteMic={handleToggleMuteMic}
+            onToggleMuteSpeakers={handleToggleMuteSpeakers}
             audioLevel={micMuted ? 0 : audioLevel}
             isConnecting={isConnectingMic}
             voiceStatus={voiceStatus}
+            speakersData={speakersData}
+            players={players}
+            myId={myId}
           />
         )}
 

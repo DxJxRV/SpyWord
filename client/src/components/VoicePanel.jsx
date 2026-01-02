@@ -1,30 +1,38 @@
 import { useEffect, useRef } from "react";
-import { Mic, MicOff, Loader2, Volume2, VolumeX } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, Loader2 } from "lucide-react";
 
 /**
  * VoicePanel - Control de micrófono y visualizador de audio
- * @param {boolean} micEnabled - Estado del micrófono (activado/desactivado)
- * @param {boolean} micMuted - Estado de silencio (sin desconectar)
- * @param {Function} onToggleMic - Callback al activar/desactivar micrófono
- * @param {Function} onToggleMute - Callback al silenciar/activar sin desconectar
+ * @param {boolean} voiceEnabled - Sistema de voz activado
+ * @param {boolean} micMuted - Micrófono silenciado
+ * @param {boolean} speakersMuted - Audio silenciado
+ * @param {Function} onToggleMuteMic - Callback al silenciar/activar micrófono
+ * @param {Function} onToggleMuteSpeakers - Callback al silenciar/activar audio
  * @param {number} audioLevel - Nivel de audio actual (0-100)
  * @param {boolean} isConnecting - Si está conectando el micrófono
  * @param {string} voiceStatus - Estado de la conexión: 'disconnected', 'connecting', 'connected', 'error'
+ * @param {Object} speakersData - Datos de quién está hablando {playerId: {isSpeaking, audioLevel}}
+ * @param {Object} players - Todos los jugadores {playerId: {name, profilePicture, ...}}
+ * @param {string} myId - ID del jugador actual
  */
 export default function VoicePanel({
-  micEnabled,
+  voiceEnabled,
   micMuted = false,
-  onToggleMic,
-  onToggleMute,
+  speakersMuted = false,
+  onToggleMuteMic,
+  onToggleMuteSpeakers,
   audioLevel = 0,
   isConnecting = false,
-  voiceStatus = 'disconnected'
+  voiceStatus = 'disconnected',
+  speakersData = {},
+  players = {},
+  myId
 }) {
   const canvasRef = useRef(null);
 
   // Dibujar visualizador de audio en canvas
   useEffect(() => {
-    if (!canvasRef.current || !micEnabled) return;
+    if (!canvasRef.current || !voiceEnabled) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -55,22 +63,26 @@ export default function VoicePanel({
       ctx.fillStyle = color;
       ctx.fillRect(i * barWidth, height - barHeight, barWidth - 2, barHeight);
     }
-  }, [audioLevel, micEnabled]);
-
-  const handleToggle = () => {
-    if (isConnecting) return;
-    onToggleMic();
-  };
+  }, [audioLevel, voiceEnabled]);
 
   // Detectar si está hablando (nivel > 15)
   const isSpeaking = audioLevel > 15;
 
+  // Encontrar quién está hablando actualmente
+  const currentSpeakers = Object.entries(speakersData)
+    .filter(([, data]) => data.isSpeaking)
+    .map(([playerId]) => playerId);
+
+  if (!voiceEnabled) {
+    return null; // No mostrar nada si no está habilitado
+  }
+
   return (
     <div className="w-full bg-gray-800/50 rounded-lg border border-gray-700/50 overflow-hidden">
-      {/* Header con botón de toggle */}
-      <div className="flex items-center justify-between p-3">
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 border-b border-gray-700/50">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-white">🎤 Micrófono</span>
+          <span className="text-sm font-semibold text-white">🎤 Chat de Voz</span>
 
           {/* Badge de estado */}
           {voiceStatus === 'connected' && (
@@ -93,70 +105,100 @@ export default function VoicePanel({
 
         {/* Botones de control */}
         <div className="flex items-center gap-2">
-          {/* Botón de mute (solo cuando está activado) */}
-          {micEnabled && (
-            <button
-              onClick={onToggleMute}
-              className={`relative p-2 rounded-full transition-all active:scale-95 ${
-                micMuted
-                  ? 'bg-yellow-500/30 hover:bg-yellow-500/40'
-                  : 'bg-blue-500/30 hover:bg-blue-500/40'
-              }`}
-              title={micMuted ? "Activar audio" : "Silenciar"}
-            >
-              {micMuted ? (
-                <VolumeX size={16} className="text-yellow-300" />
-              ) : (
-                <Volume2 size={16} className="text-blue-300" />
-              )}
-            </button>
-          )}
-
-          {/* Botón de toggle principal */}
+          {/* Botón para silenciar micrófono */}
           <button
-            onClick={handleToggle}
+            onClick={onToggleMuteMic}
             disabled={isConnecting}
-            className={`relative p-2 rounded-full transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-              micEnabled
-                ? `bg-green-500/30 hover:bg-green-500/40 ${isSpeaking && !micMuted ? 'ring-2 ring-green-400 animate-pulse' : ''}`
-                : 'bg-red-500/30 hover:bg-red-500/40'
+            className={`relative p-2 rounded-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 ${
+              micMuted
+                ? 'bg-red-500/30 hover:bg-red-500/40'
+                : `bg-green-500/30 hover:bg-green-500/40 ${isSpeaking ? 'ring-2 ring-green-400 animate-pulse' : ''}`
             }`}
-            title={micEnabled ? "Desactivar micrófono" : "Activar micrófono"}
+            title={micMuted ? "Activar micrófono" : "Silenciar micrófono"}
           >
-            {isConnecting ? (
-              <Loader2 size={18} className="text-white animate-spin" />
-            ) : micEnabled ? (
-              <Mic size={18} className="text-green-300" />
+            {micMuted ? (
+              <MicOff size={16} className="text-red-300" />
             ) : (
-              <MicOff size={18} className="text-red-300" />
+              <Mic size={16} className="text-green-300" />
             )}
+            <span className="text-[10px] font-bold text-white">MIC</span>
+          </button>
+
+          {/* Botón para silenciar audio */}
+          <button
+            onClick={onToggleMuteSpeakers}
+            disabled={isConnecting}
+            className={`relative p-2 rounded-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 ${
+              speakersMuted
+                ? 'bg-red-500/30 hover:bg-red-500/40'
+                : 'bg-blue-500/30 hover:bg-blue-500/40'
+            }`}
+            title={speakersMuted ? "Activar audio" : "Silenciar audio"}
+          >
+            {speakersMuted ? (
+              <VolumeX size={16} className="text-red-300" />
+            ) : (
+              <Volume2 size={16} className="text-blue-300" />
+            )}
+            <span className="text-[10px] font-bold text-white">AUDIO</span>
           </button>
         </div>
       </div>
 
-      {/* Visualizador de audio (solo cuando está activo) */}
-      {micEnabled && (
-        <div className="px-3 pb-3">
-          <div className="bg-gray-900/50 rounded-lg p-2 border border-gray-700/30">
-            <canvas
-              ref={canvasRef}
-              width={240}
-              height={40}
-              className="w-full h-10 rounded"
-            />
+      {/* Quién está hablando */}
+      {currentSpeakers.length > 0 && (
+        <div className="px-3 py-2 bg-purple-500/10 border-b border-gray-700/50">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] text-purple-300 font-bold">🗣️ Hablando:</span>
+            {currentSpeakers.map(speakerId => {
+              const player = players[speakerId];
+              if (!player) return null;
 
-            {/* Indicador de nivel */}
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-[10px] text-gray-400">
-                {isSpeaking ? '🗣️ Hablando' : '🤫 Silencio'}
-              </span>
-              <span className="text-[10px] text-gray-400 font-mono">
-                {audioLevel}%
-              </span>
-            </div>
+              return (
+                <div key={speakerId} className="flex items-center gap-1 bg-purple-500/20 rounded-full px-2 py-0.5">
+                  {player.profilePicture ? (
+                    <img
+                      src={player.profilePicture}
+                      alt={player.name}
+                      className="w-4 h-4 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center text-[8px] text-white font-bold">
+                      {player.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="text-[10px] text-purple-200 font-medium">
+                    {player.name.split(' ')[0]}
+                    {speakerId === myId && <span className="text-purple-400"> (tú)</span>}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
+
+      {/* Visualizador de audio */}
+      <div className="px-3 py-3">
+        <div className="bg-gray-900/50 rounded-lg p-2 border border-gray-700/30">
+          <canvas
+            ref={canvasRef}
+            width={240}
+            height={40}
+            className="w-full h-10 rounded"
+          />
+
+          {/* Indicador de nivel */}
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-[10px] text-gray-400">
+              {isSpeaking && !micMuted ? '🗣️ Hablando' : '🤫 Silencio'}
+            </span>
+            <span className="text-[10px] text-gray-400 font-mono">
+              {audioLevel}%
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
