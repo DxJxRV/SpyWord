@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Eye, EyeOff, Share2, QrCode, Copy, ChevronDown, ChevronUp, Play, UserPlus, Crown, Settings, UserMinus, UserCheck, X, Phone } from "lucide-react";
+import { Eye, EyeOff, Share2, QrCode, Copy, ChevronDown, ChevronUp, Play, UserPlus, Crown, Settings, UserMinus, UserCheck, X, PhoneOff } from "lucide-react";
 import { api, buildImageUrl } from "../services/api";
 import { toast } from "sonner";
 import Joyride from "react-joyride";
@@ -334,6 +334,17 @@ export default function Room() {
     }
   };
 
+  const handleCancelVote = async () => {
+    try {
+      await api.post(`/rooms/${roomId}/cancel_vote`);
+      toast.success("Votación cancelada");
+      if (navigator.vibrate) navigator.vibrate(50);
+    } catch (err) {
+      console.error("Error al cancelar votación:", err);
+      toast.error(err.response?.data?.error || "Error al cancelar la votación");
+    }
+  };
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
@@ -473,84 +484,50 @@ export default function Room() {
             <h1 className="text-5xl font-bold text-white mb-2">{countdown}</h1>
             <p className="text-xs text-gray-300">Todos se actualizarán al mismo tiempo</p>
           </div>
-        ) : roomStatus !== 'GAME_OVER' && (
+        ) : roomStatus !== 'GAME_OVER' && roomStatus !== 'VOTING' && roomStatus !== 'RESULTS' && (
           <div
             data-tutorial="word-card"
-            className={`relative bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-2xl border-2 border-purple-500/50 transition-all ${
-              roomStatus === 'VOTING'
-                ? 'p-3 shadow-[0_0_10px_rgba(168,85,247,0.2)]'
-                : 'p-8 shadow-[0_0_30px_rgba(168,85,247,0.4)]'
-            }`}
+            className="relative bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl border border-purple-500/40 shadow-lg transition-all p-6"
           >
             {/* Botón para ocultar/mostrar palabra en esquina superior derecha */}
             <button
               data-tutorial="hide-word"
               onClick={() => setWordHidden(!wordHidden)}
-              className={`absolute bg-purple-500/50 hover:bg-purple-600 rounded-lg transition-all font-semibold text-white ${
-                roomStatus === 'VOTING'
-                  ? 'top-2 right-2 px-2 py-1 text-xs'
-                  : 'top-4 right-4 px-3 py-2 text-sm'
-              }`}
+              className="absolute bg-purple-500/30 hover:bg-purple-500/50 rounded-full transition-all text-white top-3 right-3 p-2"
               title={wordHidden ? "Mostrar palabra" : "Ocultar palabra"}
             >
-              {wordHidden ? <EyeOff size={roomStatus === 'VOTING' ? 16 : 20} /> : <Eye size={roomStatus === 'VOTING' ? 16 : 20} />}
+              {wordHidden ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
 
-            {roomStatus === 'VOTING' ? (
-              // Vista colapsada durante votación
-              <div className="flex items-center justify-center gap-2">
-                <p className="text-xs text-purple-300">{modeType === 'image' ? 'Tu imagen:' : 'Tu palabra:'}</p>
-                {wordHidden ? (
-                  <h1 className="text-xl font-bold text-white">***</h1>
-                ) : (
-                  <>
-                    {itemImageUrl && word !== "???" && (
-                      <img
-                        src={buildImageUrl(itemImageUrl)}
-                        alt={word}
-                        className="h-12 w-12 object-cover rounded-lg border-2 border-purple-400"
-                      />
-                    )}
-                    {(modeType !== 'image' || !itemImageUrl || word === "???") && (
-                      <h1 className="text-xl font-bold text-white">
-                        {word || "..."}
-                      </h1>
-                    )}
-                  </>
-                )}
-                {!wordHidden && word === "???" && (
-                  <span className="text-amber-400 text-xs font-semibold">🕵️</span>
-                )}
-              </div>
-            ) : (
-              // Vista normal
-              <>
-                <p className="text-sm text-purple-300 mb-2">{modeType === 'image' ? 'Tu imagen es:' : 'Tu palabra es:'}</p>
-                {wordHidden ? (
-                  <h1 className="text-5xl font-bold text-white mb-2">***</h1>
-                ) : (
-                  <div className="flex flex-col items-center gap-3">
-                    {itemImageUrl && word !== "???" && (
-                      <img
-                        src={buildImageUrl(itemImageUrl)}
-                        alt={word}
-                        className="max-h-48 max-w-full object-contain rounded-xl border-2 border-purple-400 shadow-lg"
-                      />
-                    )}
-                    {(modeType !== 'image' || !itemImageUrl || word === "???") && (
-                      <h1 className="text-5xl font-bold text-white">
-                        {word || "..."}
-                      </h1>
-                    )}
-                  </div>
-                )}
-                {!wordHidden && word === "???" && (
-                  <p className="text-amber-400 text-sm font-semibold animate-pulse mt-2">
+            {/* Vista normal */}
+            <div className="text-center">
+              <p className="text-xs text-purple-300 mb-3 font-semibold">{modeType === 'image' ? 'Tu imagen es:' : 'Tu palabra es:'}</p>
+              {wordHidden ? (
+                <h1 className="text-5xl font-bold text-white mb-2">***</h1>
+              ) : (
+                <div className="flex flex-col items-center gap-3">
+                  {itemImageUrl && word !== "???" && (
+                    <img
+                      src={buildImageUrl(itemImageUrl)}
+                      alt={word}
+                      className="max-h-48 max-w-full object-contain rounded-xl border-2 border-purple-400 shadow-lg"
+                    />
+                  )}
+                  {(modeType !== 'image' || !itemImageUrl || word === "???") && (
+                    <h1 className="text-5xl font-bold text-white">
+                      {word || "..."}
+                    </h1>
+                  )}
+                </div>
+              )}
+              {!wordHidden && word === "???" && (
+                <div className="mt-3 bg-amber-500/20 px-4 py-2 rounded-lg border border-amber-500/40 inline-block">
+                  <p className="text-amber-400 text-sm font-semibold animate-pulse">
                     🕵️ ¡Eres el impostor!
                   </p>
-                )}
-              </>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -584,6 +561,11 @@ export default function Room() {
             }}
             roomId={roomId}
             myId={myId}
+            word={word}
+            wordHidden={wordHidden}
+            setWordHidden={setWordHidden}
+            modeType={modeType}
+            itemImageUrl={itemImageUrl}
             onUpdate={() => {
               setCurrentRound((prev) => prev);
             }}
@@ -612,10 +594,9 @@ export default function Room() {
               </button>
 
               {/* Grid de avatares de jugadores */}
-              {showPlayersGrid && (
-                <div className="p-4 pt-0">
-                  <div className="grid grid-cols-3 gap-2">
-                    {Object.entries(players).slice(0, 5).map(([playerId, player]) => (
+              <div className="p-4 pt-0">
+                <div className="grid grid-cols-3 gap-2">
+                  {Object.entries(players).slice(0, showPlayersGrid ? 5 : 3).map(([playerId, player]) => (
                       <div
                         key={playerId}
                         className="relative flex flex-col items-center gap-1"
@@ -628,29 +609,14 @@ export default function Room() {
                           </div>
                         )}
 
-                        {/* Avatar */}
-                        <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${
-                          playerId === myId
-                            ? 'from-amber-500 to-orange-600 ring-2 ring-amber-400'
-                            : 'from-purple-500 to-pink-600'
-                        } flex items-center justify-center text-white font-bold text-base shadow-lg`}>
-                          {player.name ? player.name.charAt(0).toUpperCase() : '?'}
-                        </div>
-
-                        {/* Nombre */}
-                        <span className="text-[10px] text-gray-300 truncate w-full text-center">
-                          {player.name.split(' ')[0]}
-                          {playerId === myId && <span className="text-amber-400"> (tú)</span>}
-                        </span>
-
-                        {/* Botón de configuración (solo para otros jugadores si eres admin) */}
+                        {/* Botón de configuración en esquina superior derecha (solo para otros jugadores si eres admin) */}
                         {isAdmin && playerId !== myId && (
-                          <div className="relative player-menu-container">
+                          <div className="absolute top-0 right-0 z-20 player-menu-container">
                             <button
                               onClick={() => setPlayerMenuOpen(playerMenuOpen === playerId ? null : playerId)}
-                              className="text-gray-400 hover:text-white transition-colors"
+                              className="bg-gray-900/80 hover:bg-gray-800 rounded-full p-1 text-gray-400 hover:text-white transition-colors"
                             >
-                              <Settings size={14} />
+                              <Settings size={12} />
                             </button>
 
                             {/* Menú desplegable */}
@@ -684,6 +650,21 @@ export default function Room() {
                             )}
                           </div>
                         )}
+
+                        {/* Avatar */}
+                        <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${
+                          playerId === myId
+                            ? 'from-amber-500 to-orange-600 ring-2 ring-amber-400'
+                            : 'from-purple-500 to-pink-600'
+                        } flex items-center justify-center text-white font-bold text-base shadow-lg`}>
+                          {player.name ? player.name.charAt(0).toUpperCase() : '?'}
+                        </div>
+
+                        {/* Nombre */}
+                        <span className="text-[10px] text-gray-300 truncate w-full text-center">
+                          {player.name.split(' ')[0]}
+                          {playerId === myId && <span className="text-amber-400"> (tú)</span>}
+                        </span>
                       </div>
                     ))}
 
@@ -736,7 +717,6 @@ export default function Room() {
                     </div>
                   </div>
                 </div>
-              )}
             </div>
 
             {/* Columna de botones (30%) */}
@@ -755,7 +735,7 @@ export default function Room() {
                     <span className="text-xs text-center leading-tight">{loading ? "Cargando..." : countdown !== null ? "⏳ Esperando..." : "Siguiente palabra"}</span>
                   </button>
 
-                  {/* Botón Llamar a Votación (20% del alto) */}
+                  {/* Botón Llamar a Votación / Cancelar votación (20% del alto) */}
                   <div className="flex-[0.2]">
                     {roomStatus === 'IN_GAME' ? (
                       <VotingPanel
@@ -775,11 +755,11 @@ export default function Room() {
                       />
                     ) : (
                       <button
-                        disabled
-                        className="w-full h-full bg-gray-600 px-2 py-2 rounded-lg font-semibold cursor-not-allowed opacity-50 flex flex-col items-center justify-center gap-1"
+                        onClick={handleCancelVote}
+                        className="w-full h-full bg-red-500 hover:bg-red-600 px-2 py-1 rounded-lg font-semibold transition-all active:scale-95 flex items-center justify-center gap-1"
                       >
-                        <Phone size={20} />
-                        <span className="text-[10px]">En votación</span>
+                        <PhoneOff size={16} />
+                        <span className="text-[10px]">Cancelar</span>
                       </button>
                     )}
                   </div>
@@ -805,11 +785,11 @@ export default function Room() {
                     />
                   ) : (
                     <button
-                      disabled
-                      className="w-full h-full bg-gray-600 px-6 py-3 rounded-xl font-semibold cursor-not-allowed opacity-50 flex flex-col items-center justify-center gap-2"
+                      onClick={handleCancelVote}
+                      className="w-full h-full bg-red-500 hover:bg-red-600 px-6 py-3 rounded-xl font-semibold transition-all active:scale-95 flex flex-col items-center justify-center gap-2"
                     >
-                      <Phone size={28} />
-                      <span className="text-sm">En votación</span>
+                      <PhoneOff size={28} />
+                      <span className="text-sm">Cancelar votación</span>
                     </button>
                   )}
                 </div>

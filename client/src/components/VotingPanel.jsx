@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Vote, UserX, CheckCircle, XCircle, Users, AlertTriangle, Play, Phone } from "lucide-react";
-import { api } from "../services/api";
+import { Vote, UserX, CheckCircle, XCircle, Users, AlertTriangle, Play, Phone, Eye, EyeOff } from "lucide-react";
+import { api, buildImageUrl } from "../services/api";
 
-export default function VotingPanel({ roomState, roomId, myId, onUpdate }) {
+export default function VotingPanel({ roomState, roomId, myId, word, wordHidden, setWordHidden, modeType, itemImageUrl, onUpdate }) {
   const [loading, setLoading] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
 
@@ -176,7 +176,44 @@ export default function VotingPanel({ roomState, roomId, myId, onUpdate }) {
     const playerColors = ['bg-rose-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 'bg-cyan-500', 'bg-pink-500', 'bg-orange-500'];
 
     return (
-      <div className="w-full">
+      <div className="w-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl border border-purple-500/40 shadow-lg p-4">
+        {/* Mostrar palabra compacta arriba */}
+        <div className="relative bg-gray-800/50 rounded-lg border border-purple-500/30 p-3 mb-4">
+          {/* Botón ocultar/mostrar */}
+          <button
+            onClick={() => setWordHidden?.(!wordHidden)}
+            className="absolute top-2 right-2 bg-purple-500/30 hover:bg-purple-500/50 rounded-full transition-all text-white p-1.5"
+            title={wordHidden ? "Mostrar palabra" : "Ocultar palabra"}
+          >
+            {wordHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+
+          <div className="flex items-center justify-center gap-2">
+            <p className="text-xs text-purple-300">{modeType === 'image' ? 'Tu imagen:' : 'Tu palabra:'}</p>
+            {wordHidden ? (
+              <h1 className="text-xl font-bold text-white">***</h1>
+            ) : (
+              <>
+                {itemImageUrl && word !== "???" && (
+                  <img
+                    src={buildImageUrl(itemImageUrl)}
+                    alt={word}
+                    className="h-10 w-10 object-cover rounded-lg border-2 border-purple-400"
+                  />
+                )}
+                {(modeType !== 'image' || !itemImageUrl || word === "???") && (
+                  <h1 className="text-xl font-bold text-white">
+                    {word || "..."}
+                  </h1>
+                )}
+              </>
+            )}
+            {!wordHidden && word === "???" && (
+              <span className="text-amber-400 text-xs font-semibold">🕵️</span>
+            )}
+          </div>
+        </div>
+
         {/* Header de votación */}
         <div className="mb-3 text-center">
           <h3 className="text-sm font-bold text-red-300 mb-1">¿Quién es el impostor?</h3>
@@ -189,6 +226,8 @@ export default function VotingPanel({ roomState, roomId, myId, onUpdate }) {
         <div className="grid grid-cols-2 gap-2 mb-3">
           {alivePlayers.map(({ id, name }, index) => {
             const playerColor = playerColors[index % playerColors.length];
+            const playerData = players[id];
+            const profilePicture = playerData?.profilePicture;
 
             return (
               <button
@@ -197,10 +236,23 @@ export default function VotingPanel({ roomState, roomId, myId, onUpdate }) {
                   setSelectedPlayer(id);
                   if (navigator.vibrate) navigator.vibrate(25);
                 }}
-                className={`${playerColor} h-24 rounded-xl flex items-center justify-center text-base font-bold transition-all relative overflow-hidden
+                className={`${playerColor} h-24 rounded-xl flex flex-col items-center justify-center gap-2 text-base font-bold transition-all relative overflow-hidden
                   ${selectedPlayer === id ? "scale-105 ring-4 ring-white shadow-2xl" : "hover:scale-105"}`}
               >
-                <span className="text-white drop-shadow-lg">{name}</span>
+                {/* Foto de perfil o avatar */}
+                {profilePicture ? (
+                  <img
+                    src={profilePicture}
+                    alt={name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-lg"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-white/20 border-2 border-white flex items-center justify-center text-2xl font-bold shadow-lg">
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+
+                <span className="text-white drop-shadow-lg text-sm">{name}</span>
 
                 {/* Badge de votos */}
                 {votesTally[id] && votesTally[id] > 0 && (

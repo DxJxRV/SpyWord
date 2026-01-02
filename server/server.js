@@ -768,6 +768,52 @@ app.post('/api/rooms/:roomId/continue_game', (req, res) => {
   });
 });
 
+// ❌ POST /api/rooms/:roomId/cancel_vote - Cancelar votación activa
+app.post('/api/rooms/:roomId/cancel_vote', (req, res) => {
+  const { roomId } = req.params;
+  const playerId = req.cookies.sid;
+
+  if (!rooms[roomId]) {
+    return res.status(404).json({ error: 'Sala no encontrada' });
+  }
+
+  const room = rooms[roomId];
+
+  // Verificar que el jugador esté en la sala
+  if (!room.players[playerId]) {
+    return res.status(403).json({ error: 'No estás en esta sala' });
+  }
+
+  // Verificar que haya una votación activa
+  if (room.status !== 'VOTING' && room.status !== 'RESULTS') {
+    return res.status(400).json({ error: 'No hay votación activa para cancelar' });
+  }
+
+  // Volver al estado IN_GAME
+  room.status = 'IN_GAME';
+  room.votes = {};
+  room.votersRemaining = 0;
+  room.eliminatedPlayerId = null;
+
+  // Resetear hasVoted
+  for (const pId in room.players) {
+    room.players[pId].hasVoted = false;
+  }
+
+  // Forzar actualización
+  room.lastActivity = Date.now();
+
+  console.log(`❌ Votación cancelada en ${roomId} por ${room.players[playerId]?.name}`);
+
+  // Notificar a todos los clientes esperando
+  notifyWaitingClients(roomId);
+
+  res.json({
+    success: true,
+    status: 'IN_GAME'
+  });
+});
+
 // 🏷️ POST /api/rooms/:roomId/update_name
 // Actualizar el nombre de un jugador en una sala
 app.post('/api/rooms/:roomId/update_name', (req, res) => {
