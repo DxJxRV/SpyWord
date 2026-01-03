@@ -120,6 +120,16 @@ const activeBanners = []; // Lista de banners
 const recentRoomCreations = new Map(); // userId/sessionId -> {roomId, timestamp}
 
 // ============================================
+// 📊 ESTADÍSTICAS DE LIMPIEZA
+// ============================================
+const cleanupStats = {
+  totalPlayersRemoved: 0,
+  totalRoomsDeleted: 0,
+  lastCleanupAt: Date.now(),
+  cleanupRuns: 0
+};
+
+// ============================================
 // 📛 SISTEMA DE NOMBRES ALEATORIOS
 // ============================================
 const nouns = []; // Sustantivos para nombres
@@ -168,18 +178,20 @@ function generateRoomId() {
 // Función para limpiar jugadores inactivos (más de 10 segundos sin actividad)
 function cleanInactivePlayers(room) {
   const now = Date.now();
-  const INACTIVE_THRESHOLD = 50 * 1000; // 50 segundos
+  const INACTIVE_THRESHOLD = 30 * 1000; // 30 segundos (optimizado)
 
   const activePlayerIds = [];
   const inactivePlayers = [];
 
   for (const [playerId, playerData] of Object.entries(room.players)) {
-    if (now - playerData.lastSeen < INACTIVE_THRESHOLD) {
+    const timeSinceLastSeen = now - playerData.lastSeen;
+    if (timeSinceLastSeen < INACTIVE_THRESHOLD) {
       activePlayerIds.push(playerId);
     } else {
       inactivePlayers.push(playerId);
+      const inactiveSeconds = Math.floor(timeSinceLastSeen / 1000);
       delete room.players[playerId];
-      console.log(`🗑️ Jugador inactivo eliminado: ${playerId}`);
+      console.log(`🗑️ Jugador inactivo eliminado: ${playerId} (${playerData.name}) - Inactivo por ${inactiveSeconds}s`);
     }
   }
 
@@ -206,18 +218,62 @@ function getActivePlayers(room) {
   return Object.keys(room.players);
 }
 
-// Limpiar partidas inactivas después de 15 minutos
+// Limpiar partidas inactivas después de 5 minutos (optimizado)
 setInterval(() => {
   const now = Date.now();
-  const fifteenMinutes = 15 * 60 * 1000;
+  const fiveMinutes = 5 * 60 * 1000; // Reducido de 15min a 5min
 
   for (const roomId in rooms) {
-    if (now - rooms[roomId].lastActivity > fifteenMinutes) {
+    if (now - rooms[roomId].lastActivity > fiveMinutes) {
       console.log(`🧹 Limpiando sala inactiva: ${roomId}`);
+      delete publicRooms[roomId]; // Limpiar de salas públicas también
+      delete waitingClients[roomId]; // Limpiar clientes esperando
       delete rooms[roomId];
     }
   }
 }, 60 * 1000); // Revisar cada minuto
+
+// 🔄 Worker proactivo de limpieza (cada 30 segundos)
+// Limpia jugadores inactivos y salas vacías de forma agresiva
+setInterval(() => {
+  let totalPlayersRemoved = 0;
+  let totalRoomsDeleted = 0;
+
+  for (const roomId in rooms) {
+    const room = rooms[roomId];
+    const playersBefore = Object.keys(room.players).length;
+
+    // Limpiar jugadores inactivos
+    cleanInactivePlayers(room);
+
+    const playersAfter = Object.keys(room.players).length;
+    const playersRemoved = playersBefore - playersAfter;
+    totalPlayersRemoved += playersRemoved;
+
+    if (playersRemoved > 0) {
+      console.log(`🧹 [WORKER] Limpiados ${playersRemoved} jugadores inactivos de ${roomId}`);
+    }
+
+    // Si la sala quedó vacía, eliminarla inmediatamente
+    if (playersAfter === 0) {
+      console.log(`🗑️ [WORKER] Sala vacía eliminada: ${roomId}`);
+      delete publicRooms[roomId];
+      delete waitingClients[roomId];
+      delete rooms[roomId];
+      totalRoomsDeleted++;
+    }
+  }
+
+  // Actualizar estadísticas globales
+  cleanupStats.totalPlayersRemoved += totalPlayersRemoved;
+  cleanupStats.totalRoomsDeleted += totalRoomsDeleted;
+  cleanupStats.lastCleanupAt = Date.now();
+  cleanupStats.cleanupRuns++;
+
+  if (totalPlayersRemoved > 0 || totalRoomsDeleted > 0) {
+    console.log(`📊 [WORKER] Limpieza completada: ${totalPlayersRemoved} jugadores, ${totalRoomsDeleted} salas (Total: ${cleanupStats.totalPlayersRemoved} jugadores, ${cleanupStats.totalRoomsDeleted} salas)`);
+  }
+}, 30 * 1000); // Cada 30 segundos
 
 // ➕ POST /api/rooms/create
 app.post('/api/rooms/create', checkAuth, async (req, res) => {
@@ -466,6 +522,61 @@ app.post('/api/rooms/:roomId/join', checkAuth, async (req, res) => {
     round: room.round,
     playerName: playerName.trim()
   });
+});
+
+// 🚪 POST /api/rooms/:roomId/leave - Salir explícitamente de una sala
+app.post('/api/rooms/:roomId/leave', (req, res) => {
+  const { roomId } = req.params;
+  const playerId = req.cookies.sid;
+
+  if (!rooms[roomId]) {
+    return res.status(404).json({ error: 'Sala no encontrada' });
+  }
+
+  if (!playerId || !rooms[roomId].players[playerId]) {
+    return res.status(400).json({ error: 'No estás en esta sala' });
+  }
+
+  const room = rooms[roomId];
+  const playerName = room.players[playerId]?.name || 'Jugador';
+
+  // Eliminar jugador de la sala
+  delete room.players[playerId];
+  console.log(`🚪 Jugador salió explícitamente de ${roomId}: ${playerId} (${playerName})`);
+
+  // Si era el admin, transferir admin a otro jugador
+  if (room.adminId === playerId) {
+    const remainingPlayers = Object.keys(room.players);
+    if (remainingPlayers.length > 0) {
+      room.adminId = remainingPlayers[0];
+      console.log(`👑 Nuevo admin asignado (por salida): ${room.adminId}`);
+
+      // Resetear el voice host peer ID si el admin era el host
+      if (room.voiceHostPeerId) {
+        room.voiceHostPeerId = null;
+        console.log(`🎤 Voice host reseteado por salida del admin`);
+      }
+    } else {
+      // Última persona salió, marcar sala para limpieza inmediata
+      console.log(`🧹 Sala vacía después de salida: ${roomId}`);
+      delete publicRooms[roomId];
+      delete rooms[roomId];
+      delete waitingClients[roomId]; // Limpiar clientes esperando
+
+      return res.json({ success: true, roomDeleted: true });
+    }
+  }
+
+  // Actualizar actividad
+  room.lastActivity = Date.now();
+
+  // Notificar a otros clientes del cambio
+  notifyWaitingClients(roomId);
+
+  // Limpiar cookie
+  res.clearCookie('sid');
+
+  res.json({ success: true, roomDeleted: false });
 });
 
 // 🔁 POST /api/rooms/:roomId/restart
@@ -1192,11 +1303,12 @@ app.post('/api/rooms/:roomId/set-public', (req, res) => {
 // 🌐 GET /api/matchmaking/public-rooms
 // Listar salas públicas y salas solicitando jugadores
 app.get('/api/matchmaking/public-rooms', (req, res) => {
-  const availableRooms = [];
+  try {
+    const availableRooms = [];
 
-  // 1. Limpiar y agregar salas públicas
-  for (const roomId in publicRooms) {
-    const room = rooms[roomId];
+    // 1. Limpiar y agregar salas públicas
+    for (const roomId in publicRooms) {
+      const room = rooms[roomId];
 
     // Limpiar si la sala no existe o está vacía
     if (!room || Object.keys(room.players).length === 0) {
@@ -1280,6 +1392,10 @@ app.get('/api/matchmaking/public-rooms', (req, res) => {
   filteredRooms.sort((a, b) => b.createdAt - a.createdAt);
 
   res.json({ rooms: filteredRooms });
+  } catch (error) {
+    console.error('❌ Error al obtener salas públicas:', error);
+    res.status(500).json({ error: 'Error al obtener salas públicas', rooms: [] });
+  }
 });
 
 // 📡 GET /api/rooms/:roomId/state
@@ -1489,8 +1605,10 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
     if (hasResponded) return;
     hasResponded = true;
 
-    // Remover este cliente de la lista de espera
-    waitingClients[roomId] = waitingClients[roomId].filter(client => client !== clientData);
+    // Remover este cliente de la lista de espera (si la sala todavía existe)
+    if (waitingClients[roomId]) {
+      waitingClients[roomId] = waitingClients[roomId].filter(client => client !== clientData);
+    }
 
     clearInterval(interval);
     await sendState(unchanged);
@@ -1529,7 +1647,10 @@ app.get('/api/rooms/:roomId/state', checkAuth, async (req, res) => {
   req.on('close', () => {
     if (!hasResponded) {
       console.log(`🔌 [DISCONNECT] Cliente desconectado de ${roomId}`);
-      waitingClients[roomId] = waitingClients[roomId].filter(client => client !== clientData);
+      // Solo limpiar si la sala todavía existe
+      if (waitingClients[roomId]) {
+        waitingClients[roomId] = waitingClients[roomId].filter(client => client !== clientData);
+      }
       clearInterval(interval);
     }
   });
@@ -1960,6 +2081,15 @@ app.get('/api/admin/dashboard', async (req, res) => {
       },
       roulette: {
         recentSpins
+      },
+      cleanup: {
+        totalPlayersRemoved: cleanupStats.totalPlayersRemoved,
+        totalRoomsDeleted: cleanupStats.totalRoomsDeleted,
+        lastCleanupAt: new Date(cleanupStats.lastCleanupAt).toISOString(),
+        cleanupRuns: cleanupStats.cleanupRuns,
+        uptimeMinutes: Math.floor(uptime / 60),
+        avgPlayersRemovedPerRun: cleanupStats.cleanupRuns > 0 ? (cleanupStats.totalPlayersRemoved / cleanupStats.cleanupRuns).toFixed(2) : 0,
+        avgRoomsDeletedPerRun: cleanupStats.cleanupRuns > 0 ? (cleanupStats.totalRoomsDeleted / cleanupStats.cleanupRuns).toFixed(2) : 0
       }
     });
   } catch (error) {

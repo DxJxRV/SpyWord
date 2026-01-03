@@ -207,6 +207,7 @@ export default function Room() {
         if (res.data.kicked) {
           console.log("🚫 [POLL] Jugador eliminado de la sala → redirigiendo a home");
           toast.error("Has sido eliminado de la sala");
+          cleanupVoice(); // Limpiar voz antes de salir
           navigate("/");
           return;
         }
@@ -692,18 +693,48 @@ export default function Room() {
     }
   }, [isAdmin, myId, players, voiceEnabled, voiceHostId]);
 
+  // Función para salir de la sala de forma limpia
+  const leaveRoom = async () => {
+    try {
+      await api.post(`/rooms/${roomId}/leave`);
+      console.log('✅ Salida de sala confirmada');
+    } catch (error) {
+      console.error('❌ Error al salir de la sala:', error);
+    }
+  };
+
   // Efecto: Cleanup al desmontar componente o salir de la sala
+  // Usamos un ref para evitar que StrictMode cause doble-llamada en desarrollo
+  const hasJoinedRef = useRef(false);
+
   useEffect(() => {
+    // Marcar que nos unimos a la sala después de que el componente esté estable
+    const timer = setTimeout(() => {
+      hasJoinedRef.current = true;
+    }, 1000);
+
     return () => {
+      clearTimeout(timer);
       cleanupVoice();
+
+      // Solo llamar leaveRoom si realmente nos unimos a la sala (evita StrictMode double-mount)
+      if (hasJoinedRef.current) {
+        leaveRoom();
+      }
     };
-  }, []);
+  }, [roomId]);
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-6 pt-20">
         <h1 className="text-2xl font-bold mb-4 text-red-400">❌ {error}</h1>
-        <button onClick={() => navigate("/")} className="bg-white/20 px-6 py-3 rounded-lg hover:bg-white/30 transition-all">
+        <button
+          onClick={async () => {
+            await leaveRoom();
+            navigate("/");
+          }}
+          className="bg-white/20 px-6 py-3 rounded-lg hover:bg-white/30 transition-all"
+        >
           🔙 Volver al inicio
         </button>
       </div>
@@ -734,7 +765,10 @@ export default function Room() {
 
           {/* Botón salir */}
           <button
-            onClick={() => navigate('/')}
+            onClick={async () => {
+              await leaveRoom();
+              navigate('/');
+            }}
             className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 text-sm font-medium"
           >
             <span>✕</span>
