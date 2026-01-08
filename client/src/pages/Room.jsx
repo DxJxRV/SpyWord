@@ -1107,12 +1107,12 @@ export default function Room() {
                       <button
                         data-tutorial="add-friends-button"
                         onClick={() => setShowInviteOptions(!showInviteOptions)}
-                        className="w-12 h-12 rounded-full bg-gray-800/50 border-2 border-dashed border-gray-600 hover:border-purple-500 hover:bg-gray-700/50 flex items-center justify-center text-gray-400 hover:text-white shadow-lg transition-all active:scale-95 relative"
+                        className="w-12 h-12 rounded-full bg-purple-500/20 border-2 border-dashed border-purple-500 hover:border-purple-400 hover:bg-purple-500/30 flex items-center justify-center text-purple-400 hover:text-purple-300 shadow-lg transition-all active:scale-95 relative"
                       >
                         <UserPlus size={20} className="absolute" />
                       </button>
 
-                      <span className="text-[10px] text-gray-300 text-center">
+                      <span className="text-[10px] text-purple-300 text-center">
                         Amigos
                       </span>
 
@@ -1150,8 +1150,8 @@ export default function Room() {
                       )}
                     </div>
 
-                    {/* Burbuja de Solicitar jugador (solo admin) */}
-                    {isAdmin && (
+                    {/* Burbuja de Solicitar jugador - OCULTA */}
+                    {false && isAdmin && (
                       <div className="relative flex flex-col items-center gap-1">
                         <button
                           onClick={handleRequestPlayer}
@@ -1183,17 +1183,17 @@ export default function Room() {
                         {roomIsPublic ? 'Pública' : 'Privada'}
                       </span>
                     )}
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 text-purple-400">
                       <UserPlus size={10} />
                       Amigos: Invita con QR/Link
                     </span>
-                    {isAdmin && (
+                    {false && isAdmin && (
                       <span className="text-purple-400 flex items-center gap-1">
                         <Users size={10} />
                         Solicitar: Busca jugadores (máx 10)
                       </span>
                     )}
-                    {isAdmin && roomRequestedPlayers > 0 && (
+                    {false && isAdmin && roomRequestedPlayers > 0 && (
                       <span className="text-red-400 flex items-center gap-1">
                         <X size={10} />
                         Click para cancelar

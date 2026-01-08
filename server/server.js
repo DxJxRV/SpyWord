@@ -178,7 +178,7 @@ function generateRoomId() {
 // Función para limpiar jugadores inactivos (más de 10 segundos sin actividad)
 function cleanInactivePlayers(room) {
   const now = Date.now();
-  const INACTIVE_THRESHOLD = 30 * 1000; // 30 segundos (optimizado)
+  const INACTIVE_THRESHOLD = 90 * 1000; // 90 segundos (mayor que long polling de 30s)
 
   const activePlayerIds = [];
   const inactivePlayers = [];
