@@ -446,7 +446,12 @@ export default function PassAndPlay() {
   };
 
   const selectPlayer = (playerIndex) => {
-    if (!votingEnabled) return;
+    // Si es el primer click y votingEnabled es false, activarlo automáticamente
+    if (!votingEnabled) {
+      setVotingEnabled(true);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }
+
     setSelectedPlayer(playerIndex);
     if (navigator.vibrate) navigator.vibrate(20);
   };
@@ -458,11 +463,21 @@ export default function PassAndPlay() {
   };
 
   const skipVote = () => {
-    setVotingMode(false);
+    // Solo resetear la votación pero mantener en Sala de Guerra
     setVotingEnabled(false);
     setSelectedPlayer(null);
+
+    // Elegir nuevo speaker aleatorio
+    const alivePlayersList = alivePlayers.filter(p => p.isAlive);
+    if (alivePlayersList.length > 0) {
+      const randomSpeaker = alivePlayersList[Math.floor(Math.random() * alivePlayersList.length)];
+      setSpeakerIndex(randomSpeaker.index);
+    }
+
+    // Resetear timer para nueva discusión
     setDiscussionTimer(120);
-    setSpeakerIndex(null);
+
+    if (navigator.vibrate) navigator.vibrate(100);
   };
 
   const resetGame = () => {
@@ -720,17 +735,15 @@ export default function PassAndPlay() {
             </div>
           </div>
 
-          {/* Botón EMPEZAR fijo en el bottom */}
-          <div className="fixed bottom-0 left-0 right-0 pt-6 pb-4 px-4 bg-gradient-to-t from-gray-950 via-gray-950/95 to-transparent z-40">
-            <div className="max-w-lg mx-auto">
-              <button
-                onClick={startGame}
-                className="pnp-start-button w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/50 animate-breathe"
-              >
-                <Play size={28} />
-                <span>EMPEZAR</span>
-              </button>
-            </div>
+          {/* Botón EMPEZAR */}
+          <div className="mt-8">
+            <button
+              onClick={startGame}
+              className="pnp-start-button w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/50 animate-breathe"
+            >
+              <Play size={28} />
+              <span>EMPEZAR</span>
+            </button>
           </div>
 
           {/* Banner Publicitario */}
@@ -1227,14 +1240,14 @@ export default function PassAndPlay() {
                     <button
                       key={player.index}
                       onClick={() => selectPlayer(player.index)}
-                      disabled={!isAlive || !votingEnabled}
+                      disabled={!isAlive}
                       className={`
                         relative aspect-square rounded-xl p-3 transition-all active:scale-95
                         flex flex-col items-center justify-center gap-2
                         ${!isAlive ? 'player-card-dead cursor-not-allowed' : ''}
                         ${isSelected ? 'player-card-selected' : 'bg-gradient-to-br from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800'}
                         ${isSpeaker ? 'speaker-card border-2 border-amber-500' : 'border border-gray-700'}
-                        ${votingEnabled && isAlive ? 'cursor-pointer' : 'cursor-default'}
+                        ${isAlive ? 'cursor-pointer' : 'cursor-default'}
                       `}
                     >
                       {/* Emoji del jugador */}
@@ -1274,47 +1287,30 @@ export default function PassAndPlay() {
             </div>
 
             {/* FOOTER: Acciones */}
-            <div className="space-y-3 pb-safe">
-              {!votingEnabled ? (
-                // Modo Debate - Botón fijo en el bottom
-                <div className="fixed bottom-0 left-0 right-0 pt-6 pb-4 px-4 bg-gradient-to-t from-gray-950 via-gray-950/95 to-transparent z-40">
-                  <div className="max-w-2xl mx-auto">
-                    <button
-                      onClick={enableVoting}
-                      className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 px-6 py-4 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-purple-500/50"
-                    >
-                      <span>🗳️</span>
-                      <span>ABRIR VOTACIONES</span>
-                    </button>
-                  </div>
-                </div>
+            <div className="space-y-3 pb-safe mt-6">
+              {/* Botones de votación (se activan automáticamente al seleccionar) */}
+              {selectedPlayer !== null ? (
+                <button
+                  onClick={confirmVote}
+                  className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-red-500/30 animate-pulse"
+                >
+                  <span>⚠️</span>
+                  <span>CONFIRMAR VOTO CONTRA {playerAvatars[selectedPlayer]} J{selectedPlayer + 1}</span>
+                </button>
               ) : (
-                // Modo Votación
-                <>
-                  {selectedPlayer !== null ? (
-                    <button
-                      onClick={confirmVote}
-                      className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-6 py-5 rounded-xl text-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-red-500/30 animate-pulse"
-                    >
-                      <span>⚠️</span>
-                      <span>CONFIRMAR VOTO CONTRA {playerAvatars[selectedPlayer]} J{selectedPlayer + 1}</span>
-                    </button>
-                  ) : (
-                    <div className="w-full bg-gray-800/50 border-2 border-dashed border-gray-600 px-6 py-5 rounded-xl text-center">
-                      <p className="text-gray-400 font-semibold">
-                        👆 Selecciona un jugador para votar
-                      </p>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={skipVote}
-                    className="w-full bg-gray-700 hover:bg-gray-600 px-4 py-3 rounded-lg transition-all text-sm font-semibold"
-                  >
-                    Saltar votación
-                  </button>
-                </>
+                <div className="w-full bg-gray-800/50 border-2 border-dashed border-gray-600 px-6 py-5 rounded-xl text-center">
+                  <p className="text-gray-400 font-semibold">
+                    👆 Selecciona un jugador para votar
+                  </p>
+                </div>
               )}
+
+              <button
+                onClick={skipVote}
+                className="w-full bg-gray-700 hover:bg-gray-600 px-4 py-3 rounded-lg transition-all text-sm font-semibold"
+              >
+                🔄 Resetear y volver a discutir
+              </button>
 
               <button
                 onClick={resetGame}

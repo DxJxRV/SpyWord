@@ -18,6 +18,7 @@ import FullscreenButton from "./components/FullscreenButton";
 import Footer from "./components/Footer";
 import PremiumTab from "./components/PremiumTab";
 import RouletteModal from "./components/RouletteModal";
+import BottomAdBanner from "./components/BottomAdBanner";
 import { TutorialProvider } from "./contexts/TutorialContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { getUserName, setUserName as saveUserName, initializeUserName } from "./utils/nameGenerator";
@@ -225,6 +226,9 @@ export default function App() {
 
           {/* 🔹 Footer condicional */}
           <ConditionalFooter />
+
+          {/* 🔹 Banner de anuncios inferior (global) */}
+          <BottomAdBanner />
           </div>
         </TutorialProvider>
       </AuthProvider>
