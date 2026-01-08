@@ -27,7 +27,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border-t border-purple-500/20 mt-auto pb-28">
+    <footer className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border-t border-purple-500/20 mt-auto pb-20">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Blog Section */}
         <div className="mb-8 pb-8 border-b border-purple-500/20">
